@@ -18,7 +18,7 @@ function formatMem() {
 export default async function ({ reply, sock, from }) {
     const start = performance.now();
     const mem = formatMem();
-    reply(`🏓 Pong!\n\n•Latency:\n${(performance.now() - start).toFixed(4)}ms\n\n•RAM:\n  Total: ${mem.total}\n  Free: ${mem.free}\n  Used: ${mem.used} (${mem.percentUsed})`);
+    reply(`🏓 Pong!\n\n•Latency:\n  ${(performance.now() - start).toFixed(4)}ms\n\n•RAM:\n  Total: ${mem.total}\n  Free: ${mem.free}\n  Used: ${mem.used} (${mem.percentUsed})`);
 }
 
 // Contoh plugin lain:
