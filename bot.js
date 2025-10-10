@@ -151,7 +151,7 @@ const connect = async () => {
         if (!isGroup && !m.key.fromMe) return;
         if (
             isGroup &&
-            !m.key.participant === (await sock.user.lid.split(":")[0]) + "@lid"
+            !m.key.participant === sock.user.lid.split(":")[0] + "@lid"
         )
             return;
 
