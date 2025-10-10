@@ -1,8 +1,8 @@
-// plugins/ping.js
+import { performance } from "perf_hooks";
 
 export default async function ({ reply, sock, from }) {
-    const start = Date.now();
-    reply(`🏓 Pong!\nLatency: ${Date.now() - start}ms`);
+    const start = performance.now();
+    reply(`🏓 Pong!\nLatency: ${(performance.now() - start).toFixed(4)}ms`);
 }
 
 // Contoh plugin lain:
