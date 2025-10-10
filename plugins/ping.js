@@ -21,7 +21,7 @@ export default async function ({ reply, sock, from }) {
     const speed = end - start;
     const mem = formatMem();
     reply(
-        `🏓 Pong!\n\n•Latency:\n  ${start.toFixed(4)}ms\n\n•RAM:\n  Total: ${
+        `🏓 Pong!\n\n•Latency:\n  ${speed.toFixed(4)}ms\n\n•RAM:\n  Total: ${
             mem.total
         }\n  Free: ${mem.free}\n  Used: ${mem.used} (${mem.percentUsed})`
     );
