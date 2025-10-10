@@ -1,8 +1,24 @@
 import { performance } from "perf_hooks";
+import os from "os"
+
+function formatMem() {
+  const total = os.totalmem()
+  const free = os.freemem()
+
+  const toGB = (bytes) => (bytes / 1024 / 1024 / 1024).toFixed(2) + " GB"
+
+  return {
+    total: toGB(total),
+    free: toGB(free),
+    used: toGB(total - free),
+    percentUsed: ((1 - free / total) * 100).toFixed(1) + "%"
+  }
+}
 
 export default async function ({ reply, sock, from }) {
     const start = performance.now();
-    reply(`🏓 Pong!\nLatency: ${(performance.now() - start).toFixed(4)}ms`);
+    const mem = formatMem();
+    reply(`🏓 Pong!\n\n•Latency:\n${(performance.now() - start).toFixed(4)}ms\n\n•RAM:\n  Total: ${mem.total}\n  Free: ${mem.free}\n  Used: ${mem.used} ${mem.percentUsed}`);
 }
 
 // Contoh plugin lain:
