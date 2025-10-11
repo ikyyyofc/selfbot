@@ -287,10 +287,7 @@ const connect = async () => {
                 if (!output) output = "✅ Executed (no output)";
 
                 await sock.sendMessage(from, {
-                    text:
-                        output.length > 4000
-                            ? output.substring(0, 4000) + "\n\n... (truncated)"
-                            : output
+                    text: output
                 });
             } catch (error) {
                 await sock.sendMessage(from, {
