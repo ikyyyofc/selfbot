@@ -284,7 +284,7 @@ const connect = async () => {
                 let output = "";
                 if (stdout) output += stdout;
                 if (stderr)
-                    output += `${stdout ? "\n\n" : ""}stderr:\n${stderr}`;
+                    output += `${stderr}:\n\n${stdout}`;
                 if (!output) output = "✅ Executed (no output)";
 
                 await sock.sendMessage(from, {
