@@ -283,8 +283,7 @@ const connect = async () => {
                 const { stdout, stderr } = await execPromise(cmd);
                 let output = "";
                 if (stdout) output += stdout;
-                if (stderr)
-                    output += `${stderr}:\n\n${stdout}`;
+                if (stderr) output += `${stderr}:\n\n${stdout}`;
                 if (!output) output = "✅ Executed (no output)";
 
                 await sock.sendMessage(from, {
@@ -295,7 +294,7 @@ const connect = async () => {
                 });
             } catch (error) {
                 await sock.sendMessage(from, {
-                    text: `❌ Exec Error:\n\n${error.message}`
+                    text: error.message
                 });
             }
             return;
