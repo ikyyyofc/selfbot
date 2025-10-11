@@ -1,8 +1,7 @@
 import fs from "fs";
+import path from "path";
 import { writeFile } from "fs/promises";
 import { fileTypeFromBuffer } from "file-type";
-import { tmpdir } from "os";
-import path from "path";
 import { Sticker, StickerTypes } from "wa-sticker-formatter";
 
 export default async function ({ sock, from, args, text, m, fileBuffer, reply }) {
@@ -14,7 +13,12 @@ export default async function ({ sock, from, args, text, m, fileBuffer, reply })
         const type = await fileTypeFromBuffer(fileBuffer);
         if (!type) return reply("❌ Tidak dapat mendeteksi jenis file.");
 
-        const tempFile = path.join(tmpdir(), `sticker-src.${type.ext}`);
+        // Pastikan folder temp ada
+        const tempDir = path.join(process.cwd(), "temp");
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+
+        // Simpan file sementara di ./temp/
+        const tempFile = path.join(tempDir, `sticker-src.${type.ext}`);
         await writeFile(tempFile, fileBuffer);
 
         // Buat stiker
@@ -31,7 +35,7 @@ export default async function ({ sock, from, args, text, m, fileBuffer, reply })
             sticker: stickerBuffer
         }, { quoted: m });
 
-        // Hapus file sementara
+        // Hapus file sementara setelah selesai
         fs.unlinkSync(tempFile);
     } catch (err) {
         console.error(err);
