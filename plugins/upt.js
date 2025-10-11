@@ -22,6 +22,7 @@ export default async function ({ reply }) {
       process.exit(0);
     } else {
       // Tidak ada update, tidak perlu melakukan apa pun
+      reply("🟢 Repository sudah versi terbaru.");
       console.log("🟢 Repository sudah versi terbaru.");
     }
   } catch (err) {
