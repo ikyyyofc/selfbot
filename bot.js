@@ -208,7 +208,7 @@ const connect = async () => {
                 isGroup
             );
             const output = util.inspect(result, { depth: 2 });
-            await sock.sendMessage(from, { text: `✅ Eval:\n\n${output}` });
+            await sock.sendMessage(from, { text: output });
         } catch (error) {
             await sock.sendMessage(from, {
                 text: `❌ Eval Error:\n\n${error.message}`
