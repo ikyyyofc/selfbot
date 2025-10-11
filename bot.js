@@ -261,7 +261,7 @@ const connect = async () => {
                 await sock.sendMessage(from, { text: output });
             } catch (error) {
                 await sock.sendMessage(from, {
-                    text: `❌ Eval Error:\n\n${error.message}`
+                    text: error.message
                 });
             }
             return;
