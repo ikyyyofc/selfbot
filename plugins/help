@@ -1,4 +1,3 @@
-Contoh plugin lain:
 export default async function ({ reply, args, text, fileBuffer }) {
   await reply(`Test command`);
 
