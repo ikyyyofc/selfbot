@@ -310,6 +310,18 @@ const connect = async () => {
 
         // Plugin execution
         if (plugins.has(command)) {
+            // Kirim reaksi "wait" (⏳)
+            try {
+                await sock.sendMessage(from, {
+                    react: {
+                        text: "⏳",
+                        key: m.key
+                    }
+                });
+            } catch (e) {
+                console.error(colors.red("❌ Failed to send reaction:"), e.message);
+            }
+
             try {
                 const execute = plugins.get(command);
 
@@ -381,6 +393,18 @@ const connect = async () => {
                 await sock.sendMessage(from, {
                     text: `❌ Plugin error: ${error.message}`
                 });
+            } finally {
+                // Hapus reaksi (kirim reaksi kosong)
+                try {
+                    await sock.sendMessage(from, {
+                        react: {
+                            text: "",
+                            key: m.key
+                        }
+                    });
+                } catch (e) {
+                    console.error(colors.red("❌ Failed to remove reaction:"), e.message);
+                }
             }
             return;
         }
