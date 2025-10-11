@@ -31,6 +31,10 @@ const MEDIA_STORAGE_DIR = path.join(__dirname, config.SESSION, "media_store");
 const MESSAGE_INDEX_FILE = path.join(MESSAGE_STORAGE_DIR, "index.json");
 const MAX_STORED_MESSAGES = 1000;
 
+// Tracking pesan yang sudah diproses untuk mencegah spam
+const processedUpdates = new Map(); // key: messageId, value: { delete: timestamp, edit: timestamp }
+const UPDATE_COOLDOWN = 5000; // 5 detik cooldown
+
 // Inisialisasi folder storage
 function initStorage() {
     if (!fs.existsSync(MESSAGE_STORAGE_DIR)) {
@@ -612,8 +616,21 @@ const connect = async () => {
                 continue;
             }
 
+            const now = Date.now();
+            const processed = processedUpdates.get(messageId) || { delete: 0, edit: 0 };
+
             // Pesan dihapus
             if (update.update.message === null || update.update.message === undefined) {
+                // Cek apakah sudah diproses dalam cooldown period
+                if (now - processed.delete < UPDATE_COOLDOWN) {
+                    console.log(colors.gray(`⏭️ Skipping duplicate delete: ${messageId}`));
+                    continue;
+                }
+
+                // Update tracking
+                processed.delete = now;
+                processedUpdates.set(messageId, processed);
+
                 console.log(colors.yellow(`🗑️ Message deleted: ${messageId}`));
 
                 const senderName = stored.pushName || stored.sender.split("@")[0];
@@ -672,6 +689,16 @@ const connect = async () => {
 
             // Pesan diedit
             if (update.update.editedMessage) {
+                // Cek apakah sudah diproses dalam cooldown period
+                if (now - processed.edit < UPDATE_COOLDOWN) {
+                    console.log(colors.gray(`⏭️ Skipping duplicate edit: ${messageId}`));
+                    continue;
+                }
+
+                // Update tracking
+                processed.edit = now;
+                processedUpdates.set(messageId, processed);
+
                 console.log(colors.yellow(`✏️ Message edited: ${messageId}`));
 
                 const editedMsg = update.update.editedMessage;
@@ -734,6 +761,14 @@ const connect = async () => {
                 } catch (error) {
                     console.error(colors.red("❌ Failed to send anti-edit:"), error.message);
                 }
+            }
+        }
+
+        // Cleanup tracking lama (lebih dari 1 menit)
+        const oneMinuteAgo = Date.now() - 60000;
+        for (const [id, data] of processedUpdates.entries()) {
+            if (data.delete < oneMinuteAgo && data.edit < oneMinuteAgo) {
+                processedUpdates.delete(id);
             }
         }
     });
