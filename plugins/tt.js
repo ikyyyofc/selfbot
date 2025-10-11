@@ -24,7 +24,7 @@ async function postData(input) {
 }
 
 export default async function ({ sock, from, args, reply }) {
-  if (!args) return reply("⚠️ Kirim link TikTok yang mau diunduh.");
+  if (!args[0]) return reply("⚠️ Kirim link TikTok yang mau diunduh.");
 
   try {
     const result = await postData(args[0]);
