@@ -25,115 +25,36 @@ const config = await import("./config.js").then(m => m.default);
 const plugins = new Map();
 const PLUGIN_DIR = path.join(__dirname, "plugins");
 
-// ===== STORAGE UNTUK ANTI-DELETE/EDIT =====
-const MESSAGE_STORAGE_DIR = path.join(__dirname, config.SESSION, "message_store");
-const MEDIA_STORAGE_DIR = path.join(__dirname, config.SESSION, "media_store");
-const MESSAGE_INDEX_FILE = path.join(MESSAGE_STORAGE_DIR, "index.json");
-const MAX_STORED_MESSAGES = 1000;
+// ===== STORAGE UNTUK ANTI-DELETE & ANTI-EDIT =====
+const MESSAGE_STORE_LIMIT = 1000; // batasi jumlah pesan yang disimpan
+const MESSAGE_STORE_FILE = path.join(config.SESSION, "message_store.json");
 
-// Tracking pesan yang sudah diproses untuk mencegah spam
-const processedUpdates = new Map(); // key: messageId, value: { delete: timestamp, edit: timestamp }
-const UPDATE_COOLDOWN = 5000; // 5 detik cooldown
-
-// Inisialisasi folder storage
-function initStorage() {
-    if (!fs.existsSync(MESSAGE_STORAGE_DIR)) {
-        fs.mkdirSync(MESSAGE_STORAGE_DIR, { recursive: true });
-    }
-    if (!fs.existsSync(MEDIA_STORAGE_DIR)) {
-        fs.mkdirSync(MEDIA_STORAGE_DIR, { recursive: true });
-    }
-    if (!fs.existsSync(MESSAGE_INDEX_FILE)) {
-        fs.writeFileSync(MESSAGE_INDEX_FILE, JSON.stringify({}));
-    }
-}
-
-// Load message index dari file
-function loadMessageIndex() {
+// Load message store dari file
+function loadMessageStore() {
     try {
-        const data = fs.readFileSync(MESSAGE_INDEX_FILE, "utf8");
-        return JSON.parse(data);
-    } catch (error) {
-        return {};
-    }
-}
-
-// Save message index ke file
-function saveMessageIndex(index) {
-    try {
-        fs.writeFileSync(MESSAGE_INDEX_FILE, JSON.stringify(index, null, 2));
-    } catch (error) {
-        console.error(colors.red("❌ Failed to save message index:"), error.message);
-    }
-}
-
-// Simpan pesan ke storage
-async function storeMessage(messageId, data) {
-    try {
-        const index = loadMessageIndex();
-        
-        // Batasi jumlah pesan yang disimpan
-        const keys = Object.keys(index);
-        if (keys.length >= MAX_STORED_MESSAGES) {
-            const oldestKey = keys[0];
-            const oldestData = index[oldestKey];
-            
-            // Hapus file lama
-            const oldMessageFile = path.join(MESSAGE_STORAGE_DIR, `${oldestKey}.json`);
-            if (fs.existsSync(oldMessageFile)) {
-                fs.unlinkSync(oldMessageFile);
-            }
-            if (oldestData.mediaPath && fs.existsSync(oldestData.mediaPath)) {
-                fs.unlinkSync(oldestData.mediaPath);
-            }
-            
-            delete index[oldestKey];
+        if (fs.existsSync(MESSAGE_STORE_FILE)) {
+            const data = fs.readFileSync(MESSAGE_STORE_FILE, "utf8");
+            const parsed = JSON.parse(data);
+            return new Map(Object.entries(parsed));
         }
-
-        // Simpan data pesan
-        const messageFile = path.join(MESSAGE_STORAGE_DIR, `${messageId}.json`);
-        fs.writeFileSync(messageFile, JSON.stringify(data, null, 2));
-        
-        // Update index
-        index[messageId] = {
-            timestamp: data.timestamp,
-            from: data.from,
-            hasMedia: !!data.mediaPath,
-            mediaPath: data.mediaPath
-        };
-        
-        saveMessageIndex(index);
     } catch (error) {
-        console.error(colors.red("❌ Failed to store message:"), error.message);
+        console.error(colors.red("❌ Failed to load message store:"), error.message);
     }
+    return new Map();
 }
 
-// Load pesan dari storage
-function loadMessage(messageId) {
+// Save message store ke file
+function saveMessageStore(messageStore) {
     try {
-        const messageFile = path.join(MESSAGE_STORAGE_DIR, `${messageId}.json`);
-        if (!fs.existsSync(messageFile)) return null;
-        
-        const data = fs.readFileSync(messageFile, "utf8");
-        return JSON.parse(data);
+        const obj = Object.fromEntries(messageStore);
+        fs.writeFileSync(MESSAGE_STORE_FILE, JSON.stringify(obj, null, 2));
     } catch (error) {
-        console.error(colors.red("❌ Failed to load message:"), error.message);
-        return null;
+        console.error(colors.red("❌ Failed to save message store:"), error.message);
     }
 }
 
-// Simpan media ke storage
-async function saveMedia(messageId, buffer, mimeType) {
-    try {
-        const ext = mimeType.split("/")[1].split(";")[0];
-        const mediaPath = path.join(MEDIA_STORAGE_DIR, `${messageId}.${ext}`);
-        fs.writeFileSync(mediaPath, buffer);
-        return mediaPath;
-    } catch (error) {
-        console.error(colors.red("❌ Failed to save media:"), error.message);
-        return null;
-    }
-}
+let messageStore = loadMessageStore();
+console.log(colors.cyan(`💾 Loaded ${messageStore.size} messages from storage`));
 
 async function loadPlugins() {
     try {
@@ -167,7 +88,6 @@ async function loadPlugins() {
 
 const connect = async () => {
     await loadPlugins();
-    initStorage();
     console.log(colors.green("Connecting..."));
 
     const { state, saveCreds } = await useMultiFileAuthState(config.SESSION);
@@ -252,90 +172,31 @@ const connect = async () => {
         }
     });
 
-    // ===== EVENT: PESAN MASUK (SIMPAN KE STORAGE) =====
-    sock.ev.on("messages.upsert", async ({ messages }) => {
+    // ===== EVENT: SIMPAN PESAN UNTUK ANTI-DELETE =====
+    sock.ev.on("messages.upsert", async ({ messages, type }) => {
         const m = messages[0];
         if (!m.message) return;
 
         const from = m.key.remoteJid;
         const messageId = m.key.id;
         
-        // Ekstrak teks dari pesan
-        let text =
-            m.message?.conversation ||
-            m.message?.extendedTextMessage?.text ||
-            m.message?.imageMessage?.caption ||
-            m.message?.videoMessage?.caption ||
-            m.message?.documentMessage?.caption ||
-            m.message?.audioMessage?.caption ||
-            "";
-
-        // Siapkan data untuk disimpan
-        const messageData = {
-            message: m,
-            text: text,
-            from: from,
-            timestamp: Date.now(),
-            sender: m.key.participant || m.key.remoteJid,
-            pushName: m.pushName || "",
-            mediaPath: null,
-            mediaType: null,
-            mimetype: null
-        };
-
-        // Download dan simpan media jika ada
-        try {
-            let mediaBuffer = null;
-            let mimeType = null;
-
-            if (m.message?.imageMessage) {
-                mediaBuffer = await downloadMediaMessage(m, "buffer", {}, {
-                    logger: Pino({ level: "silent" }),
-                    reuploadRequest: sock.updateMediaMessage
-                });
-                mimeType = m.message.imageMessage.mimetype;
-                messageData.mediaType = "image";
-            } else if (m.message?.videoMessage) {
-                mediaBuffer = await downloadMediaMessage(m, "buffer", {}, {
-                    logger: Pino({ level: "silent" }),
-                    reuploadRequest: sock.updateMediaMessage
-                });
-                mimeType = m.message.videoMessage.mimetype;
-                messageData.mediaType = "video";
-            } else if (m.message?.audioMessage) {
-                mediaBuffer = await downloadMediaMessage(m, "buffer", {}, {
-                    logger: Pino({ level: "silent" }),
-                    reuploadRequest: sock.updateMediaMessage
-                });
-                mimeType = m.message.audioMessage.mimetype;
-                messageData.mediaType = "audio";
-            } else if (m.message?.documentMessage) {
-                mediaBuffer = await downloadMediaMessage(m, "buffer", {}, {
-                    logger: Pino({ level: "silent" }),
-                    reuploadRequest: sock.updateMediaMessage
-                });
-                mimeType = m.message.documentMessage.mimetype;
-                messageData.mediaType = "document";
-            } else if (m.message?.stickerMessage) {
-                mediaBuffer = await downloadMediaMessage(m, "buffer", {}, {
-                    logger: Pino({ level: "silent" }),
-                    reuploadRequest: sock.updateMediaMessage
-                });
-                mimeType = m.message.stickerMessage.mimetype || "image/webp";
-                messageData.mediaType = "sticker";
-            }
-
-            if (mediaBuffer && mimeType) {
-                const mediaPath = await saveMedia(messageId, mediaBuffer, mimeType);
-                messageData.mediaPath = mediaPath;
-                messageData.mimetype = mimeType;
-            }
-        } catch (error) {
-            console.error(colors.red("❌ Failed to download media:"), error.message);
+        // Simpan pesan ke storage (dengan limit)
+        if (messageStore.size >= MESSAGE_STORE_LIMIT) {
+            // Hapus pesan terlama
+            const firstKey = messageStore.keys().next().value;
+            messageStore.delete(firstKey);
         }
-
-        // Simpan ke storage
-        await storeMessage(messageId, messageData);
+        
+        messageStore.set(messageId, {
+            message: m,
+            from: from,
+            timestamp: Date.now()
+        });
+        
+        // Simpan ke file secara periodik (setiap 10 pesan)
+        if (messageStore.size % 10 === 0) {
+            saveMessageStore(messageStore);
+        }
 
         const isGroup = from.endsWith("@g.us");
         // Self bot - hanya respon pesan dari bot sendiri
@@ -345,6 +206,14 @@ const connect = async () => {
             m.key.participant !== sock.user.lid.split(":")[0] + "@lid"
         )
             return;
+
+        let text =
+            m.message?.conversation ||
+            m.message?.extendedTextMessage?.text ||
+            m.message?.imageMessage?.caption ||
+            m.message?.videoMessage?.caption ||
+            m.message?.documentMessage?.caption ||
+            "";
 
         text = text.trim();
         if (!text) return;
@@ -374,8 +243,7 @@ const connect = async () => {
                     "colors",
                     "loadPlugins",
                     "isGroup",
-                    "loadMessage",
-                    "storeMessage",
+                    "messageStore",
                     `return (async () => { ${code} })()`
                 );
 
@@ -391,8 +259,7 @@ const connect = async () => {
                     colors,
                     loadPlugins,
                     isGroup,
-                    loadMessage,
-                    storeMessage
+                    messageStore
                 );
                 const output = util.inspect(result, { depth: 2 });
                 await sock.sendMessage(from, { text: output });
@@ -428,8 +295,7 @@ const connect = async () => {
                     "colors",
                     "loadPlugins",
                     "isGroup",
-                    "loadMessage",
-                    "storeMessage",
+                    "messageStore",
                     `return (async () => { return ${code} })()`
                 );
 
@@ -445,8 +311,7 @@ const connect = async () => {
                     colors,
                     loadPlugins,
                     isGroup,
-                    loadMessage,
-                    storeMessage
+                    messageStore
                 );
                 const output = util.inspect(result, { depth: 2 });
                 await sock.sendMessage(from, { text: output });
@@ -601,180 +466,180 @@ const connect = async () => {
         }
     });
 
-    // ===== EVENT: PESAN DI-UPDATE (HAPUS/EDIT) =====
+    // ===== EVENT: ANTI-DELETE & ANTI-EDIT =====
     sock.ev.on("messages.update", async (updates) => {
         for (const update of updates) {
-            const messageId = update.key.id;
-            const stored = loadMessage(messageId);
-
-            if (!stored) continue;
-
-            // Cek apakah dari grup, jika ya, skip
-            const isGroup = stored.from.endsWith("@g.us");
-            if (isGroup) {
-                console.log(colors.gray(`⏭️ Ignoring group message: ${messageId}`));
-                continue;
-            }
-
-            const now = Date.now();
-            const processed = processedUpdates.get(messageId) || { delete: 0, edit: 0 };
-
-            // Pesan dihapus
-            if (update.update.message === null || update.update.message === undefined) {
-                // Cek apakah sudah diproses dalam cooldown period
-                if (now - processed.delete < UPDATE_COOLDOWN) {
-                    console.log(colors.gray(`⏭️ Skipping duplicate delete: ${messageId}`));
-                    continue;
-                }
-
-                // Update tracking
-                processed.delete = now;
-                processedUpdates.set(messageId, processed);
-
-                console.log(colors.yellow(`🗑️ Message deleted: ${messageId}`));
-
-                const senderName = stored.pushName || stored.sender.split("@")[0];
-                const isStatus = stored.from === "status@broadcast";
+            try {
+                const messageId = update.key.id;
+                const from = update.key.remoteJid;
                 
-                // Tentukan target pengiriman
-                let targetJid = stored.from;
-                if (isStatus) {
-                    // Jika dari status, kirim ke nomor bot sendiri
-                    targetJid = sock.user.id.split(":")[0] + "@s.whatsapp.net";
-                }
+                // Cek apakah pesan ada di storage
+                const storedData = messageStore.get(messageId);
+                if (!storedData) continue;
+
+                const storedMessage = storedData.message;
                 
-                let responseText = isStatus 
-                    ? `📸 *Anti-Delete Story/Status*\n\n`
-                    : `🚫 *Anti-Delete Message*\n\n`;
-                responseText += `👤 Sender: ${senderName}\n`;
-                if (isStatus) {
-                    responseText += `📱 Number: ${stored.sender.split("@")[0]}\n`;
-                }
-                responseText += `📝 Deleted ${isStatus ? "status" : "message"}:\n${stored.text || "(no text)"}`;
+                // ===== ANTI-DELETE =====
+                if (update.update?.message === null || update.update?.messageStubType === 68) {
+                    console.log(colors.magenta(`🗑️ Message deleted detected`));
+                    
+                    // Ekstrak info pengirim
+                    const isGroup = from.endsWith("@g.us");
+                    const sender = storedMessage.key.participant || storedMessage.key.remoteJid;
+                    const senderName = storedMessage.pushName || sender.split("@")[0];
+                    
+                    // Ekstrak konten pesan
+                    let deletedContent = storedMessage.message?.conversation ||
+                        storedMessage.message?.extendedTextMessage?.text ||
+                        storedMessage.message?.imageMessage?.caption ||
+                        storedMessage.message?.videoMessage?.caption ||
+                        "";
 
-                try {
-                    // Kirim teks
-                    await sock.sendMessage(targetJid, {
-                        text: responseText
-                    });
-
-                    // Kirim media jika ada
-                    if (stored.mediaPath && fs.existsSync(stored.mediaPath)) {
-                        const mediaBuffer = fs.readFileSync(stored.mediaPath);
-                        
-                        const mediaMessage = {};
-                        if (stored.mediaType === "image") {
-                            mediaMessage.image = mediaBuffer;
-                            mediaMessage.caption = `🖼️ Deleted ${stored.mediaType}${isStatus ? " from status" : ""}`;
-                        } else if (stored.mediaType === "video") {
-                            mediaMessage.video = mediaBuffer;
-                            mediaMessage.caption = `🎥 Deleted ${stored.mediaType}${isStatus ? " from status" : ""}`;
-                        } else if (stored.mediaType === "audio") {
-                            mediaMessage.audio = mediaBuffer;
-                            mediaMessage.mimetype = stored.mimetype || "audio/mpeg";
-                        } else if (stored.mediaType === "document") {
-                            mediaMessage.document = mediaBuffer;
-                            mediaMessage.mimetype = stored.mimetype || "application/octet-stream";
-                            mediaMessage.fileName = `deleted_document_${messageId}`;
-                        } else if (stored.mediaType === "sticker") {
-                            mediaMessage.sticker = mediaBuffer;
-                        }
-
-                        await sock.sendMessage(targetJid, mediaMessage);
+                    // Format pesan anti-delete
+                    let antiDeleteMsg = `🚫 *PESAN DIHAPUS*\n\n`;
+                    antiDeleteMsg += `👤 Pengirim: ${senderName}\n`;
+                    antiDeleteMsg += `📱 Nomor: ${sender.split("@")[0]}\n`;
+                    antiDeleteMsg += `⏰ Waktu: ${new Date(storedMessage.messageTimestamp * 1000).toLocaleString("id-ID")}\n\n`;
+                    
+                    if (deletedContent) {
+                        antiDeleteMsg += `📝 Pesan:\n${deletedContent}`;
                     }
-                } catch (error) {
-                    console.error(colors.red("❌ Failed to send anti-delete:"), error.message);
-                }
-            }
 
-            // Pesan diedit
-            if (update.update.editedMessage) {
-                // Cek apakah sudah diproses dalam cooldown period
-                if (now - processed.edit < UPDATE_COOLDOWN) {
-                    console.log(colors.gray(`⏭️ Skipping duplicate edit: ${messageId}`));
-                    continue;
-                }
+                    // Kirim notifikasi
+                    await sock.sendMessage(from, { text: antiDeleteMsg });
 
-                // Update tracking
-                processed.edit = now;
-                processedUpdates.set(messageId, processed);
-
-                console.log(colors.yellow(`✏️ Message edited: ${messageId}`));
-
-                const editedMsg = update.update.editedMessage;
-                const newText = 
-                    editedMsg?.conversation ||
-                    editedMsg?.extendedTextMessage?.text ||
-                    editedMsg?.imageMessage?.caption ||
-                    editedMsg?.videoMessage?.caption ||
-                    editedMsg?.documentMessage?.caption ||
-                    "";
-
-                const senderName = stored.pushName || stored.sender.split("@")[0];
-                const isStatus = stored.from === "status@broadcast";
-                
-                // Tentukan target pengiriman
-                let targetJid = stored.from;
-                if (isStatus) {
-                    // Jika dari status, kirim ke nomor bot sendiri
-                    targetJid = sock.user.id.split(":")[0] + "@s.whatsapp.net";
-                }
-
-                let responseText = `✏️ *Anti-Edit Message*\n\n`;
-                responseText += `👤 Sender: ${senderName}\n`;
-                if (isStatus) {
-                    responseText += `📱 Number: ${stored.sender.split("@")[0]}\n`;
-                }
-                responseText += `📝 Original message:\n${stored.text || "(no text)"}\n\n`;
-                responseText += `📝 Edited to:\n${newText || "(no text)"}`;
-
-                try {
-                    // Kirim teks perbandingan edit
-                    await sock.sendMessage(targetJid, {
-                        text: responseText
-                    });
-
-                    // Kirim media asli jika ada (sebelum edit)
-                    if (stored.mediaPath && fs.existsSync(stored.mediaPath)) {
-                        const mediaBuffer = fs.readFileSync(stored.mediaPath);
-                        
-                        const mediaMessage = {};
-                        if (stored.mediaType === "image") {
-                            mediaMessage.image = mediaBuffer;
-                            mediaMessage.caption = `🖼️ Original ${stored.mediaType} before edit`;
-                        } else if (stored.mediaType === "video") {
-                            mediaMessage.video = mediaBuffer;
-                            mediaMessage.caption = `🎥 Original ${stored.mediaType} before edit`;
-                        } else if (stored.mediaType === "audio") {
-                            mediaMessage.audio = mediaBuffer;
-                            mediaMessage.mimetype = stored.mimetype || "audio/mpeg";
-                        } else if (stored.mediaType === "document") {
-                            mediaMessage.document = mediaBuffer;
-                            mediaMessage.mimetype = stored.mimetype || "application/octet-stream";
-                            mediaMessage.fileName = `original_document_${messageId}`;
-                        } else if (stored.mediaType === "sticker") {
-                            mediaMessage.sticker = mediaBuffer;
+                    // Jika ada media, kirim juga
+                    if (storedMessage.message?.imageMessage) {
+                        try {
+                            const buffer = await downloadMediaMessage(
+                                storedMessage,
+                                "buffer",
+                                {},
+                                {
+                                    logger: Pino({ level: "silent" }),
+                                    reuploadRequest: sock.updateMediaMessage
+                                }
+                            );
+                            await sock.sendMessage(from, {
+                                image: buffer,
+                                caption: "🖼️ Gambar yang dihapus"
+                            });
+                        } catch (e) {
+                            console.error(colors.red("❌ Failed to resend image:"), e.message);
                         }
-
-                        await sock.sendMessage(targetJid, mediaMessage);
+                    } else if (storedMessage.message?.videoMessage) {
+                        try {
+                            const buffer = await downloadMediaMessage(
+                                storedMessage,
+                                "buffer",
+                                {},
+                                {
+                                    logger: Pino({ level: "silent" }),
+                                    reuploadRequest: sock.updateMediaMessage
+                                }
+                            );
+                            await sock.sendMessage(from, {
+                                video: buffer,
+                                caption: "🎥 Video yang dihapus"
+                            });
+                        } catch (e) {
+                            console.error(colors.red("❌ Failed to resend video:"), e.message);
+                        }
+                    } else if (storedMessage.message?.audioMessage) {
+                        try {
+                            const buffer = await downloadMediaMessage(
+                                storedMessage,
+                                "buffer",
+                                {},
+                                {
+                                    logger: Pino({ level: "silent" }),
+                                    reuploadRequest: sock.updateMediaMessage
+                                }
+                            );
+                            await sock.sendMessage(from, {
+                                audio: buffer,
+                                mimetype: "audio/mp4",
+                                caption: "🎵 Audio yang dihapus"
+                            });
+                        } catch (e) {
+                            console.error(colors.red("❌ Failed to resend audio:"), e.message);
+                        }
+                    } else if (storedMessage.message?.documentMessage) {
+                        try {
+                            const buffer = await downloadMediaMessage(
+                                storedMessage,
+                                "buffer",
+                                {},
+                                {
+                                    logger: Pino({ level: "silent" }),
+                                    reuploadRequest: sock.updateMediaMessage
+                                }
+                            );
+                            await sock.sendMessage(from, {
+                                document: buffer,
+                                mimetype: storedMessage.message.documentMessage.mimetype,
+                                fileName: storedMessage.message.documentMessage.fileName,
+                                caption: "📄 Dokumen yang dihapus"
+                            });
+                        } catch (e) {
+                            console.error(colors.red("❌ Failed to resend document:"), e.message);
+                        }
                     }
-                } catch (error) {
-                    console.error(colors.red("❌ Failed to send anti-edit:"), error.message);
                 }
-            }
-        }
+                
+                // ===== ANTI-EDIT =====
+                if (update.update?.editedMessage) {
+                    console.log(colors.yellow(`✏️ Message edited detected`));
+                    
+                    const isGroup = from.endsWith("@g.us");
+                    const sender = storedMessage.key.participant || storedMessage.key.remoteJid;
+                    const senderName = storedMessage.pushName || sender.split("@")[0];
+                    
+                    // Pesan lama
+                    let oldContent = storedMessage.message?.conversation ||
+                        storedMessage.message?.extendedTextMessage?.text ||
+                        "";
+                    
+                    // Pesan baru
+                    let newContent = update.update.editedMessage?.conversation ||
+                        update.update.editedMessage?.extendedTextMessage?.text ||
+                        "";
 
-        // Cleanup tracking lama (lebih dari 1 menit)
-        const oneMinuteAgo = Date.now() - 60000;
-        for (const [id, data] of processedUpdates.entries()) {
-            if (data.delete < oneMinuteAgo && data.edit < oneMinuteAgo) {
-                processedUpdates.delete(id);
+                    // Format pesan anti-edit
+                    let antiEditMsg = `✏️ *PESAN DIEDIT*\n\n`;
+                    antiEditMsg += `👤 Pengirim: ${senderName}\n`;
+                    antiEditMsg += `📱 Nomor: ${sender.split("@")[0]}\n`;
+                    antiEditMsg += `⏰ Waktu: ${new Date(storedMessage.messageTimestamp * 1000).toLocaleString("id-ID")}\n\n`;
+                    antiEditMsg += `📝 Pesan Lama:\n${oldContent || "(kosong)"}\n\n`;
+                    antiEditMsg += `✨ Pesan Baru:\n${newContent || "(kosong)"}`;
+
+                    await sock.sendMessage(from, { text: antiEditMsg });
+                    
+                    // Update storage dengan pesan baru
+                    messageStore.set(messageId, {
+                        message: {
+                            ...storedMessage,
+                            message: update.update.editedMessage
+                        },
+                        from: from,
+                        timestamp: Date.now()
+                    });
+                    
+                    // Simpan perubahan ke file
+                    saveMessageStore(messageStore);
+                }
+                
+            } catch (error) {
+                console.error(colors.red("❌ Anti-delete/edit error:"), error.message);
             }
         }
     });
 
     process.on("SIGINT", () => {
         console.log(colors.yellow("\n⏹️  Shutting down..."));
+        // Simpan message store sebelum exit
+        saveMessageStore(messageStore);
+        console.log(colors.green("💾 Message store saved"));
         console.log(colors.green("👋 Stopped\n"));
         process.exit(0);
     });
