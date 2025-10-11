@@ -12,7 +12,10 @@ export default async function ({ sock, text, reply }) {
           externalAdReply: {
             title: proses.result.metadata.title,
             body: `${proses.result.metadata.channel}`,
-            thumbnailUrl: proses.result.metadata.cover
+            thumbnailUrl: proses.result.metadata.cover,
+            mediaType: 1,
+            showAdAttribution: false,
+            renderlargerThumbnail: true
           }
         } });
     } catch {}
