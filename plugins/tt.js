@@ -24,10 +24,10 @@ async function postData(input) {
 }
 
 export default async function ({ sock, from, args, text, reply }) {
-  if (!text) return reply("⚠️ Kirim link TikTok yang mau diunduh.");
+  if (!args) return reply("⚠️ Kirim link TikTok yang mau diunduh.");
 
   try {
-    const result = await postData(text);
+    const result = await postData(args[0]);
 
     if (result.code !== 0 || !result.data) {
       return reply("❌ Gagal mengambil data dari TikTok. Pastikan link valid.");
