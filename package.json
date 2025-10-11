@@ -13,6 +13,8 @@
   "description": "",
   "dependencies": {
     "@colors/colors": "latest",
-    "@whiskeysockets/baileys": "latest"
+    "@whiskeysockets/baileys": "latest",
+    "file-type": "latest",
+    "wa-sticker-formatter": "latest"
   }
 }
