@@ -275,7 +275,8 @@ const connect = async () => {
             sender: m.key.participant || m.key.remoteJid,
             pushName: m.pushName || "",
             mediaPath: null,
-            mediaType: null
+            mediaType: null,
+            mimetype: null
         };
 
         // Download dan simpan media jika ada
@@ -311,11 +312,19 @@ const connect = async () => {
                 });
                 mimeType = m.message.documentMessage.mimetype;
                 messageData.mediaType = "document";
+            } else if (m.message?.stickerMessage) {
+                mediaBuffer = await downloadMediaMessage(m, "buffer", {}, {
+                    logger: Pino({ level: "silent" }),
+                    reuploadRequest: sock.updateMediaMessage
+                });
+                mimeType = m.message.stickerMessage.mimetype || "image/webp";
+                messageData.mediaType = "sticker";
             }
 
             if (mediaBuffer && mimeType) {
                 const mediaPath = await saveMedia(messageId, mediaBuffer, mimeType);
                 messageData.mediaPath = mediaPath;
+                messageData.mimetype = mimeType;
             }
         } catch (error) {
             console.error(colors.red("❌ Failed to download media:"), error.message);
@@ -645,11 +654,13 @@ const connect = async () => {
                             mediaMessage.caption = `🎥 Deleted ${stored.mediaType}${isStatus ? " from status" : ""}`;
                         } else if (stored.mediaType === "audio") {
                             mediaMessage.audio = mediaBuffer;
-                            mediaMessage.mimetype = "audio/mpeg";
+                            mediaMessage.mimetype = stored.mimetype || "audio/mpeg";
                         } else if (stored.mediaType === "document") {
                             mediaMessage.document = mediaBuffer;
-                            mediaMessage.mimetype = "application/octet-stream";
+                            mediaMessage.mimetype = stored.mimetype || "application/octet-stream";
                             mediaMessage.fileName = `deleted_document_${messageId}`;
+                        } else if (stored.mediaType === "sticker") {
+                            mediaMessage.sticker = mediaBuffer;
                         }
 
                         await sock.sendMessage(targetJid, mediaMessage);
@@ -663,9 +674,13 @@ const connect = async () => {
             if (update.update.editedMessage) {
                 console.log(colors.yellow(`✏️ Message edited: ${messageId}`));
 
+                const editedMsg = update.update.editedMessage;
                 const newText = 
-                    update.update.editedMessage?.conversation ||
-                    update.update.editedMessage?.extendedTextMessage?.text ||
+                    editedMsg?.conversation ||
+                    editedMsg?.extendedTextMessage?.text ||
+                    editedMsg?.imageMessage?.caption ||
+                    editedMsg?.videoMessage?.caption ||
+                    editedMsg?.documentMessage?.caption ||
                     "";
 
                 const senderName = stored.pushName || stored.sender.split("@")[0];
@@ -683,13 +698,39 @@ const connect = async () => {
                 if (isStatus) {
                     responseText += `📱 Number: ${stored.sender.split("@")[0]}\n`;
                 }
-                responseText += `📝 Original message:\n${stored.text}\n\n`;
-                responseText += `📝 Edited to:\n${newText}`;
+                responseText += `📝 Original message:\n${stored.text || "(no text)"}\n\n`;
+                responseText += `📝 Edited to:\n${newText || "(no text)"}`;
 
                 try {
+                    // Kirim teks perbandingan edit
                     await sock.sendMessage(targetJid, {
                         text: responseText
                     });
+
+                    // Kirim media asli jika ada (sebelum edit)
+                    if (stored.mediaPath && fs.existsSync(stored.mediaPath)) {
+                        const mediaBuffer = fs.readFileSync(stored.mediaPath);
+                        
+                        const mediaMessage = {};
+                        if (stored.mediaType === "image") {
+                            mediaMessage.image = mediaBuffer;
+                            mediaMessage.caption = `🖼️ Original ${stored.mediaType} before edit`;
+                        } else if (stored.mediaType === "video") {
+                            mediaMessage.video = mediaBuffer;
+                            mediaMessage.caption = `🎥 Original ${stored.mediaType} before edit`;
+                        } else if (stored.mediaType === "audio") {
+                            mediaMessage.audio = mediaBuffer;
+                            mediaMessage.mimetype = stored.mimetype || "audio/mpeg";
+                        } else if (stored.mediaType === "document") {
+                            mediaMessage.document = mediaBuffer;
+                            mediaMessage.mimetype = stored.mimetype || "application/octet-stream";
+                            mediaMessage.fileName = `original_document_${messageId}`;
+                        } else if (stored.mediaType === "sticker") {
+                            mediaMessage.sticker = mediaBuffer;
+                        }
+
+                        await sock.sendMessage(targetJid, mediaMessage);
+                    }
                 } catch (error) {
                     console.error(colors.red("❌ Failed to send anti-edit:"), error.message);
                 }
