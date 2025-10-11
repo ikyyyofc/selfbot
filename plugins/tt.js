@@ -23,7 +23,7 @@ async function postData(input) {
   }
 }
 
-export default async function ({ sock, from, args, text, reply }) {
+export default async function ({ sock, from, args, reply }) {
   if (!args) return reply("⚠️ Kirim link TikTok yang mau diunduh.");
 
   try {
