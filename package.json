@@ -15,6 +15,7 @@
     "@colors/colors": "latest",
     "@whiskeysockets/baileys": "latest",
     "file-type": "latest",
+    "node-fetch": "latest",
     "wa-sticker-formatter": "latest"
   }
 }
