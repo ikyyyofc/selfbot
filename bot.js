@@ -142,253 +142,253 @@ const connect = async () => {
     });
 
     sock.ev.on("messages.upsert", async ({ messages }) => {
-    const m = messages[0];
-    if (!m.message) return;
+        const m = messages[0];
+        if (!m.message) return;
 
-    const from = m.key.remoteJid;
-    const isGroup = from.endsWith("@g.us");
-    // Self bot - hanya respon pesan dari bot sendiri
-    if (!isGroup && !m.key.fromMe) return;
-    if (
-        isGroup &&
-        m.key.participant !== sock.user.lid.split(":")[0] + "@lid"
-    )
-        return;
-
-    let text =
-        m.message?.conversation ||
-        m.message?.extendedTextMessage?.text ||
-        m.message?.imageMessage?.caption ||
-        m.message?.videoMessage?.caption ||
-        m.message?.documentMessage?.caption ||
-        "";
-
-    text = text.trim();
-    if (!text) return;
-
-    // ===== PENGECEKAN EVAL/EXEC TANPA PREFIX =====
-    // Eval dengan >
-    if (text.startsWith(">") && !text.startsWith("=>")) {
-        const code = text.slice(1).trim();
-        
-        if (!code) {
-            await sock.sendMessage(from, { text: "No code provided" });
+        const from = m.key.remoteJid;
+        const isGroup = from.endsWith("@g.us");
+        // Self bot - hanya respon pesan dari bot sendiri
+        if (!isGroup && !m.key.fromMe) return;
+        if (
+            isGroup &&
+            m.key.participant !== sock.user.lid.split(":")[0] + "@lid"
+        )
             return;
-        }
 
-        console.log(colors.cyan(`📩 eval`));
+        let text =
+            m.message?.conversation ||
+            m.message?.extendedTextMessage?.text ||
+            m.message?.imageMessage?.caption ||
+            m.message?.videoMessage?.caption ||
+            m.message?.documentMessage?.caption ||
+            "";
 
-        try {
-            const evalFunc = new Function(
-                "sock",
-                "from",
-                "m",
-                "plugins",
-                "config",
-                "fs",
-                "path",
-                "util",
-                "colors",
-                "loadPlugins",
-                "isGroup",
-                `return (async () => { ${code} })()`
-            );
+        text = text.trim();
+        if (!text) return;
 
-            const result = await evalFunc(
-                sock,
-                from,
-                m,
-                plugins,
-                config,
-                fs,
-                path,
-                util,
-                colors,
-                loadPlugins,
-                isGroup
-            );
-            const output = util.inspect(result, { depth: 2 });
-            await sock.sendMessage(from, { text: output });
-        } catch (error) {
-            await sock.sendMessage(from, {
-                text: `❌ Eval Error:\n\n${error.message}`
-            });
-        }
-        return;
-    }
+        // ===== PENGECEKAN EVAL/EXEC TANPA PREFIX =====
+        // Eval dengan >
+        if (text.startsWith(">") && !text.startsWith("=>")) {
+            const code = text.slice(1).trim();
 
-    // Eval dengan return (=>)
-    if (text.startsWith("=>")) {
-        const code = text.slice(2).trim();
-        
-        if (!code) {
-            await sock.sendMessage(from, { text: "No code provided" });
-            return;
-        }
-
-        console.log(colors.cyan(`📩 eval-return`));
-
-        try {
-            const evalFunc = new Function(
-                "sock",
-                "from",
-                "m",
-                "plugins",
-                "config",
-                "fs",
-                "path",
-                "util",
-                "colors",
-                "loadPlugins",
-                "isGroup",
-                `return (async () => { return ${code} })()`
-            );
-
-            const result = await evalFunc(
-                sock,
-                from,
-                m,
-                plugins,
-                config,
-                fs,
-                path,
-                util,
-                colors,
-                loadPlugins,
-                isGroup
-            );
-            const output = util.inspect(result, { depth: 2 });
-            await sock.sendMessage(from, { text: output });
-        } catch (error) {
-            await sock.sendMessage(from, {
-                text: `❌ Eval Error:\n\n${error.message}`
-            });
-        }
-        return;
-    }
-
-    // Exec dengan $
-    if (text.startsWith("$")) {
-        const cmd = text.slice(1).trim();
-        
-        if (!cmd) {
-            await sock.sendMessage(from, { text: "No command provided" });
-            return;
-        }
-
-        console.log(colors.cyan(`📩 exec`));
-
-        try {
-            await sock.sendMessage(from, { text: `⏳ Executing: ${cmd}` });
-            const { stdout, stderr } = await execPromise(cmd);
-            let output = "";
-            if (stdout) output += `stdout:\n${stdout}`;
-            if (stderr)
-                output += `${stdout ? "\n\n" : ""}stderr:\n${stderr}`;
-            if (!output) output = "✅ Executed (no output)";
-
-            await sock.sendMessage(from, {
-                text:
-                    output.length > 4000
-                        ? output.substring(0, 4000) + "\n\n... (truncated)"
-                        : output
-            });
-        } catch (error) {
-            await sock.sendMessage(from, {
-                text: `❌ Exec Error:\n\n${error.message}`
-            });
-        }
-        return;
-    }
-
-    // ===== PENGECEKAN PREFIX UNTUK PLUGIN =====
-    const prefixes = config.PREFIX || ["."];
-    const prefix = prefixes.find(p => text.startsWith(p));
-    if (!prefix) return;
-
-    const args = text.slice(prefix.length).trim().split(/ +/);
-    const command = args.shift()?.toLowerCase();
-    if (!command) return;
-
-    console.log(colors.cyan(`📩 ${command}`));
-
-    // Plugin execution
-    if (plugins.has(command)) {
-        try {
-            const execute = plugins.get(command);
-
-            // Download media if available
-            let fileBuffer = null;
-            const quotedMsg =
-                m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-
-            if (
-                quotedMsg?.imageMessage ||
-                quotedMsg?.videoMessage ||
-                quotedMsg?.documentMessage ||
-                quotedMsg?.audioMessage
-            ) {
-                try {
-                    fileBuffer = await downloadMediaMessage(
-                        { message: quotedMsg },
-                        "buffer",
-                        {},
-                        {
-                            logger: Pino({ level: "silent" }),
-                            reuploadRequest: sock.updateMediaMessage
-                        }
-                    );
-                } catch (e) {}
+            if (!code) {
+                await sock.sendMessage(from, { text: "No code provided" });
+                return;
             }
 
-            if (
-                !fileBuffer &&
-                (m.message?.imageMessage ||
-                    m.message?.videoMessage ||
-                    m.message?.documentMessage ||
-                    m.message?.audioMessage)
-            ) {
-                try {
-                    fileBuffer = await downloadMediaMessage(
-                        m,
-                        "buffer",
-                        {},
-                        {
-                            logger: Pino({ level: "silent" }),
-                            reuploadRequest: sock.updateMediaMessage
-                        }
-                    );
-                } catch (e) {}
+            console.log(colors.cyan(`📩 eval`));
+
+            try {
+                const evalFunc = new Function(
+                    "sock",
+                    "from",
+                    "m",
+                    "plugins",
+                    "config",
+                    "fs",
+                    "path",
+                    "util",
+                    "colors",
+                    "loadPlugins",
+                    "isGroup",
+                    `return (async () => { ${code} })()`
+                );
+
+                const result = await evalFunc(
+                    sock,
+                    from,
+                    m,
+                    plugins,
+                    config,
+                    fs,
+                    path,
+                    util,
+                    colors,
+                    loadPlugins,
+                    isGroup
+                );
+                const output = util.inspect(result, { depth: 2 });
+                await sock.sendMessage(from, { text: output });
+            } catch (error) {
+                await sock.sendMessage(from, {
+                    text: `❌ Eval Error:\n\n${error.message}`
+                });
+            }
+            return;
+        }
+
+        // Eval dengan return (=>)
+        if (text.startsWith("=>")) {
+            const code = text.slice(2).trim();
+
+            if (!code) {
+                await sock.sendMessage(from, { text: "No code provided" });
+                return;
             }
 
-            const context = {
-                sock,
-                from,
-                args,
-                text: args.join(" "),
-                message: m,
-                fileBuffer,
-                reply: async content => {
-                    if (typeof content === "string") {
-                        return await sock.sendMessage(from, {
-                            text: content
-                        });
-                    }
-                    return await sock.sendMessage(from, content);
+            console.log(colors.cyan(`📩 eval-return`));
+
+            try {
+                const evalFunc = new Function(
+                    "sock",
+                    "from",
+                    "m",
+                    "plugins",
+                    "config",
+                    "fs",
+                    "path",
+                    "util",
+                    "colors",
+                    "loadPlugins",
+                    "isGroup",
+                    `return (async () => { return ${code} })()`
+                );
+
+                const result = await evalFunc(
+                    sock,
+                    from,
+                    m,
+                    plugins,
+                    config,
+                    fs,
+                    path,
+                    util,
+                    colors,
+                    loadPlugins,
+                    isGroup
+                );
+                const output = util.inspect(result, { depth: 2 });
+                await sock.sendMessage(from, { text: output });
+            } catch (error) {
+                await sock.sendMessage(from, {
+                    text: `❌ Eval Error:\n\n${error.message}`
+                });
+            }
+            return;
+        }
+
+        // Exec dengan $
+        if (text.startsWith("$")) {
+            const cmd = text.slice(1).trim();
+
+            if (!cmd) {
+                await sock.sendMessage(from, { text: "No command provided" });
+                return;
+            }
+
+            console.log(colors.cyan(`📩 exec`));
+
+            try {
+                await sock.sendMessage(from, { text: `⏳ Executing: ${cmd}` });
+                const { stdout, stderr } = await execPromise(cmd);
+                let output = "";
+                if (stdout) output += stdout;
+                if (stderr)
+                    output += `${stdout ? "\n\n" : ""}stderr:\n${stderr}`;
+                if (!output) output = "✅ Executed (no output)";
+
+                await sock.sendMessage(from, {
+                    text:
+                        output.length > 4000
+                            ? output.substring(0, 4000) + "\n\n... (truncated)"
+                            : output
+                });
+            } catch (error) {
+                await sock.sendMessage(from, {
+                    text: `❌ Exec Error:\n\n${error.message}`
+                });
+            }
+            return;
+        }
+
+        // ===== PENGECEKAN PREFIX UNTUK PLUGIN =====
+        const prefixes = config.PREFIX || ["."];
+        const prefix = prefixes.find(p => text.startsWith(p));
+        if (!prefix) return;
+
+        const args = text.slice(prefix.length).trim().split(/ +/);
+        const command = args.shift()?.toLowerCase();
+        if (!command) return;
+
+        console.log(colors.cyan(`📩 ${command}`));
+
+        // Plugin execution
+        if (plugins.has(command)) {
+            try {
+                const execute = plugins.get(command);
+
+                // Download media if available
+                let fileBuffer = null;
+                const quotedMsg =
+                    m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+
+                if (
+                    quotedMsg?.imageMessage ||
+                    quotedMsg?.videoMessage ||
+                    quotedMsg?.documentMessage ||
+                    quotedMsg?.audioMessage
+                ) {
+                    try {
+                        fileBuffer = await downloadMediaMessage(
+                            { message: quotedMsg },
+                            "buffer",
+                            {},
+                            {
+                                logger: Pino({ level: "silent" }),
+                                reuploadRequest: sock.updateMediaMessage
+                            }
+                        );
+                    } catch (e) {}
                 }
-            };
 
-            await execute(context);
-            console.log(colors.green(`✅ ${command} executed`));
-        } catch (error) {
-            console.error(colors.red(`❌ Plugin error:`), error);
-            await sock.sendMessage(from, {
-                text: `❌ Plugin error: ${error.message}`
-            });
+                if (
+                    !fileBuffer &&
+                    (m.message?.imageMessage ||
+                        m.message?.videoMessage ||
+                        m.message?.documentMessage ||
+                        m.message?.audioMessage)
+                ) {
+                    try {
+                        fileBuffer = await downloadMediaMessage(
+                            m,
+                            "buffer",
+                            {},
+                            {
+                                logger: Pino({ level: "silent" }),
+                                reuploadRequest: sock.updateMediaMessage
+                            }
+                        );
+                    } catch (e) {}
+                }
+
+                const context = {
+                    sock,
+                    from,
+                    args,
+                    text: args.join(" "),
+                    message: m,
+                    fileBuffer,
+                    reply: async content => {
+                        if (typeof content === "string") {
+                            return await sock.sendMessage(from, {
+                                text: content
+                            });
+                        }
+                        return await sock.sendMessage(from, content);
+                    }
+                };
+
+                await execute(context);
+                console.log(colors.green(`✅ ${command} executed`));
+            } catch (error) {
+                console.error(colors.red(`❌ Plugin error:`), error);
+                await sock.sendMessage(from, {
+                    text: `❌ Plugin error: ${error.message}`
+                });
+            }
+            return;
         }
-        return;
-    }
-});
+    });
 
     process.on("SIGINT", () => {
         console.log(colors.yellow("\n⏹️  Shutting down..."));
