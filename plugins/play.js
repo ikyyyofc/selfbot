@@ -27,6 +27,6 @@ export default async function ({ sock, text, reply, m }) {
             { quoted: m }
         );
     } catch {
-      
+      reply("ntahlah error pluginnya")
     }
 }
