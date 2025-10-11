@@ -11,7 +11,8 @@ export default async function ({ sock, text, reply }) {
         reply({ audio: { url: proses.result.downloadUrl }, mimetype: "audio/mpeg", fileName: `${proses.result.metadata.title}.mp3`, contextInfo: {
           externalAdReply: {
             title: proses.result.metadata.title,
-            body: 
+            body: `${proses.result.metadata.channel}`,
+            thumbnailUrl: proses.result.metadata.cover
           }
         } });
     } catch {}
