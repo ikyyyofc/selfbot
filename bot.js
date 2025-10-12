@@ -178,27 +178,28 @@ const connect = async () => {
         if (!m.message) return;
 
         const from = m.key.remoteJid;
+        const isGroup = from.endsWith("@g.us");
         const messageId = m.key.id;
         
-        // Simpan pesan ke storage (dengan limit)
-        if (messageStore.size >= MESSAGE_STORE_LIMIT) {
-            // Hapus pesan terlama
-            const firstKey = messageStore.keys().next().value;
-            messageStore.delete(firstKey);
+        // Simpan pesan ke storage (dengan limit) - hanya untuk private chat
+        if (!isGroup) {
+            if (messageStore.size >= MESSAGE_STORE_LIMIT) {
+                // Hapus pesan terlama
+                const firstKey = messageStore.keys().next().value;
+                messageStore.delete(firstKey);
+            }
+            
+            messageStore.set(messageId, {
+                message: m,
+                from: from,
+                timestamp: Date.now()
+            });
+            
+            // Simpan ke file secara periodik (setiap 10 pesan)
+            if (messageStore.size % 10 === 0) {
+                saveMessageStore(messageStore);
+            }
         }
-        
-        messageStore.set(messageId, {
-            message: m,
-            from: from,
-            timestamp: Date.now()
-        });
-        
-        // Simpan ke file secara periodik (setiap 10 pesan)
-        if (messageStore.size % 10 === 0) {
-            saveMessageStore(messageStore);
-        }
-
-        const isGroup = from.endsWith("@g.us");
         // Self bot - hanya respon pesan dari bot sendiri
         if (!isGroup && !m.key.fromMe) return;
         if (
@@ -472,6 +473,10 @@ const connect = async () => {
             try {
                 const messageId = update.key.id;
                 const from = update.key.remoteJid;
+                const isGroup = from.endsWith("@g.us");
+                
+                // Abaikan pesan dari grup
+                if (isGroup) continue;
                 
                 // Cek apakah pesan ada di storage
                 const storedData = messageStore.get(messageId);
@@ -481,11 +486,10 @@ const connect = async () => {
                 
                 // ===== ANTI-DELETE =====
                 if (update.update?.message === null || update.update?.messageStubType === 68) {
-                    console.log(colors.magenta(`🗑️ Message deleted detected`));
+                    console.log(colors.magenta(`🗑️ Message deleted detected (Private)`));
                     
                     // Ekstrak info pengirim
-                    const isGroup = from.endsWith("@g.us");
-                    const sender = storedMessage.key.participant || storedMessage.key.remoteJid;
+                    const sender = storedMessage.key.remoteJid;
                     const senderName = storedMessage.pushName || sender.split("@")[0];
                     
                     // Ekstrak konten pesan
@@ -589,10 +593,9 @@ const connect = async () => {
                 
                 // ===== ANTI-EDIT =====
                 if (update.update?.editedMessage) {
-                    console.log(colors.yellow(`✏️ Message edited detected`));
+                    console.log(colors.yellow(`✏️ Message edited detected (Private)`));
                     
-                    const isGroup = from.endsWith("@g.us");
-                    const sender = storedMessage.key.participant || storedMessage.key.remoteJid;
+                    const sender = storedMessage.key.remoteJid;
                     const senderName = storedMessage.pushName || sender.split("@")[0];
                     
                     // Pesan lama
