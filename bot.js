@@ -591,8 +591,6 @@ const connect = async () => {
                     }
                 }
                 
-                if (update.update?.message !== null || update.update?.messageStubType !== 68) console.log(update)
-                
                 // ===== ANTI-EDIT =====
                 if (update.update?.editedMessage) {
                     console.log(colors.yellow(`✏️ Message edited detected (Private)`));
