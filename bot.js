@@ -26,10 +26,9 @@ const plugins = new Map();
 const PLUGIN_DIR = path.join(__dirname, "plugins");
 
 // ===== STORAGE UNTUK ANTI-DELETE & ANTI-EDIT =====
-const MESSAGE_STORE_LIMIT = 1000; // batasi jumlah pesan yang disimpan
+const MESSAGE_STORE_LIMIT = 1000;
 const MESSAGE_STORE_FILE = path.join(config.SESSION, "message_store.json");
 
-// Load message store dari file
 function loadMessageStore() {
     try {
         if (fs.existsSync(MESSAGE_STORE_FILE)) {
@@ -43,7 +42,6 @@ function loadMessageStore() {
     return new Map();
 }
 
-// Save message store ke file
 function saveMessageStore(messageStore) {
     try {
         const obj = Object.fromEntries(messageStore);
@@ -109,12 +107,8 @@ const connect = async () => {
     if (!sock.authState.creds.registered) {
         setTimeout(async () => {
             try {
-                const code = await sock.requestPairingCode(
-                    config.PAIRING_NUMBER
-                );
-                console.log(
-                    colors.green(`Pairing Code: `) + colors.yellow(code)
-                );
+                const code = await sock.requestPairingCode(config.PAIRING_NUMBER);
+                console.log(colors.green(`Pairing Code: `) + colors.yellow(code));
             } catch (err) {
                 console.error(`Failed to get pairing code: ${err}`);
             }
@@ -127,9 +121,7 @@ const connect = async () => {
         const { connection, lastDisconnect } = update;
 
         if (connection === "open") {
-            console.log(
-                colors.green("✅ Connected as ") + colors.cyan(sock.user.name)
-            );
+            console.log(colors.green("✅ Connected as ") + colors.cyan(sock.user.name));
         }
 
         if (connection === "close") {
@@ -139,10 +131,7 @@ const connect = async () => {
 
             if (reason === DisconnectReason.loggedOut || statusCode === 401) {
                 console.log(colors.red("❌ Logged out"));
-                fs.rmSync(`./${config.SESSION}`, {
-                    recursive: true,
-                    force: true
-                });
+                fs.rmSync(`./${config.SESSION}`, { recursive: true, force: true });
                 await connect();
                 return;
             }
@@ -150,18 +139,12 @@ const connect = async () => {
             switch (statusCode) {
                 case 403:
                     console.warn(colors.red("⚠️ Account banned"));
-                    fs.rmSync(`./${config.SESSION}`, {
-                        recursive: true,
-                        force: true
-                    });
+                    fs.rmSync(`./${config.SESSION}`, { recursive: true, force: true });
                     await connect();
                     break;
                 case 405:
                     console.warn(colors.yellow("⚠️ Not logged in"));
-                    fs.rmSync(`./${config.SESSION}`, {
-                        recursive: true,
-                        force: true
-                    });
+                    fs.rmSync(`./${config.SESSION}`, { recursive: true, force: true });
                     await connect();
                     break;
                 default:
@@ -172,7 +155,6 @@ const connect = async () => {
         }
     });
 
-    // ===== EVENT: SIMPAN PESAN UNTUK ANTI-DELETE =====
     sock.ev.on("messages.upsert", async ({ messages, type }) => {
         const m = messages[0];
         if (!m.message) return;
@@ -180,9 +162,7 @@ const connect = async () => {
         const from = m.key.remoteJid;
         const messageId = m.key.id;
         
-        // Simpan pesan ke storage (dengan limit)
         if (messageStore.size >= MESSAGE_STORE_LIMIT) {
-            // Hapus pesan terlama
             const firstKey = messageStore.keys().next().value;
             messageStore.delete(firstKey);
         }
@@ -193,19 +173,13 @@ const connect = async () => {
             timestamp: Date.now()
         });
         
-        // Simpan ke file secara periodik (setiap 10 pesan)
         if (messageStore.size % 10 === 0) {
             saveMessageStore(messageStore);
         }
 
         const isGroup = from.endsWith("@g.us");
-        // Self bot - hanya respon pesan dari bot sendiri
         if (!isGroup && !m.key.fromMe) return;
-        if (
-            isGroup &&
-            m.key.participant !== sock.user.lid.split(":")[0] + "@lid"
-        )
-            return;
+        if (isGroup && m.key.participant !== sock.user.lid.split(":")[0] + "@lid") return;
 
         let text =
             m.message?.conversation ||
@@ -218,55 +192,28 @@ const connect = async () => {
         text = text.trim();
         if (!text) return;
 
-        // ===== PENGECEKAN EVAL/EXEC TANPA PREFIX =====
         // Eval dengan >
         if (text.startsWith(">") && !text.startsWith("=>")) {
             const code = text.slice(1).trim();
-
             if (!code) {
                 await sock.sendMessage(from, { text: "No code provided" });
                 return;
             }
-
             console.log(colors.cyan(`📩 eval`));
-
             try {
                 const evalFunc = new Function(
-                    "sock",
-                    "from",
-                    "m",
-                    "plugins",
-                    "config",
-                    "fs",
-                    "path",
-                    "util",
-                    "colors",
-                    "loadPlugins",
-                    "isGroup",
-                    "messageStore",
+                    "sock", "from", "m", "plugins", "config", "fs", "path", 
+                    "util", "colors", "loadPlugins", "isGroup", "messageStore",
                     `return (async () => { ${code} })()`
                 );
-
                 const result = await evalFunc(
-                    sock,
-                    from,
-                    m,
-                    plugins,
-                    config,
-                    fs,
-                    path,
-                    util,
-                    colors,
-                    loadPlugins,
-                    isGroup,
-                    messageStore
+                    sock, from, m, plugins, config, fs, path, 
+                    util, colors, loadPlugins, isGroup, messageStore
                 );
                 const output = util.inspect(result, { depth: 2 });
                 await sock.sendMessage(from, { text: output });
             } catch (error) {
-                await sock.sendMessage(from, {
-                    text: error.message
-                });
+                await sock.sendMessage(from, { text: error.message });
             }
             return;
         }
@@ -274,51 +221,25 @@ const connect = async () => {
         // Eval dengan return (=>)
         if (text.startsWith("=>")) {
             const code = text.slice(2).trim();
-
             if (!code) {
                 await sock.sendMessage(from, { text: "No code provided" });
                 return;
             }
-
             console.log(colors.cyan(`📩 eval-return`));
-
             try {
                 const evalFunc = new Function(
-                    "sock",
-                    "from",
-                    "m",
-                    "plugins",
-                    "config",
-                    "fs",
-                    "path",
-                    "util",
-                    "colors",
-                    "loadPlugins",
-                    "isGroup",
-                    "messageStore",
+                    "sock", "from", "m", "plugins", "config", "fs", "path", 
+                    "util", "colors", "loadPlugins", "isGroup", "messageStore",
                     `return (async () => { return ${code} })()`
                 );
-
                 const result = await evalFunc(
-                    sock,
-                    from,
-                    m,
-                    plugins,
-                    config,
-                    fs,
-                    path,
-                    util,
-                    colors,
-                    loadPlugins,
-                    isGroup,
-                    messageStore
+                    sock, from, m, plugins, config, fs, path, 
+                    util, colors, loadPlugins, isGroup, messageStore
                 );
                 const output = util.inspect(result, { depth: 2 });
                 await sock.sendMessage(from, { text: output });
             } catch (error) {
-                await sock.sendMessage(from, {
-                    text: error.message
-                });
+                await sock.sendMessage(from, { text: error.message });
             }
             return;
         }
@@ -326,14 +247,11 @@ const connect = async () => {
         // Exec dengan $
         if (text.startsWith("$")) {
             const cmd = text.slice(1).trim();
-
             if (!cmd) {
                 await sock.sendMessage(from, { text: "No command provided" });
                 return;
             }
-
             console.log(colors.cyan(`📩 exec`));
-
             try {
                 await sock.sendMessage(from, { text: `⏳ Executing: ${cmd}` });
                 const { stdout, stderr } = await execPromise(cmd);
@@ -341,19 +259,13 @@ const connect = async () => {
                 if (stdout) output += stdout;
                 if (stderr) output += `${stderr}:\n\n${stdout}`;
                 if (!output) output = "✅ Executed (no output)";
-
-                await sock.sendMessage(from, {
-                    text: output
-                });
+                await sock.sendMessage(from, { text: output });
             } catch (error) {
-                await sock.sendMessage(from, {
-                    text: error.message
-                });
+                await sock.sendMessage(from, { text: error.message });
             }
             return;
         }
 
-        // ===== PENGECEKAN PREFIX UNTUK PLUGIN =====
         const prefixes = config.PREFIX || ["."];
         const prefix = prefixes.find(p => text.startsWith(p));
         if (!prefix) return;
@@ -364,15 +276,10 @@ const connect = async () => {
 
         console.log(colors.cyan(`📩 ${command}`));
 
-        // Plugin execution
         if (plugins.has(command)) {
-            // Kirim reaksi "wait" (⏳)
             try {
                 await sock.sendMessage(from, {
-                    react: {
-                        text: "⏳",
-                        key: m.key
-                    }
+                    react: { text: "⏳", key: m.key }
                 });
             } catch (e) {
                 console.error(colors.red("❌ Failed to send reaction:"), e.message);
@@ -381,22 +288,14 @@ const connect = async () => {
             try {
                 const execute = plugins.get(command);
 
-                // Download media if available
                 let fileBuffer = null;
-                const quotedMsg =
-                    m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+                const quotedMsg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
 
-                if (
-                    quotedMsg?.imageMessage ||
-                    quotedMsg?.videoMessage ||
-                    quotedMsg?.documentMessage ||
-                    quotedMsg?.audioMessage
-                ) {
+                if (quotedMsg?.imageMessage || quotedMsg?.videoMessage || 
+                    quotedMsg?.documentMessage || quotedMsg?.audioMessage) {
                     try {
                         fileBuffer = await downloadMediaMessage(
-                            { message: quotedMsg },
-                            "buffer",
-                            {},
+                            { message: quotedMsg }, "buffer", {},
                             {
                                 logger: Pino({ level: "silent" }),
                                 reuploadRequest: sock.updateMediaMessage
@@ -405,18 +304,11 @@ const connect = async () => {
                     } catch (e) {}
                 }
 
-                if (
-                    !fileBuffer &&
-                    (m.message?.imageMessage ||
-                        m.message?.videoMessage ||
-                        m.message?.documentMessage ||
-                        m.message?.audioMessage)
-                ) {
+                if (!fileBuffer && (m.message?.imageMessage || m.message?.videoMessage || 
+                    m.message?.documentMessage || m.message?.audioMessage)) {
                     try {
                         fileBuffer = await downloadMediaMessage(
-                            m,
-                            "buffer",
-                            {},
+                            m, "buffer", {},
                             {
                                 logger: Pino({ level: "silent" }),
                                 reuploadRequest: sock.updateMediaMessage
@@ -434,9 +326,7 @@ const connect = async () => {
                     fileBuffer,
                     reply: async content => {
                         if (typeof content === "string") {
-                            return await sock.sendMessage(from, {
-                                text: content
-                            });
+                            return await sock.sendMessage(from, { text: content });
                         }
                         return await sock.sendMessage(from, content);
                     }
@@ -450,13 +340,9 @@ const connect = async () => {
                     text: `❌ Plugin error: ${error.message}`
                 });
             } finally {
-                // Hapus reaksi (kirim reaksi kosong)
                 try {
                     await sock.sendMessage(from, {
-                        react: {
-                            text: "",
-                            key: m.key
-                        }
+                        react: { text: "", key: m.key }
                     });
                 } catch (e) {
                     console.error(colors.red("❌ Failed to remove reaction:"), e.message);
@@ -473,43 +359,34 @@ const connect = async () => {
                 const messageId = update.key.id;
                 const from = update.key.remoteJid;
                 
-                // Abaikan jika dari grup
                 const isGroup = from.endsWith("@g.us");
                 if (isGroup) continue;
                 
-                // Cek apakah pesan ada di storage
                 const storedData = messageStore.get(messageId);
                 if (!storedData) continue;
 
                 const storedMessage = storedData.message;
-                
-                // Abaikan jika pesan dari diri sendiri (fromMe)
                 if (storedMessage.key.fromMe) continue;
                 
                 // ===== ANTI-DELETE =====
                 if (update.update?.message === null || update.update?.messageStubType === 68) {
                     console.log(colors.magenta(`🗑️ Message deleted detected`));
                     
-                    // Ekstrak info pengirim
-                    const isGroup = from.endsWith("@g.us");
                     const sender = storedMessage.key.participant || storedMessage.key.remoteJid;
                     const senderName = storedMessage.pushName || sender.split("@")[0];
                     
-                    // Ekstrak konten pesan
                     let deletedContent = storedMessage.message?.conversation ||
                         storedMessage.message?.extendedTextMessage?.text ||
                         storedMessage.message?.imageMessage?.caption ||
                         storedMessage.message?.videoMessage?.caption ||
                         "";
 
-                    // Cek jenis media
                     const hasSticker = storedMessage.message?.stickerMessage;
                     const hasImage = storedMessage.message?.imageMessage;
                     const hasVideo = storedMessage.message?.videoMessage;
                     const hasAudio = storedMessage.message?.audioMessage;
                     const hasDocument = storedMessage.message?.documentMessage;
 
-                    // Format pesan anti-delete
                     let antiDeleteMsg = `🚫 *PESAN DIHAPUS*\n\n`;
                     antiDeleteMsg += `👤 Pengirim: ${senderName}\n`;
                     antiDeleteMsg += `📱 Nomor: ${sender.split("@")[0]}\n`;
@@ -529,52 +406,26 @@ const connect = async () => {
                         antiDeleteMsg += `📄 Tipe: Dokumen`;
                     }
 
-                    // Kirim notifikasi
                     await sock.sendMessage(from, { text: antiDeleteMsg });
 
-                    // Jika ada stiker, kirim ulang
+                    // Resend media berdasarkan tipe
                     if (hasSticker) {
                         try {
                             const buffer = await downloadMediaMessage(
-                                storedMessage,
-                                "buffer",
-                                {},
+                                storedMessage, "buffer", {},
                                 {
                                     logger: Pino({ level: "silent" }),
                                     reuploadRequest: sock.updateMediaMessage
                                 }
                             );
-                            await sock.sendMessage(from, {
-                                sticker: buffer
-                            });
+                            await sock.sendMessage(from, { sticker: buffer });
                         } catch (e) {
                             console.error(colors.red("❌ Failed to resend sticker:"), e.message);
                         }
-                    }
-                    // Jika ada media lain, kirim juga
-                    else if (hasImage) {
+                    } else if (hasImage) {
                         try {
                             const buffer = await downloadMediaMessage(
-                                storedMessage,
-                                "buffer",
-                                {},
-                                {
-                                    logger: Pino({ level: "silent" }),
-                                    reuploadRequest: sock.updateMediaMessage
-                                }
-                            );
-                            await sock.sendMessage(from, {
-                                image: buffer,
-                                caption: "🖼️ Gambar yang dihapus"
-                            });
-                    }
-                    // Jika ada media lain, kirim juga
-                    else if (hasImage) {
-                        try {
-                            const buffer = await downloadMediaMessage(
-                                storedMessage,
-                                "buffer",
-                                {},
+                                storedMessage, "buffer", {},
                                 {
                                     logger: Pino({ level: "silent" }),
                                     reuploadRequest: sock.updateMediaMessage
@@ -590,24 +441,7 @@ const connect = async () => {
                     } else if (hasVideo) {
                         try {
                             const buffer = await downloadMediaMessage(
-                                storedMessage,
-                                "buffer",
-                                {},
-                                {
-                                    logger: Pino({ level: "silent" }),
-                                    reuploadRequest: sock.updateMediaMessage
-                                }
-                            );
-                            await sock.sendMessage(from, {
-                                video: buffer,
-                                caption: "🎥 Video yang dihapus"
-                            });
-                    } else if (hasVideo) {
-                        try {
-                            const buffer = await downloadMediaMessage(
-                                storedMessage,
-                                "buffer",
-                                {},
+                                storedMessage, "buffer", {},
                                 {
                                     logger: Pino({ level: "silent" }),
                                     reuploadRequest: sock.updateMediaMessage
@@ -623,9 +457,7 @@ const connect = async () => {
                     } else if (hasAudio) {
                         try {
                             const buffer = await downloadMediaMessage(
-                                storedMessage,
-                                "buffer",
-                                {},
+                                storedMessage, "buffer", {},
                                 {
                                     logger: Pino({ level: "silent" }),
                                     reuploadRequest: sock.updateMediaMessage
@@ -633,24 +465,7 @@ const connect = async () => {
                             );
                             await sock.sendMessage(from, {
                                 audio: buffer,
-                                mimetype: "audio/mp4",
-                                caption: "🎵 Audio yang dihapus"
-                            });
-                    } else if (hasAudio) {
-                        try {
-                            const buffer = await downloadMediaMessage(
-                                storedMessage,
-                                "buffer",
-                                {},
-                                {
-                                    logger: Pino({ level: "silent" }),
-                                    reuploadRequest: sock.updateMediaMessage
-                                }
-                            );
-                            await sock.sendMessage(from, {
-                                audio: buffer,
-                                mimetype: "audio/mp4",
-                                caption: "🎵 Audio yang dihapus"
+                                mimetype: "audio/mp4"
                             });
                         } catch (e) {
                             console.error(colors.red("❌ Failed to resend audio:"), e.message);
@@ -658,26 +473,7 @@ const connect = async () => {
                     } else if (hasDocument) {
                         try {
                             const buffer = await downloadMediaMessage(
-                                storedMessage,
-                                "buffer",
-                                {},
-                                {
-                                    logger: Pino({ level: "silent" }),
-                                    reuploadRequest: sock.updateMediaMessage
-                                }
-                            );
-                            await sock.sendMessage(from, {
-                                document: buffer,
-                                mimetype: storedMessage.message.documentMessage.mimetype,
-                                fileName: storedMessage.message.documentMessage.fileName,
-                                caption: "📄 Dokumen yang dihapus"
-                            });
-                    } else if (hasDocument) {
-                        try {
-                            const buffer = await downloadMediaMessage(
-                                storedMessage,
-                                "buffer",
-                                {},
+                                storedMessage, "buffer", {},
                                 {
                                     logger: Pino({ level: "silent" }),
                                     reuploadRequest: sock.updateMediaMessage
@@ -699,21 +495,15 @@ const connect = async () => {
                 if (update.update?.editedMessage) {
                     console.log(colors.yellow(`✏️ Message edited detected`));
                     
-                    const isGroup = from.endsWith("@g.us");
                     const sender = storedMessage.key.participant || storedMessage.key.remoteJid;
                     const senderName = storedMessage.pushName || sender.split("@")[0];
                     
-                    // Pesan lama
                     let oldContent = storedMessage.message?.conversation ||
-                        storedMessage.message?.extendedTextMessage?.text ||
-                        "";
+                        storedMessage.message?.extendedTextMessage?.text || "";
                     
-                    // Pesan baru
                     let newContent = update.update.editedMessage?.conversation ||
-                        update.update.editedMessage?.extendedTextMessage?.text ||
-                        "";
+                        update.update.editedMessage?.extendedTextMessage?.text || "";
 
-                    // Format pesan anti-edit
                     let antiEditMsg = `✏️ *PESAN DIEDIT*\n\n`;
                     antiEditMsg += `👤 Pengirim: ${senderName}\n`;
                     antiEditMsg += `📱 Nomor: ${sender.split("@")[0]}\n`;
@@ -723,7 +513,6 @@ const connect = async () => {
 
                     await sock.sendMessage(from, { text: antiEditMsg });
                     
-                    // Update storage dengan pesan baru
                     messageStore.set(messageId, {
                         message: {
                             ...storedMessage,
@@ -733,7 +522,6 @@ const connect = async () => {
                         timestamp: Date.now()
                     });
                     
-                    // Simpan perubahan ke file
                     saveMessageStore(messageStore);
                 }
                 
@@ -745,7 +533,6 @@ const connect = async () => {
 
     process.on("SIGINT", () => {
         console.log(colors.yellow("\n⏹️  Shutting down..."));
-        // Simpan message store sebelum exit
         saveMessageStore(messageStore);
         console.log(colors.green("💾 Message store saved"));
         console.log(colors.green("👋 Stopped\n"));
