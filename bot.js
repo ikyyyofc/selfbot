@@ -594,7 +594,7 @@ const connect = async () => {
                     }
                 }
                 
-                if (update.update?.message === null || update.update?.messageStubType === 68) console.log(m)
+                if (update.update?.message === null || update.update?.messageStubType === 68) console.log(message)
                 
                 // ===== ANTI-EDIT =====
                 if (update.update?.editedMessage) {
