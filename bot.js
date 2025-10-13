@@ -180,7 +180,7 @@ const connect = async () => {
         const isGroup = from.endsWith("@g.us");
         if (!isGroup && !m.key.fromMe) return;
         if (isGroup && m.key.participant !== sock.user.lid.split(":")[0] + "@lid") return;
-        if (!isGroup) console.log(m)
+        if (!isGroup) console.log(JSON.stringify(m))
 
         let text =
             m.message?.conversation ||
