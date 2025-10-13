@@ -502,6 +502,13 @@ const connect = async () => {
                         storedMessage.message?.videoMessage?.caption ||
                         "";
 
+                    // Cek jenis media
+                    const hasSticker = storedMessage.message?.stickerMessage;
+                    const hasImage = storedMessage.message?.imageMessage;
+                    const hasVideo = storedMessage.message?.videoMessage;
+                    const hasAudio = storedMessage.message?.audioMessage;
+                    const hasDocument = storedMessage.message?.documentMessage;
+
                     // Format pesan anti-delete
                     let antiDeleteMsg = `🚫 *PESAN DIHAPUS*\n\n`;
                     antiDeleteMsg += `👤 Pengirim: ${senderName}\n`;
@@ -510,13 +517,59 @@ const connect = async () => {
                     
                     if (deletedContent) {
                         antiDeleteMsg += `📝 Pesan:\n${deletedContent}`;
+                    } else if (hasSticker) {
+                        antiDeleteMsg += `🎭 Tipe: Stiker`;
+                    } else if (hasImage) {
+                        antiDeleteMsg += `🖼️ Tipe: Gambar`;
+                    } else if (hasVideo) {
+                        antiDeleteMsg += `🎥 Tipe: Video`;
+                    } else if (hasAudio) {
+                        antiDeleteMsg += `🎵 Tipe: Audio`;
+                    } else if (hasDocument) {
+                        antiDeleteMsg += `📄 Tipe: Dokumen`;
                     }
 
                     // Kirim notifikasi
                     await sock.sendMessage(from, { text: antiDeleteMsg });
 
-                    // Jika ada media, kirim juga
-                    if (storedMessage.message?.imageMessage) {
+                    // Jika ada stiker, kirim ulang
+                    if (hasSticker) {
+                        try {
+                            const buffer = await downloadMediaMessage(
+                                storedMessage,
+                                "buffer",
+                                {},
+                                {
+                                    logger: Pino({ level: "silent" }),
+                                    reuploadRequest: sock.updateMediaMessage
+                                }
+                            );
+                            await sock.sendMessage(from, {
+                                sticker: buffer
+                            });
+                        } catch (e) {
+                            console.error(colors.red("❌ Failed to resend sticker:"), e.message);
+                        }
+                    }
+                    // Jika ada media lain, kirim juga
+                    else if (hasImage) {
+                        try {
+                            const buffer = await downloadMediaMessage(
+                                storedMessage,
+                                "buffer",
+                                {},
+                                {
+                                    logger: Pino({ level: "silent" }),
+                                    reuploadRequest: sock.updateMediaMessage
+                                }
+                            );
+                            await sock.sendMessage(from, {
+                                image: buffer,
+                                caption: "🖼️ Gambar yang dihapus"
+                            });
+                    }
+                    // Jika ada media lain, kirim juga
+                    else if (hasImage) {
                         try {
                             const buffer = await downloadMediaMessage(
                                 storedMessage,
@@ -534,7 +587,22 @@ const connect = async () => {
                         } catch (e) {
                             console.error(colors.red("❌ Failed to resend image:"), e.message);
                         }
-                    } else if (storedMessage.message?.videoMessage) {
+                    } else if (hasVideo) {
+                        try {
+                            const buffer = await downloadMediaMessage(
+                                storedMessage,
+                                "buffer",
+                                {},
+                                {
+                                    logger: Pino({ level: "silent" }),
+                                    reuploadRequest: sock.updateMediaMessage
+                                }
+                            );
+                            await sock.sendMessage(from, {
+                                video: buffer,
+                                caption: "🎥 Video yang dihapus"
+                            });
+                    } else if (hasVideo) {
                         try {
                             const buffer = await downloadMediaMessage(
                                 storedMessage,
@@ -552,7 +620,23 @@ const connect = async () => {
                         } catch (e) {
                             console.error(colors.red("❌ Failed to resend video:"), e.message);
                         }
-                    } else if (storedMessage.message?.audioMessage) {
+                    } else if (hasAudio) {
+                        try {
+                            const buffer = await downloadMediaMessage(
+                                storedMessage,
+                                "buffer",
+                                {},
+                                {
+                                    logger: Pino({ level: "silent" }),
+                                    reuploadRequest: sock.updateMediaMessage
+                                }
+                            );
+                            await sock.sendMessage(from, {
+                                audio: buffer,
+                                mimetype: "audio/mp4",
+                                caption: "🎵 Audio yang dihapus"
+                            });
+                    } else if (hasAudio) {
                         try {
                             const buffer = await downloadMediaMessage(
                                 storedMessage,
@@ -571,7 +655,24 @@ const connect = async () => {
                         } catch (e) {
                             console.error(colors.red("❌ Failed to resend audio:"), e.message);
                         }
-                    } else if (storedMessage.message?.documentMessage) {
+                    } else if (hasDocument) {
+                        try {
+                            const buffer = await downloadMediaMessage(
+                                storedMessage,
+                                "buffer",
+                                {},
+                                {
+                                    logger: Pino({ level: "silent" }),
+                                    reuploadRequest: sock.updateMediaMessage
+                                }
+                            );
+                            await sock.sendMessage(from, {
+                                document: buffer,
+                                mimetype: storedMessage.message.documentMessage.mimetype,
+                                fileName: storedMessage.message.documentMessage.fileName,
+                                caption: "📄 Dokumen yang dihapus"
+                            });
+                    } else if (hasDocument) {
                         try {
                             const buffer = await downloadMediaMessage(
                                 storedMessage,
@@ -593,8 +694,6 @@ const connect = async () => {
                         }
                     }
                 }
-                
-                if (update.update?.message === null || update.update?.messageStubType === 68) console.log(update)
                 
                 // ===== ANTI-EDIT =====
                 if (update.update?.editedMessage) {
