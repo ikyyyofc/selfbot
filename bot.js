@@ -377,25 +377,44 @@ sock.ev.on("messages.update", async (updates) => {
                 const sender = storedMessage.key.participant || storedMessage.key.remoteJid;
                 const senderName = storedMessage.pushName || sender.split("@")[0];
                 
-                let deletedContent = storedMessage.message?.conversation ||
-                    storedMessage.message?.extendedTextMessage?.text ||
-                    storedMessage.message?.imageMessage?.caption ||
-                    storedMessage.message?.videoMessage?.caption ||
+                // Ambil pesan dari versi terakhir (bisa dari history edit atau original)
+                const lastMessage = storedData.editHistory 
+                    ? storedData.editHistory[storedData.editHistory.length - 1].message 
+                    : storedMessage.message;
+                
+                let deletedContent = lastMessage?.conversation ||
+                    lastMessage?.extendedTextMessage?.text ||
+                    lastMessage?.imageMessage?.caption ||
+                    lastMessage?.videoMessage?.caption ||
                     "";
 
-                const hasSticker = storedMessage.message?.stickerMessage;
-                const hasImage = storedMessage.message?.imageMessage;
-                const hasVideo = storedMessage.message?.videoMessage;
-                const hasAudio = storedMessage.message?.audioMessage;
-                const hasDocument = storedMessage.message?.documentMessage;
+                const hasSticker = lastMessage?.stickerMessage;
+                const hasImage = lastMessage?.imageMessage;
+                const hasVideo = lastMessage?.videoMessage;
+                const hasAudio = lastMessage?.audioMessage;
+                const hasDocument = lastMessage?.documentMessage;
 
                 let antiDeleteMsg = `🚫 *PESAN DIHAPUS*\n\n`;
                 antiDeleteMsg += `👤 Pengirim: ${senderName}\n`;
                 antiDeleteMsg += `📱 Nomor: ${sender.split("@")[0]}\n`;
-                antiDeleteMsg += `⏰ Waktu: ${new Date(storedMessage.messageTimestamp * 1000).toLocaleString("id-ID")}\n\n`;
+                antiDeleteMsg += `⏰ Waktu: ${new Date(storedMessage.messageTimestamp * 1000).toLocaleString("id-ID")}\n`;
+                
+                // Tampilkan history edit jika ada
+                if (storedData.editHistory && storedData.editHistory.length > 0) {
+                    antiDeleteMsg += `\n📝 *Riwayat Edit (${storedData.editHistory.length}x):*\n`;
+                    storedData.editHistory.forEach((edit, index) => {
+                        const content = edit.message?.conversation || 
+                                      edit.message?.extendedTextMessage?.text || 
+                                      "(media/sticker)";
+                        antiDeleteMsg += `\n${index + 1}. ${content}\n   ⏰ ${new Date(edit.timestamp).toLocaleString("id-ID")}`;
+                    });
+                    antiDeleteMsg += `\n`;
+                } else {
+                    antiDeleteMsg += `\n`;
+                }
                 
                 if (deletedContent) {
-                    antiDeleteMsg += `📝 Pesan:\n${deletedContent}`;
+                    antiDeleteMsg += `📝 *Pesan Terakhir:*\n${deletedContent}`;
                 } else if (hasSticker) {
                     antiDeleteMsg += `🎭 Tipe: Stiker`;
                 } else if (hasImage) {
@@ -410,8 +429,10 @@ sock.ev.on("messages.update", async (updates) => {
 
                 await sock.sendMessage(from, { text: antiDeleteMsg });
 
-                // Resend media berdasarkan tipe
-                if (hasSticker) {
+                // Resend media berdasarkan tipe dari pesan ORIGINAL, bukan edit terakhir
+                const originalMessage = storedMessage.message;
+                
+                if (originalMessage?.stickerMessage) {
                     try {
                         const buffer = await downloadMediaMessage(
                             storedMessage, "buffer", {},
@@ -424,7 +445,7 @@ sock.ev.on("messages.update", async (updates) => {
                     } catch (e) {
                         console.error(colors.red("❌ Failed to resend sticker:"), e.message);
                     }
-                } else if (hasImage) {
+                } else if (originalMessage?.imageMessage) {
                     try {
                         const buffer = await downloadMediaMessage(
                             storedMessage, "buffer", {},
@@ -440,7 +461,7 @@ sock.ev.on("messages.update", async (updates) => {
                     } catch (e) {
                         console.error(colors.red("❌ Failed to resend image:"), e.message);
                     }
-                } else if (hasVideo) {
+                } else if (originalMessage?.videoMessage) {
                     try {
                         const buffer = await downloadMediaMessage(
                             storedMessage, "buffer", {},
@@ -456,7 +477,7 @@ sock.ev.on("messages.update", async (updates) => {
                     } catch (e) {
                         console.error(colors.red("❌ Failed to resend video:"), e.message);
                     }
-                } else if (hasAudio) {
+                } else if (originalMessage?.audioMessage) {
                     try {
                         const buffer = await downloadMediaMessage(
                             storedMessage, "buffer", {},
@@ -472,7 +493,7 @@ sock.ev.on("messages.update", async (updates) => {
                     } catch (e) {
                         console.error(colors.red("❌ Failed to resend audio:"), e.message);
                     }
-                } else if (hasDocument) {
+                } else if (originalMessage?.documentMessage) {
                     try {
                         const buffer = await downloadMediaMessage(
                             storedMessage, "buffer", {},
@@ -483,8 +504,8 @@ sock.ev.on("messages.update", async (updates) => {
                         );
                         await sock.sendMessage(from, {
                             document: buffer,
-                            mimetype: storedMessage.message.documentMessage.mimetype,
-                            fileName: storedMessage.message.documentMessage.fileName,
+                            mimetype: originalMessage.documentMessage.mimetype,
+                            fileName: originalMessage.documentMessage.fileName,
                             caption: "📄 Dokumen yang dihapus"
                         });
                     } catch (e) {
@@ -494,7 +515,6 @@ sock.ev.on("messages.update", async (updates) => {
             }
             
             // ===== ANTI-EDIT =====
-            // Struktur edit di Baileys: update.update.message.editedMessage atau protocolMessage
             else if (update.update?.message?.editedMessage || 
                      update.update?.message?.protocolMessage?.type === 14) {
                 
@@ -503,17 +523,29 @@ sock.ev.on("messages.update", async (updates) => {
                 const sender = storedMessage.key.participant || storedMessage.key.remoteJid;
                 const senderName = storedMessage.pushName || sender.split("@")[0];
                 
-                // Ambil pesan lama
-                let oldContent = storedMessage.message?.conversation ||
-                    storedMessage.message?.extendedTextMessage?.text || 
-                    "(kosong)";
+                // Ambil pesan lama (dari edit terakhir atau original)
+                let oldContent = "";
+                if (storedData.editHistory && storedData.editHistory.length > 0) {
+                    // Jika sudah pernah di-edit, ambil dari history terakhir
+                    const lastEdit = storedData.editHistory[storedData.editHistory.length - 1];
+                    oldContent = lastEdit.message?.conversation ||
+                        lastEdit.message?.extendedTextMessage?.text || 
+                        "(kosong)";
+                } else {
+                    // Jika belum pernah di-edit, ambil dari original
+                    oldContent = storedMessage.message?.conversation ||
+                        storedMessage.message?.extendedTextMessage?.text || 
+                        "(kosong)";
+                }
                 
                 // Ambil pesan baru dari editedMessage
                 let newContent = "";
+                let newMessageObj = null;
+                
                 if (update.update.message?.editedMessage) {
-                    // Struktur: update.update.message.editedMessage.message.extendedTextMessage.text
                     const editedMsg = update.update.message.editedMessage.message;
                     if (editedMsg) {
+                        newMessageObj = editedMsg;
                         newContent = editedMsg.conversation ||
                             editedMsg.extendedTextMessage?.text ||
                             "(kosong)";
@@ -521,9 +553,9 @@ sock.ev.on("messages.update", async (updates) => {
                         newContent = "(kosong)";
                     }
                 } else if (update.update.message?.protocolMessage) {
-                    // Untuk protocolMessage tipe 14 (edit)
                     const editedMsg = update.update.message.protocolMessage.editedMessage;
                     if (editedMsg) {
+                        newMessageObj = editedMsg;
                         newContent = editedMsg.conversation ||
                             editedMsg.extendedTextMessage?.text ||
                             "(kosong)";
@@ -537,28 +569,39 @@ sock.ev.on("messages.update", async (updates) => {
                 let antiEditMsg = `✏️ *PESAN DIEDIT*\n\n`;
                 antiEditMsg += `👤 Pengirim: ${senderName}\n`;
                 antiEditMsg += `📱 Nomor: ${sender.split("@")[0]}\n`;
-                antiEditMsg += `⏰ Waktu: ${new Date(storedMessage.messageTimestamp * 1000).toLocaleString("id-ID")}\n\n`;
+                antiEditMsg += `⏰ Waktu Original: ${new Date(storedMessage.messageTimestamp * 1000).toLocaleString("id-ID")}\n`;
+                antiEditMsg += `⏰ Waktu Edit: ${new Date().toLocaleString("id-ID")}\n\n`;
+                
+                // Tampilkan edit count
+                const editCount = (storedData.editHistory?.length || 0) + 1;
+                antiEditMsg += `🔢 Edit ke-${editCount}\n\n`;
+                
                 antiEditMsg += `📝 Pesan Lama:\n${oldContent}\n\n`;
                 antiEditMsg += `✨ Pesan Baru:\n${newContent}`;
 
                 await sock.sendMessage(from, { text: antiEditMsg });
                 
-                // Update message store dengan pesan yang sudah diedit
-                const updatedMessage = update.update.message?.editedMessage || 
-                                      update.update.message?.protocolMessage?.editedMessage;
-                
-                if (updatedMessage) {
-                    messageStore.set(messageId, {
-                        message: {
-                            ...storedMessage,
-                            message: updatedMessage
-                        },
-                        from: from,
-                        timestamp: Date.now()
-                    });
-                    
-                    saveMessageStore(messageStore);
+                // Update message store dengan MENAMBAHKAN ke history, bukan replace
+                if (!storedData.editHistory) {
+                    storedData.editHistory = [];
                 }
+                
+                // Tambahkan edit baru ke history
+                storedData.editHistory.push({
+                    message: newMessageObj,
+                    timestamp: Date.now(),
+                    editNumber: editCount
+                });
+                
+                // Update store (JANGAN update message original, simpan history saja)
+                messageStore.set(messageId, {
+                    message: storedMessage, // Keep original message
+                    from: from,
+                    timestamp: storedData.timestamp, // Keep original timestamp
+                    editHistory: storedData.editHistory // Update history
+                });
+                
+                saveMessageStore(messageStore);
             }
             
         } catch (error) {
