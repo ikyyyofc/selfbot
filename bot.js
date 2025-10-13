@@ -352,7 +352,7 @@ const connect = async () => {
         }
     });
 
-    // ===== EVENT: ANTI-DELETE & ANTI-EDIT =====
+// ===== EVENT: ANTI-DELETE & ANTI-EDIT =====
 sock.ev.on("messages.update", async (updates) => {
     for (const update of updates) {
         try {
@@ -511,9 +511,15 @@ sock.ev.on("messages.update", async (updates) => {
                 // Ambil pesan baru dari editedMessage
                 let newContent = "";
                 if (update.update.message?.editedMessage) {
-                    newContent = update.update.message.editedMessage.conversation ||
-                        update.update.message.editedMessage.extendedTextMessage?.text ||
-                        "(kosong)";
+                    // Struktur: update.update.message.editedMessage.message.extendedTextMessage.text
+                    const editedMsg = update.update.message.editedMessage.message;
+                    if (editedMsg) {
+                        newContent = editedMsg.conversation ||
+                            editedMsg.extendedTextMessage?.text ||
+                            "(kosong)";
+                    } else {
+                        newContent = "(kosong)";
+                    }
                 } else if (update.update.message?.protocolMessage) {
                     // Untuk protocolMessage tipe 14 (edit)
                     const editedMsg = update.update.message.protocolMessage.editedMessage;
@@ -521,7 +527,11 @@ sock.ev.on("messages.update", async (updates) => {
                         newContent = editedMsg.conversation ||
                             editedMsg.extendedTextMessage?.text ||
                             "(kosong)";
+                    } else {
+                        newContent = "(kosong)";
                     }
+                } else {
+                    newContent = "(kosong)";
                 }
 
                 let antiEditMsg = `✏️ *PESAN DIEDIT*\n\n`;
