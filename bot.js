@@ -162,56 +162,6 @@ const connect = async () => {
         const from = m.key.remoteJid;
         const messageId = m.key.id;
         
-        // ===== ANTI-EDIT DETECTION =====
-        const protocolMsg = m.message?.protocolMessage;
-        if (protocolMsg && protocolMsg.type === 1) { // MESSAGE_EDIT
-            const editedMsgId = protocolMsg.key?.id;
-            const storedData = messageStore.get(editedMsgId);
-            
-            if (storedData) {
-                const storedMessage = storedData.message;
-                const isGroup = from.endsWith("@g.us");
-                
-                // Skip jika dari group atau dari diri sendiri
-                if (!isGroup && !storedMessage.key.fromMe) {
-                    console.log(colors.yellow(`✏️ Message edited detected`));
-                    
-                    const sender = storedMessage.key.participant || storedMessage.key.remoteJid;
-                    const senderName = storedMessage.pushName || sender.split("@")[0];
-                    
-                    let oldContent = storedMessage.message?.conversation ||
-                        storedMessage.message?.extendedTextMessage?.text || "";
-                    
-                    let newContent = protocolMsg.editedMessage?.conversation ||
-                        protocolMsg.editedMessage?.extendedTextMessage?.text || "";
-
-                    let antiEditMsg = `✏️ *PESAN DIEDIT*\n\n`;
-                    antiEditMsg += `👤 Pengirim: ${senderName}\n`;
-                    antiEditMsg += `📱 Nomor: ${sender.split("@")[0]}\n`;
-                    antiEditMsg += `⏰ Waktu Asli: ${new Date(storedMessage.messageTimestamp * 1000).toLocaleString("id-ID")}\n`;
-                    antiEditMsg += `⏰ Waktu Edit: ${new Date(protocolMsg.timestampMs).toLocaleString("id-ID")}\n\n`;
-                    antiEditMsg += `📝 Pesan Lama:\n${oldContent || "(kosong)"}\n\n`;
-                    antiEditMsg += `✨ Pesan Baru:\n${newContent || "(kosong)"}`;
-
-                    await sock.sendMessage(from, { text: antiEditMsg });
-                    
-                    // Update stored message dengan versi terbaru
-                    messageStore.set(editedMsgId, {
-                        message: {
-                            ...storedMessage,
-                            message: protocolMsg.editedMessage,
-                            messageTimestamp: Math.floor(protocolMsg.timestampMs / 1000)
-                        },
-                        from: from,
-                        timestamp: Date.now()
-                    });
-                    saveMessageStore(messageStore);
-                }
-            }
-            return; // Skip processing lebih lanjut untuk protocol message
-        }
-        
-        // Store message untuk anti-delete & anti-edit
         if (messageStore.size >= MESSAGE_STORE_LIMIT) {
             const firstKey = messageStore.keys().next().value;
             messageStore.delete(firstKey);
@@ -403,152 +353,211 @@ const connect = async () => {
         }
     });
 
-    // ===== EVENT: ANTI-DELETE =====
-    sock.ev.on("messages.update", async (updates) => {
-        for (const update of updates) {
-            try {
-                const messageId = update.key.id;
-                const from = update.key.remoteJid;
-                
-                const isGroup = from.endsWith("@g.us");
-                if (isGroup) continue;
-                
-                const storedData = messageStore.get(messageId);
-                if (!storedData) continue;
+    // ===== EVENT: ANTI-DELETE & ANTI-EDIT =====
+sock.ev.on("messages.update", async (updates) => {
+    for (const update of updates) {
+        try {
+            const messageId = update.key.id;
+            const from = update.key.remoteJid;
+            
+            const isGroup = from.endsWith("@g.us");
+            if (isGroup) continue;
+            
+            const storedData = messageStore.get(messageId);
+            if (!storedData) continue;
 
-                const storedMessage = storedData.message;
-                if (storedMessage.key.fromMe) continue;
+            const storedMessage = storedData.message;
+            if (storedMessage.key.fromMe) continue;
+            
+            console.log(colors.blue("📋 Update received:"), JSON.stringify(update, null, 2));
+            
+            // ===== ANTI-DELETE =====
+            if (update.update?.message === null || update.update?.messageStubType === 68) {
+                console.log(colors.magenta(`🗑️ Message deleted detected`));
                 
-                if (update.update?.message !== null || update.update?.messageStubType !== 68) console.log(`\n\n${JSON.stringify(update, null, 2)}\n\n`)
+                const sender = storedMessage.key.participant || storedMessage.key.remoteJid;
+                const senderName = storedMessage.pushName || sender.split("@")[0];
                 
-                // ===== ANTI-DELETE =====
-                if (update.update?.message === null || update.update?.messageStubType === 68) {
-                    console.log(colors.magenta(`🗑️ Message deleted detected`));
-                    
-                    const sender = storedMessage.key.participant || storedMessage.key.remoteJid;
-                    const senderName = storedMessage.pushName || sender.split("@")[0];
-                    
-                    let deletedContent = storedMessage.message?.conversation ||
-                        storedMessage.message?.extendedTextMessage?.text ||
-                        storedMessage.message?.imageMessage?.caption ||
-                        storedMessage.message?.videoMessage?.caption ||
-                        "";
+                let deletedContent = storedMessage.message?.conversation ||
+                    storedMessage.message?.extendedTextMessage?.text ||
+                    storedMessage.message?.imageMessage?.caption ||
+                    storedMessage.message?.videoMessage?.caption ||
+                    "";
 
-                    const hasSticker = storedMessage.message?.stickerMessage;
-                    const hasImage = storedMessage.message?.imageMessage;
-                    const hasVideo = storedMessage.message?.videoMessage;
-                    const hasAudio = storedMessage.message?.audioMessage;
-                    const hasDocument = storedMessage.message?.documentMessage;
+                const hasSticker = storedMessage.message?.stickerMessage;
+                const hasImage = storedMessage.message?.imageMessage;
+                const hasVideo = storedMessage.message?.videoMessage;
+                const hasAudio = storedMessage.message?.audioMessage;
+                const hasDocument = storedMessage.message?.documentMessage;
 
-                    let antiDeleteMsg = `🚫 *PESAN DIHAPUS*\n\n`;
-                    antiDeleteMsg += `👤 Pengirim: ${senderName}\n`;
-                    antiDeleteMsg += `📱 Nomor: ${sender.split("@")[0]}\n`;
-                    antiDeleteMsg += `⏰ Waktu: ${new Date(storedMessage.messageTimestamp * 1000).toLocaleString("id-ID")}\n\n`;
-                    
-                    if (deletedContent) {
-                        antiDeleteMsg += `📝 Pesan:\n${deletedContent}`;
-                    } else if (hasSticker) {
-                        antiDeleteMsg += `🎭 Tipe: Stiker`;
-                    } else if (hasImage) {
-                        antiDeleteMsg += `🖼️ Tipe: Gambar`;
-                    } else if (hasVideo) {
-                        antiDeleteMsg += `🎥 Tipe: Video`;
-                    } else if (hasAudio) {
-                        antiDeleteMsg += `🎵 Tipe: Audio`;
-                    } else if (hasDocument) {
-                        antiDeleteMsg += `📄 Tipe: Dokumen`;
+                let antiDeleteMsg = `🚫 *PESAN DIHAPUS*\n\n`;
+                antiDeleteMsg += `👤 Pengirim: ${senderName}\n`;
+                antiDeleteMsg += `📱 Nomor: ${sender.split("@")[0]}\n`;
+                antiDeleteMsg += `⏰ Waktu: ${new Date(storedMessage.messageTimestamp * 1000).toLocaleString("id-ID")}\n\n`;
+                
+                if (deletedContent) {
+                    antiDeleteMsg += `📝 Pesan:\n${deletedContent}`;
+                } else if (hasSticker) {
+                    antiDeleteMsg += `🎭 Tipe: Stiker`;
+                } else if (hasImage) {
+                    antiDeleteMsg += `🖼️ Tipe: Gambar`;
+                } else if (hasVideo) {
+                    antiDeleteMsg += `🎥 Tipe: Video`;
+                } else if (hasAudio) {
+                    antiDeleteMsg += `🎵 Tipe: Audio`;
+                } else if (hasDocument) {
+                    antiDeleteMsg += `📄 Tipe: Dokumen`;
+                }
+
+                await sock.sendMessage(from, { text: antiDeleteMsg });
+
+                // Resend media berdasarkan tipe
+                if (hasSticker) {
+                    try {
+                        const buffer = await downloadMediaMessage(
+                            storedMessage, "buffer", {},
+                            {
+                                logger: Pino({ level: "silent" }),
+                                reuploadRequest: sock.updateMediaMessage
+                            }
+                        );
+                        await sock.sendMessage(from, { sticker: buffer });
+                    } catch (e) {
+                        console.error(colors.red("❌ Failed to resend sticker:"), e.message);
                     }
-
-                    await sock.sendMessage(from, { text: antiDeleteMsg });
-
-                    // Resend media berdasarkan tipe
-                    if (hasSticker) {
-                        try {
-                            const buffer = await downloadMediaMessage(
-                                storedMessage, "buffer", {},
-                                {
-                                    logger: Pino({ level: "silent" }),
-                                    reuploadRequest: sock.updateMediaMessage
-                                }
-                            );
-                            await sock.sendMessage(from, { sticker: buffer });
-                        } catch (e) {
-                            console.error(colors.red("❌ Failed to resend sticker:"), e.message);
-                        }
-                    } else if (hasImage) {
-                        try {
-                            const buffer = await downloadMediaMessage(
-                                storedMessage, "buffer", {},
-                                {
-                                    logger: Pino({ level: "silent" }),
-                                    reuploadRequest: sock.updateMediaMessage
-                                }
-                            );
-                            await sock.sendMessage(from, {
-                                image: buffer,
-                                caption: "🖼️ Gambar yang dihapus"
-                            });
-                        } catch (e) {
-                            console.error(colors.red("❌ Failed to resend image:"), e.message);
-                        }
-                    } else if (hasVideo) {
-                        try {
-                            const buffer = await downloadMediaMessage(
-                                storedMessage, "buffer", {},
-                                {
-                                    logger: Pino({ level: "silent" }),
-                                    reuploadRequest: sock.updateMediaMessage
-                                }
-                            );
-                            await sock.sendMessage(from, {
-                                video: buffer,
-                                caption: "🎥 Video yang dihapus"
-                            });
-                        } catch (e) {
-                            console.error(colors.red("❌ Failed to resend video:"), e.message);
-                        }
-                    } else if (hasAudio) {
-                        try {
-                            const buffer = await downloadMediaMessage(
-                                storedMessage, "buffer", {},
-                                {
-                                    logger: Pino({ level: "silent" }),
-                                    reuploadRequest: sock.updateMediaMessage
-                                }
-                            );
-                            await sock.sendMessage(from, {
-                                audio: buffer,
-                                mimetype: "audio/mp4"
-                            });
-                        } catch (e) {
-                            console.error(colors.red("❌ Failed to resend audio:"), e.message);
-                        }
-                    } else if (hasDocument) {
-                        try {
-                            const buffer = await downloadMediaMessage(
-                                storedMessage, "buffer", {},
-                                {
-                                    logger: Pino({ level: "silent" }),
-                                    reuploadRequest: sock.updateMediaMessage
-                                }
-                            );
-                            await sock.sendMessage(from, {
-                                document: buffer,
-                                mimetype: storedMessage.message.documentMessage.mimetype,
-                                fileName: storedMessage.message.documentMessage.fileName,
-                                caption: "📄 Dokumen yang dihapus"
-                            });
-                        } catch (e) {
-                            console.error(colors.red("❌ Failed to resend document:"), e.message);
-                        }
+                } else if (hasImage) {
+                    try {
+                        const buffer = await downloadMediaMessage(
+                            storedMessage, "buffer", {},
+                            {
+                                logger: Pino({ level: "silent" }),
+                                reuploadRequest: sock.updateMediaMessage
+                            }
+                        );
+                        await sock.sendMessage(from, {
+                            image: buffer,
+                            caption: "🖼️ Gambar yang dihapus"
+                        });
+                    } catch (e) {
+                        console.error(colors.red("❌ Failed to resend image:"), e.message);
+                    }
+                } else if (hasVideo) {
+                    try {
+                        const buffer = await downloadMediaMessage(
+                            storedMessage, "buffer", {},
+                            {
+                                logger: Pino({ level: "silent" }),
+                                reuploadRequest: sock.updateMediaMessage
+                            }
+                        );
+                        await sock.sendMessage(from, {
+                            video: buffer,
+                            caption: "🎥 Video yang dihapus"
+                        });
+                    } catch (e) {
+                        console.error(colors.red("❌ Failed to resend video:"), e.message);
+                    }
+                } else if (hasAudio) {
+                    try {
+                        const buffer = await downloadMediaMessage(
+                            storedMessage, "buffer", {},
+                            {
+                                logger: Pino({ level: "silent" }),
+                                reuploadRequest: sock.updateMediaMessage
+                            }
+                        );
+                        await sock.sendMessage(from, {
+                            audio: buffer,
+                            mimetype: "audio/mp4"
+                        });
+                    } catch (e) {
+                        console.error(colors.red("❌ Failed to resend audio:"), e.message);
+                    }
+                } else if (hasDocument) {
+                    try {
+                        const buffer = await downloadMediaMessage(
+                            storedMessage, "buffer", {},
+                            {
+                                logger: Pino({ level: "silent" }),
+                                reuploadRequest: sock.updateMediaMessage
+                            }
+                        );
+                        await sock.sendMessage(from, {
+                            document: buffer,
+                            mimetype: storedMessage.message.documentMessage.mimetype,
+                            fileName: storedMessage.message.documentMessage.fileName,
+                            caption: "📄 Dokumen yang dihapus"
+                        });
+                    } catch (e) {
+                        console.error(colors.red("❌ Failed to resend document:"), e.message);
                     }
                 }
-                
-            } catch (error) {
-                console.error(colors.red("❌ Anti-delete error:"), error.message);
             }
+            
+            // ===== ANTI-EDIT =====
+            // Struktur edit di Baileys: update.update.message.editedMessage atau protocolMessage
+            else if (update.update?.message?.editedMessage || 
+                     update.update?.message?.protocolMessage?.type === 14) {
+                
+                console.log(colors.yellow(`✏️ Message edited detected`));
+                
+                const sender = storedMessage.key.participant || storedMessage.key.remoteJid;
+                const senderName = storedMessage.pushName || sender.split("@")[0];
+                
+                // Ambil pesan lama
+                let oldContent = storedMessage.message?.conversation ||
+                    storedMessage.message?.extendedTextMessage?.text || 
+                    "(kosong)";
+                
+                // Ambil pesan baru dari editedMessage
+                let newContent = "";
+                if (update.update.message?.editedMessage) {
+                    newContent = update.update.message.editedMessage.conversation ||
+                        update.update.message.editedMessage.extendedTextMessage?.text ||
+                        "(kosong)";
+                } else if (update.update.message?.protocolMessage) {
+                    // Untuk protocolMessage tipe 14 (edit)
+                    const editedMsg = update.update.message.protocolMessage.editedMessage;
+                    if (editedMsg) {
+                        newContent = editedMsg.conversation ||
+                            editedMsg.extendedTextMessage?.text ||
+                            "(kosong)";
+                    }
+                }
+
+                let antiEditMsg = `✏️ *PESAN DIEDIT*\n\n`;
+                antiEditMsg += `👤 Pengirim: ${senderName}\n`;
+                antiEditMsg += `📱 Nomor: ${sender.split("@")[0]}\n`;
+                antiEditMsg += `⏰ Waktu: ${new Date(storedMessage.messageTimestamp * 1000).toLocaleString("id-ID")}\n\n`;
+                antiEditMsg += `📝 Pesan Lama:\n${oldContent}\n\n`;
+                antiEditMsg += `✨ Pesan Baru:\n${newContent}`;
+
+                await sock.sendMessage(from, { text: antiEditMsg });
+                
+                // Update message store dengan pesan yang sudah diedit
+                const updatedMessage = update.update.message?.editedMessage || 
+                                      update.update.message?.protocolMessage?.editedMessage;
+                
+                if (updatedMessage) {
+                    messageStore.set(messageId, {
+                        message: {
+                            ...storedMessage,
+                            message: updatedMessage
+                        },
+                        from: from,
+                        timestamp: Date.now()
+                    });
+                    
+                    saveMessageStore(messageStore);
+                }
+            }
+            
+        } catch (error) {
+            console.error(colors.red("❌ Anti-delete/edit error:"), error.message);
+            console.error(error.stack);
         }
-    });
+    }
+});
 
     process.on("SIGINT", () => {
         console.log(colors.yellow("\n⏹️  Shutting down..."));
