@@ -162,6 +162,56 @@ const connect = async () => {
         const from = m.key.remoteJid;
         const messageId = m.key.id;
         
+        // ===== ANTI-EDIT DETECTION =====
+        const protocolMsg = m.message?.protocolMessage;
+        if (protocolMsg && protocolMsg.type === 1) { // MESSAGE_EDIT
+            const editedMsgId = protocolMsg.key?.id;
+            const storedData = messageStore.get(editedMsgId);
+            
+            if (storedData) {
+                const storedMessage = storedData.message;
+                const isGroup = from.endsWith("@g.us");
+                
+                // Skip jika dari group atau dari diri sendiri
+                if (!isGroup && !storedMessage.key.fromMe) {
+                    console.log(colors.yellow(`✏️ Message edited detected`));
+                    
+                    const sender = storedMessage.key.participant || storedMessage.key.remoteJid;
+                    const senderName = storedMessage.pushName || sender.split("@")[0];
+                    
+                    let oldContent = storedMessage.message?.conversation ||
+                        storedMessage.message?.extendedTextMessage?.text || "";
+                    
+                    let newContent = protocolMsg.editedMessage?.conversation ||
+                        protocolMsg.editedMessage?.extendedTextMessage?.text || "";
+
+                    let antiEditMsg = `✏️ *PESAN DIEDIT*\n\n`;
+                    antiEditMsg += `👤 Pengirim: ${senderName}\n`;
+                    antiEditMsg += `📱 Nomor: ${sender.split("@")[0]}\n`;
+                    antiEditMsg += `⏰ Waktu Asli: ${new Date(storedMessage.messageTimestamp * 1000).toLocaleString("id-ID")}\n`;
+                    antiEditMsg += `⏰ Waktu Edit: ${new Date(protocolMsg.timestampMs).toLocaleString("id-ID")}\n\n`;
+                    antiEditMsg += `📝 Pesan Lama:\n${oldContent || "(kosong)"}\n\n`;
+                    antiEditMsg += `✨ Pesan Baru:\n${newContent || "(kosong)"}`;
+
+                    await sock.sendMessage(from, { text: antiEditMsg });
+                    
+                    // Update stored message dengan versi terbaru
+                    messageStore.set(editedMsgId, {
+                        message: {
+                            ...storedMessage,
+                            message: protocolMsg.editedMessage,
+                            messageTimestamp: Math.floor(protocolMsg.timestampMs / 1000)
+                        },
+                        from: from,
+                        timestamp: Date.now()
+                    });
+                    saveMessageStore(messageStore);
+                }
+            }
+            return; // Skip processing lebih lanjut untuk protocol message
+        }
+        
+        // Store message untuk anti-delete & anti-edit
         if (messageStore.size >= MESSAGE_STORE_LIMIT) {
             const firstKey = messageStore.keys().next().value;
             messageStore.delete(firstKey);
@@ -353,7 +403,7 @@ const connect = async () => {
         }
     });
 
-    // ===== EVENT: ANTI-DELETE & ANTI-EDIT =====
+    // ===== EVENT: ANTI-DELETE =====
     sock.ev.on("messages.update", async (updates) => {
         for (const update of updates) {
             try {
@@ -492,42 +542,8 @@ const connect = async () => {
                     }
                 }
                 
-                // ===== ANTI-EDIT =====
-                if (update.update?.editedMessage) {
-                    console.log(colors.yellow(`✏️ Message edited detected`));
-                    
-                    const sender = storedMessage.key.participant || storedMessage.key.remoteJid;
-                    const senderName = storedMessage.pushName || sender.split("@")[0];
-                    
-                    let oldContent = storedMessage.message?.conversation ||
-                        storedMessage.message?.extendedTextMessage?.text || "";
-                    
-                    let newContent = update.update.editedMessage?.conversation ||
-                        update.update.editedMessage?.extendedTextMessage?.text || "";
-
-                    let antiEditMsg = `✏️ *PESAN DIEDIT*\n\n`;
-                    antiEditMsg += `👤 Pengirim: ${senderName}\n`;
-                    antiEditMsg += `📱 Nomor: ${sender.split("@")[0]}\n`;
-                    antiEditMsg += `⏰ Waktu: ${new Date(storedMessage.messageTimestamp * 1000).toLocaleString("id-ID")}\n\n`;
-                    antiEditMsg += `📝 Pesan Lama:\n${oldContent || "(kosong)"}\n\n`;
-                    antiEditMsg += `✨ Pesan Baru:\n${newContent || "(kosong)"}`;
-
-                    await sock.sendMessage(from, { text: antiEditMsg });
-                    
-                    messageStore.set(messageId, {
-                        message: {
-                            ...storedMessage,
-                            message: update.update.editedMessage
-                        },
-                        from: from,
-                        timestamp: Date.now()
-                    });
-                    
-                    saveMessageStore(messageStore);
-                }
-                
             } catch (error) {
-                console.error(colors.red("❌ Anti-delete/edit error:"), error.message);
+                console.error(colors.red("❌ Anti-delete error:"), error.message);
             }
         }
     });
