@@ -1,77 +1,112 @@
-// ai-edit-image.js
-import upload from '../lib/upload.js'; // pastikan path benar
-// jika environment-mu tidak support import, ubah ke require:
-// const upload = require('../lib/upload.js');
+// plugins/ai-edit-image.js
+// Plugin untuk edit gambar dengan AI (endpoint: wudysoft.xyz nano-banana v17)
+// Export default function sesuai pola project plugin-bot-wa yang kamu pakai.
+
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
+
+// jika environmentmu memakai require, ganti import upload dengan require:
+// const upload = require("../lib/upload.js");
+import upload from "../lib/upload.js";
 
 export default async function ({ sock, from, args, text, m, fileBuffer, reply }) {
-  // text berisi prompt (wrapper menyediakan text = args.join(" "))
-  const prompt = (text || '').trim();
-
   try {
-    // 1) cek ada media
-    if (!fileBuffer) {
+    // Ambil prompt: prioritas = text (wrapper menyediakan), lalu args join
+    const prompt = (typeof text === "string" && text.trim().length > 0)
+      ? text.trim()
+      : (Array.isArray(args) && args.length ? args.join(" ").trim() : "");
+
+    // Jika tidak ada prompt, beri contoh/petunjuk penggunaan singkat
+    if (!prompt) {
       return await reply(
-        'Gagal: tidak ada gambar.\nCara pakai: balas sebuah gambar atau kirim gambar bersama caption/pesan yang berisi prompt.\nContoh: kirim gambar lalu tulis "ubah jadi gaya kartun" sebagai caption atau reply.'
+        "Gunakan perintah ini dengan menyertakan prompt teks dan reply ke gambar.\nContoh: */ai-edit tambahkan topi merah pada orang di foto* (reply ke gambar)."
       );
     }
 
-    // 2) upload fileBuffer ke host (../lib/upload.js) -> harus mengembalikan URL string
-    let imageUrl;
+    // fileBuffer disediakan oleh wrapper ketika ada media (lihat context project).
+    // Jika tidak tersedia, beri tahu cara pakai.
+    if (!fileBuffer) {
+      return await reply(
+        "Gagal menemukan gambar. Reply ke gambar yang ingin diedit atau kirim gambar bersama perintah.\nContoh: reply ke gambar lalu ketik perintah dengan prompt."
+      );
+    }
+
+    // Upload gambar ke host yang tersedia via ../lib/upload.js
+    // upload(fileBuffer) => harus mengembalikan URL string (sesuai modulmu).
+    let uploadedUrl;
     try {
-      imageUrl = await upload(fileBuffer);
-    } catch (e) {
-      console.error('Upload error:', e);
-      return await reply('Gagal meng-upload gambar ke host. Cek konfigurasi ../lib/upload.js');
+      uploadedUrl = await upload(fileBuffer);
+      if (!uploadedUrl || typeof uploadedUrl !== "string") {
+        throw new Error("upload.js tidak mengembalikan URL string yang valid.");
+      }
+    } catch (errUpload) {
+      console.error("Upload error:", errUpload);
+      return await reply("Gagal upload gambar ke host. Cek modul ../lib/upload.js dan coba lagi.");
     }
 
-    if (!imageUrl || typeof imageUrl !== 'string') {
-      return await reply('Upload gagal: modul upload tidak mengembalikan URL string.');
-    }
+    // Build endpoint (GET dengan query params). Pastikan encodeURIComponent.
+    const apiBase = "https://wudysoft.xyz/api/ai/nano-banana/v17";
+    const url = `${apiBase}?prompt=${encodeURIComponent(prompt)}&imageUrl=${encodeURIComponent(uploadedUrl)}`;
 
-    // 3) panggil API nano-banana dengan prompt & imageUrl
-    const apiBase = 'https://api.nekolabs.my.id/ai/gemini/nano-banana';
-    const apiUrl = `${apiBase}?prompt=${encodeURIComponent(prompt)}&imageUrl=${encodeURIComponent(imageUrl)}`;
-
+    // Panggil API eksternal
     let apiRes;
     try {
-      const res = await fetch(apiUrl, {
-        method: 'GET',
+      const res = await fetch(url, {
+        method: "GET",
         headers: {
-          'Accept': 'application/json'
-        }
+          "Accept": "application/json"
+        },
+        // optional: timeout handling not added (depends runtime)
       });
+
+      if (!res.ok) {
+        const textErr = await res.text().catch(()=>"[non-json response]");
+        console.error("AI API returned non-OK:", res.status, textErr);
+        return await reply(`AI service error: ${res.status}.`);
+      }
+
       apiRes = await res.json();
-    } catch (e) {
-      console.error('API request error:', e);
-      return await reply('Gagal memanggil API edit gambar. Cek koneksi atau endpoint API.');
+    } catch (err) {
+      console.error("Fetch error:", err);
+      return await reply("Gagal menghubungi layanan AI. Coba lagi nanti.");
     }
 
-    // 4) tangani response
-    // contoh respon yang kamu berikan:
-    // { "success": true, "result": "url hasil" }
-    if (!apiRes || apiRes.success !== true || !apiRes.result) {
-      console.error('API returned unexpected:', apiRes);
-      const pretty = JSON.stringify(apiRes, null, 2);
-      return await reply(`API mengembalikan hasil yang tidak diharapkan:\n${pretty}`);
+    // Contoh response yang diharapkan:
+    // {
+    //  "status": "succeeded",
+    //  "result": ["https://.../edited.jpg"],
+    //  "prompt": "..."
+    // }
+    if (!apiRes || (apiRes.status !== "succeeded" && apiRes.status !== "success")) {
+      // tampilkan pesan singkat dan debug minimal dari response
+      return await reply(`Proses edit gagal. Response: ${JSON.stringify(apiRes)}`);
     }
 
-    const resultUrl = apiRes.result;
+    // Ambil URL hasil (array result)
+    const results = Array.isArray(apiRes.result) ? apiRes.result : [];
+    if (results.length === 0) {
+      return await reply("Layanan AI tidak mengembalikan URL hasil.");
+    }
 
-    // 5) kirim hasil ke pengguna: coba kirim sebagai gambar via URL (WhatsApp mendukung fetch dari url)
+    // Gunakan hasil pertama
+    const resultUrl = results[0];
+
+    // Kirim hasil ke chat: pertama kirim teks URL, lalu kirim gambar (jika WA client mendukung pengiriman via URL)
     try {
-      await reply({
-        image: { url: resultUrl },
-        caption: `Selesai — hasil edit (prompt: ${prompt || '-'})`
-      });
-      return;
-    } catch (e) {
-      // jika kirim sebagai image gagal, kirim link sebagai fallback
-      console.warn('Gagal mengirim image message, fallback ke teks. error:', e);
-      await reply(`Hasil telah diproses, tapi gagal mengirim gambar langsung.\nLink hasil: ${resultUrl}`);
-      return;
+      // Kirim gambar secara langsung
+      await reply({ image: { url: resultUrl }, caption: `Hasil edit — prompt: ${apiRes.prompt || prompt}` });
+    } catch (errSendImage) {
+      // jika pengiriman media gagal (beberapa env tidak mendukung url langsung), kirim hanya teks
+      console.warn("Gagal kirim gambar langsung, mengirim URL sebagai teks:", errSendImage);
+      await reply(`Hasil edit: ${resultUrl}\nPrompt: ${apiRes.prompt || prompt}`);
     }
-  } catch (err) {
-    console.error('Unexpected error in ai-edit-image plugin:', err);
-    await reply('Terjadi error saat memproses permintaan. Cek logs pada server.');
+
+    // Selesai
+    return;
+  } catch (errTop) {
+    console.error("Unhandled plugin error:", errTop);
+    try { await reply("Terjadi kesalahan saat memproses permintaan. Cek log server."); } catch {}
+    return;
   }
 }
