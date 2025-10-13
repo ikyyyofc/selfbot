@@ -529,12 +529,18 @@ sock.ev.on("messages.update", async (updates) => {
                     // Jika sudah pernah di-edit, ambil dari history terakhir
                     const lastEdit = storedData.editHistory[storedData.editHistory.length - 1];
                     oldContent = lastEdit.message?.conversation ||
-                        lastEdit.message?.extendedTextMessage?.text || 
+                        lastEdit.message?.extendedTextMessage?.text ||
+                        lastEdit.message?.imageMessage?.caption ||
+                        lastEdit.message?.videoMessage?.caption ||
+                        lastEdit.message?.documentMessage?.caption ||
                         "(kosong)";
                 } else {
                     // Jika belum pernah di-edit, ambil dari original
                     oldContent = storedMessage.message?.conversation ||
-                        storedMessage.message?.extendedTextMessage?.text || 
+                        storedMessage.message?.extendedTextMessage?.text ||
+                        storedMessage.message?.imageMessage?.caption ||
+                        storedMessage.message?.videoMessage?.caption ||
+                        storedMessage.message?.documentMessage?.caption ||
                         "(kosong)";
                 }
                 
@@ -548,6 +554,9 @@ sock.ev.on("messages.update", async (updates) => {
                         newMessageObj = editedMsg;
                         newContent = editedMsg.conversation ||
                             editedMsg.extendedTextMessage?.text ||
+                            editedMsg.imageMessage?.caption ||
+                            editedMsg.videoMessage?.caption ||
+                            editedMsg.documentMessage?.caption ||
                             "(kosong)";
                     } else {
                         newContent = "(kosong)";
@@ -558,6 +567,9 @@ sock.ev.on("messages.update", async (updates) => {
                         newMessageObj = editedMsg;
                         newContent = editedMsg.conversation ||
                             editedMsg.extendedTextMessage?.text ||
+                            editedMsg.imageMessage?.caption ||
+                            editedMsg.videoMessage?.caption ||
+                            editedMsg.documentMessage?.caption ||
                             "(kosong)";
                     } else {
                         newContent = "(kosong)";
@@ -565,10 +577,25 @@ sock.ev.on("messages.update", async (updates) => {
                 } else {
                     newContent = "(kosong)";
                 }
+                
+                // Deteksi tipe pesan
+                const originalMsg = storedMessage.message;
+                let messageType = "teks";
+                if (originalMsg?.imageMessage) messageType = "🖼️ Gambar";
+                else if (originalMsg?.videoMessage) messageType = "🎥 Video";
+                else if (originalMsg?.documentMessage) messageType = "📄 Dokumen";
+                else if (originalMsg?.audioMessage) messageType = "🎵 Audio";
+                else if (originalMsg?.stickerMessage) messageType = "🎭 Stiker";
 
                 let antiEditMsg = `✏️ *PESAN DIEDIT*\n\n`;
                 antiEditMsg += `👤 Pengirim: ${senderName}\n`;
                 antiEditMsg += `📱 Nomor: ${sender.split("@")[0]}\n`;
+                
+                // Tampilkan tipe pesan jika bukan teks biasa
+                if (messageType !== "teks") {
+                    antiEditMsg += `📦 Tipe: ${messageType}\n`;
+                }
+                
                 antiEditMsg += `⏰ Waktu Original: ${new Date(storedMessage.messageTimestamp * 1000).toLocaleString("id-ID")}\n`;
                 antiEditMsg += `⏰ Waktu Edit: ${new Date().toLocaleString("id-ID")}\n\n`;
                 
@@ -576,8 +603,14 @@ sock.ev.on("messages.update", async (updates) => {
                 const editCount = (storedData.editHistory?.length || 0) + 1;
                 antiEditMsg += `🔢 Edit ke-${editCount}\n\n`;
                 
-                antiEditMsg += `📝 Pesan Lama:\n${oldContent}\n\n`;
-                antiEditMsg += `✨ Pesan Baru:\n${newContent}`;
+                // Untuk media, tampilkan "Caption" bukan "Pesan"
+                if (messageType !== "teks") {
+                    antiEditMsg += `📝 Caption Lama:\n${oldContent}\n\n`;
+                    antiEditMsg += `✨ Caption Baru:\n${newContent}`;
+                } else {
+                    antiEditMsg += `📝 Pesan Lama:\n${oldContent}\n\n`;
+                    antiEditMsg += `✨ Pesan Baru:\n${newContent}`;
+                }
 
                 await sock.sendMessage(from, { text: antiEditMsg });
                 
