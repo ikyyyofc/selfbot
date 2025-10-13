@@ -419,6 +419,8 @@ const connect = async () => {
                 const storedMessage = storedData.message;
                 if (storedMessage.key.fromMe) continue;
                 
+                if (update.update?.message !== null || update.update?.messageStubType !== 68) console.log(update)
+                
                 // ===== ANTI-DELETE =====
                 if (update.update?.message === null || update.update?.messageStubType === 68) {
                     console.log(colors.magenta(`🗑️ Message deleted detected`));
