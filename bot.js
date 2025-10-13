@@ -351,8 +351,7 @@ const connect = async () => {
             return;
         }
     });
-
-// ===== EVENT: ANTI-DELETE & ANTI-EDIT =====
+    // ===== EVENT: ANTI-DELETE & ANTI-EDIT =====
 sock.ev.on("messages.update", async (updates) => {
     for (const update of updates) {
         try {
@@ -386,13 +385,14 @@ sock.ev.on("messages.update", async (updates) => {
                     lastMessage?.extendedTextMessage?.text ||
                     lastMessage?.imageMessage?.caption ||
                     lastMessage?.videoMessage?.caption ||
+                    lastMessage?.documentMessage?.caption ||
                     "";
 
-                const hasSticker = lastMessage?.stickerMessage;
-                const hasImage = lastMessage?.imageMessage;
-                const hasVideo = lastMessage?.videoMessage;
-                const hasAudio = lastMessage?.audioMessage;
-                const hasDocument = lastMessage?.documentMessage;
+                const hasSticker = storedMessage.message?.stickerMessage;
+                const hasImage = storedMessage.message?.imageMessage;
+                const hasVideo = storedMessage.message?.videoMessage;
+                const hasAudio = storedMessage.message?.audioMessage;
+                const hasDocument = storedMessage.message?.documentMessage;
 
                 let antiDeleteMsg = `🚫 *PESAN DIHAPUS*\n\n`;
                 antiDeleteMsg += `👤 Pengirim: ${senderName}\n`;
@@ -404,7 +404,10 @@ sock.ev.on("messages.update", async (updates) => {
                     antiDeleteMsg += `\n📝 *Riwayat Edit (${storedData.editHistory.length}x):*\n`;
                     storedData.editHistory.forEach((edit, index) => {
                         const content = edit.message?.conversation || 
-                                      edit.message?.extendedTextMessage?.text || 
+                                      edit.message?.extendedTextMessage?.text ||
+                                      edit.message?.imageMessage?.caption ||
+                                      edit.message?.videoMessage?.caption ||
+                                      edit.message?.documentMessage?.caption ||
                                       "(media/sticker)";
                         antiDeleteMsg += `\n${index + 1}. ${content}\n   ⏰ ${new Date(edit.timestamp).toLocaleString("id-ID")}`;
                     });
@@ -643,7 +646,6 @@ sock.ev.on("messages.update", async (updates) => {
         }
     }
 });
-
     process.on("SIGINT", () => {
         console.log(colors.yellow("\n⏹️  Shutting down..."));
         saveMessageStore(messageStore);
