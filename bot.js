@@ -414,7 +414,7 @@ const connect = async () => {
                     from,
                     args,
                     text: args.join(" "),
-                    message: m,
+                    m,
                     fileBuffer,
                     reply: async content => {
                         if (typeof content === "string") {
