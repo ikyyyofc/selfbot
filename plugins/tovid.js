@@ -1,5 +1,5 @@
 import axios from "axios"
-import cheerio from "cheerio"
+import * as cheerio from "cheerio"
 import fs from "fs"
 import { downloadMediaMessage } from "@whiskeysockets/baileys"
 import upload from "../lib/upload.js"
