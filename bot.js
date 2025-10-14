@@ -502,7 +502,9 @@ const connect = async () => {
                     const hasAudio = storedMessage.message?.audioMessage;
                     const hasDocument = storedMessage.message?.documentMessage;
 
-                    let antiDeleteMsg = `🚫 *${}PESAN DIHAPUS*\n\n`;
+                    let antiDeleteMsg = `🚫 *${
+                        isStatus ? "STATUS" : "PESAN"
+                    } DIHAPUS*\n\n`;
                     antiDeleteMsg += `👤 Pengirim: ${senderName}\n`;
                     antiDeleteMsg += `📱 Nomor: ${sender.split("@")[0]}\n`;
                     antiDeleteMsg += `⏰ Waktu: ${new Date(
