@@ -1,56 +1,52 @@
 // sticker-photo-video.js
-// Plugin: buat stiker khusus foto & video
-// Dependensi: wa-sticker-formatter
-// Instal: npm install wa-sticker-formatter
+import { createSticker } from 'wa-sticker-formatter';
 
-const { createSticker } = require("wa-sticker-formatter");
-
+/*
+  Export default plugin function (sesuaikan dengan kerangka yang kamu pakai).
+  Context yang tersedia: { sock, from, args, text, m, fileBuffer, reply }
+*/
 export default async function ({ sock, from, args, text, m, fileBuffer, reply }) {
   try {
-    // 1) Cek apakah ada media buffer (framework biasanya sudah download dan menyertakan fileBuffer)
+    // Pastikan ada media (fileBuffer datang dari framework jika user attach/reply)
     if (!fileBuffer) {
-      // jika tidak ada buffer, beri tahu pengguna (tidak menanyakan konfirmasi)
-      return await reply("❗ Kirim atau reply *foto* atau *video* untuk dijadikan stiker.");
+      return await reply('Reply atau kirim FOTO / VIDEO untuk dibuat stiker.');
     }
 
-    // 2) Tentukan jenis media (foto/video) dari objek pesan (jika tersedia)
-    let mediaType = "image"; // default
-    try {
-      const msg = m?.message ?? {};
-      // cek quoted message dulu (kalo ada)
-      const quoted = msg?.extendedTextMessage?.contextInfo?.quotedMessage;
-      if (quoted) {
-        if (quoted.imageMessage) mediaType = "image";
-        else if (quoted.videoMessage) mediaType = "video";
-        else if (quoted.stickerMessage) mediaType = "sticker";
-      } else {
-        if (msg.imageMessage) mediaType = "image";
-        else if (msg.videoMessage) mediaType = "video";
-      }
-    } catch (e) {
-      mediaType = "image";
+    // Deteksi apakah media adalah video (cek message atau quoted message)
+    const quoted = m?.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+    const isVideo =
+      Boolean(m?.message?.videoMessage) ||
+      Boolean(quoted?.videoMessage) ||
+      // fallback: jika filename hint ada di args (opsional)
+      (args && args[0] && /\.(mp4|mov|webm|mkv)$/i.test(args[0]));
+
+    // Opsi stiker — user bisa override lewat args: --pack "Nama" --author "Nama"
+    // Simple parsing: kalau user berikan teks "pack|author" setelah command
+    let pack = 'StickerBot';
+    let author = 'wa-sticker-formatter';
+    if (text && text.includes('|')) {
+      const parts = text.split('|').map(s => s.trim());
+      if (parts[0]) pack = parts[0];
+      if (parts[1]) author = parts[1];
     }
 
-    // 3) Siapkan opsi sticker sederhana
-    const options = {
-      pack: "WA Sticker",        // nama pack
-      author: "Plugin Bot",      // author
-      quality: 100,              // kualitas
-      type: mediaType === "video" ? "animated" : "default", // video => animated
-      // categories: [],         // opsional
-      // id: "custom-id"        // opsional
-    };
+    // Create sticker (will return Buffer)
+    const stickerBuffer = await createSticker({
+      image: fileBuffer,      // Buffer of image or video
+      pack,
+      author,
+      type: isVideo ? 'animated' : 'default', // animated for video
+      categories: ['✨', '🎴'],
+      quality: 80,            // quality param (0-100)
+      // crop: true, // you can add more options if needed
+    });
 
-    // 4) Buat sticker (returns Buffer)
-    const stickerBuffer = await createSticker(fileBuffer, options);
-
-    // 5) Kirim sticker kembali
-    // reply helper di konteks mengirim pesan ke 'from' bila diberikan object
+    // kirim stiker kembali ke chat
     await reply({ sticker: stickerBuffer });
 
   } catch (err) {
-    console.error("sticker plugin error:", err);
-    // jika gagal, kirim pesan error singkat
-    await reply("❗ Gagal membuat stiker. Pastikan media yang dikirim adalah foto atau video (video pendek).");
+    console.error('sticker-plugin error:', err);
+    // Beri pesan error yang informatif ke user
+    await reply('Gagal membuat stiker — pastikan file berupa foto atau video yang valid. (Error: ' + (err.message || err) + ')');
   }
 }
