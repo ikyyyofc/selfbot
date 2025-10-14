@@ -25,7 +25,7 @@ export default async function ({ m, fileBuffer, reply }) {
         await writeFile(tempInput, fileBuffer);
 
         if (isAnimated) {
-            await execPromise(`ffmpeg -i "${tempInput}" -c:v libx264 -pix_fmt yuv420p "${tempOutput}"`);
+            await execPromise(`ffmpeg -i "${tempInput}" -vcodec libx264 -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" "${tempOutput}"`);
         } else {
             await execPromise(`ffmpeg -i "${tempInput}" "${tempOutput}"`);
         }
@@ -42,6 +42,7 @@ export default async function ({ m, fileBuffer, reply }) {
         await unlink(tempOutput).catch(() => {});
 
     } catch (error) {
-        await reply("❌ Gagal mengubah stiker. Pastikan reply stiker yang valid!");
+        console.error("Error converting sticker:", error);
+        await reply(`❌ Gagal mengubah stiker: ${error.message}`);
     }
 }
