@@ -1,71 +1,56 @@
-// plugin-sticker-photo-video.js
-import { createSticker } from "wa-sticker-formatter";
+// sticker-photo-video.js
+// Plugin: buat stiker khusus foto & video
+// Dependensi: wa-sticker-formatter
+// Instal: npm install wa-sticker-formatter
 
-/**
- * Export default plugin function — dipanggil oleh host (lihat contoh project).
- * Context params available:
- *  - sock: connection object (untuk sendMessage)
- *  - from: chat id
- *  - args: array dari pesan split
- *  - text: teks utuh (caption / argumen)
- *  - m: raw message object
- *  - fileBuffer: Buffer media (jika wrapper sudah mendownload)
- *  - reply: helper untuk mengirim reply (fallback)
- */
+const { createSticker } = require("wa-sticker-formatter");
+
 export default async function ({ sock, from, args, text, m, fileBuffer, reply }) {
   try {
-    // Ambil media buffer
-    // wrapper yang kamu tunjukkan biasanya sudah menyediakan fileBuffer.
-    // Jika tidak tersedia, coba ambil dari quoted message info (host wrapper mungkin sudah handle, tapi safe-check).
+    // 1) Cek apakah ada media buffer (framework biasanya sudah download dan menyertakan fileBuffer)
     if (!fileBuffer) {
-      // Jika tidak ada fileBuffer, informasikan cara pakai
-      return await reply(
-        "Balas foto atau video dengan perintah ini, atau kirim foto/video langsung. Plugin ini membutuhkan media (photo/video)."
-      );
+      // jika tidak ada buffer, beri tahu pengguna (tidak menanyakan konfirmasi)
+      return await reply("❗ Kirim atau reply *foto* atau *video* untuk dijadikan stiker.");
     }
 
-    // Tentukan tipe media dari message (video atau image).
-    const isVideo =
-      (m?.message?.videoMessage !== undefined) ||
-      (m?.message?.extendedTextMessage?.contextInfo?.quotedMessage?.videoMessage !== undefined);
-
-    // Opsi pack & author bisa diberikan lewat caption / args dengan format "Pack|Author"
-    // Contoh: "MyPack|Me" atau hanya "MyPack"
-    let packName = "Sticker";
-    let authorName = "Bot";
-    if (text && text.trim()) {
-      const parts = text.split("|").map((p) => p.trim());
-      if (parts[0]) packName = parts[0].slice(0, 30);
-      if (parts[1]) authorName = parts[1].slice(0, 30);
-    } else if (args && args.length) {
-      // fallback: args join
-      const parts = args.join(" ").split("|").map((p) => p.trim());
-      if (parts[0]) packName = parts[0].slice(0, 30);
-      if (parts[1]) authorName = parts[1].slice(0, 30);
-    }
-
-    // Buat sticker menggunakan wa-sticker-formatter
-    // Untuk video, set type: 'video' ; untuk gambar, 'image'
-    const stickerBuffer = await createSticker(fileBuffer, {
-      pack: packName,
-      author: authorName,
-      type: isVideo ? "video" : "image", // 'video' untuk webp animasi, 'image' untuk webp statis
-      quality: 85, // kualitas (0-100)
-      categories: ["🤖", "📸"], // opsional
-    });
-
-    // Kirim stiker ke chat — gunakan sendMessage bawaan WA
-    await sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: m });
-
-    // Optional: konfirmasi
-    // Tidak perlu reply tambahan, tapi kalau host prefer reply:
-    // await reply("Selesai — stiker terkirim!");
-  } catch (err) {
-    console.error("Plugin sticker error:", err);
+    // 2) Tentukan jenis media (foto/video) dari objek pesan (jika tersedia)
+    let mediaType = "image"; // default
     try {
-      await reply("Gagal membuat stiker: " + (err?.message || String(err)));
+      const msg = m?.message ?? {};
+      // cek quoted message dulu (kalo ada)
+      const quoted = msg?.extendedTextMessage?.contextInfo?.quotedMessage;
+      if (quoted) {
+        if (quoted.imageMessage) mediaType = "image";
+        else if (quoted.videoMessage) mediaType = "video";
+        else if (quoted.stickerMessage) mediaType = "sticker";
+      } else {
+        if (msg.imageMessage) mediaType = "image";
+        else if (msg.videoMessage) mediaType = "video";
+      }
     } catch (e) {
-      // ignore
+      mediaType = "image";
     }
+
+    // 3) Siapkan opsi sticker sederhana
+    const options = {
+      pack: "WA Sticker",        // nama pack
+      author: "Plugin Bot",      // author
+      quality: 100,              // kualitas
+      type: mediaType === "video" ? "animated" : "default", // video => animated
+      // categories: [],         // opsional
+      // id: "custom-id"        // opsional
+    };
+
+    // 4) Buat sticker (returns Buffer)
+    const stickerBuffer = await createSticker(fileBuffer, options);
+
+    // 5) Kirim sticker kembali
+    // reply helper di konteks mengirim pesan ke 'from' bila diberikan object
+    await reply({ sticker: stickerBuffer });
+
+  } catch (err) {
+    console.error("sticker plugin error:", err);
+    // jika gagal, kirim pesan error singkat
+    await reply("❗ Gagal membuat stiker. Pastikan media yang dikirim adalah foto atau video (video pendek).");
   }
 }
