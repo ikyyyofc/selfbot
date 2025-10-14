@@ -464,11 +464,6 @@ const connect = async () => {
                 const storedMessage = storedData.message;
                 if (storedMessage.key.fromMe) continue;
 
-                console.log(
-                    colors.blue("📋 Update received:"),
-                    JSON.stringify(update, null, 2)
-                );
-
                 // ===== ANTI-DELETE =====
                 if (
                     update.update?.message === null ||
