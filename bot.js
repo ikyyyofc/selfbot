@@ -4,7 +4,8 @@ import makeWASocket, {
     useMultiFileAuthState,
     DisconnectReason,
     downloadMediaMessage,
-    makeCacheableSignalKeyStore
+    makeCacheableSignalKeyStore,
+    fetchLatestWaWebVersion
 } from "@whiskeysockets/baileys";
 import Pino from "pino";
 import { Boom } from "@hapi/boom";
