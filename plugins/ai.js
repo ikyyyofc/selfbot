@@ -53,7 +53,7 @@ Kalau bahas hal teknis, jelasin dengan bahasa sederhana dan santai.`
       return reply("⚠️ Gagal mendapatkan jawaban dari AI.");
     }
 
-    await reply(`🤖 *Jawaban AI:*\n\n${result}`);
+    await reply(result);
   } catch (err) {
     console.error(err);
     reply("❌ Terjadi kesalahan saat memproses permintaan ke AI.");
