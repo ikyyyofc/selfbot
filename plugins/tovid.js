@@ -1,9 +1,9 @@
-import { writeFile, unlink, readFile, mkdir } from "fs/promises";
+import { writeFile, unlink, readFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { exec } from "child_process";
 import { promisify } from "util";
-import { existsSync } from "fs";
+import fetch from "node-fetch";
 
 const execPromise = promisify(exec);
 
@@ -21,37 +21,54 @@ export default async function ({ m, fileBuffer, reply }) {
 
         const isAnimated = quotedMsg.stickerMessage.isAnimated;
         const timestamp = Date.now();
-        const tempInput = join(tmpdir(), `sticker_${timestamp}.webp`);
-
-        await writeFile(tempInput, fileBuffer);
 
         if (isAnimated) {
-            // Convert animated webp to gif first, then to mp4
-            const tempGif = join(tmpdir(), `temp_${timestamp}.gif`);
-            const tempOutput = join(tmpdir(), `converted_${timestamp}.mp4`);
+            // Upload ke service converter online
+            const formData = new (await import("form-data")).default();
+            formData.append("file", fileBuffer, { filename: "sticker.webp" });
 
-            try {
-                // WebP to GIF (more compatible)
-                await execPromise(`ffmpeg -i "${tempInput}" "${tempGif}"`);
-                
-                // GIF to MP4
-                await execPromise(`ffmpeg -i "${tempGif}" -movflags faststart -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" "${tempOutput}"`);
-                
-                const convertedBuffer = await readFile(tempOutput);
-                
-                await reply({
-                    video: convertedBuffer,
-                    caption: "✅ Stiker animasi berhasil diubah menjadi video"
-                });
+            const response = await fetch("https://api.ezgif.com/webp-to-mp4", {
+                method: "POST",
+                body: formData
+            });
 
-                await unlink(tempGif).catch(() => {});
-                await unlink(tempOutput).catch(() => {});
-            } catch (err) {
-                throw new Error("Gagal convert animated sticker: " + err.message);
+            if (!response.ok) {
+                throw new Error("Gagal upload ke converter");
             }
+
+            const result = await response.json();
+            
+            if (!result.file) {
+                throw new Error("Format stiker tidak didukung");
+            }
+
+            // Convert menggunakan API
+            const convertResponse = await fetch("https://api.ezgif.com/webp-to-mp4/" + result.file, {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" }
+            });
+
+            const convertResult = await convertResponse.json();
+            
+            if (!convertResult.url) {
+                throw new Error("Gagal konversi stiker");
+            }
+
+            // Download hasil
+            const videoResponse = await fetch(convertResult.url);
+            const videoBuffer = await videoResponse.buffer();
+
+            await reply({
+                video: videoBuffer,
+                caption: "✅ Stiker animasi berhasil diubah menjadi video"
+            });
+
         } else {
+            // Stiker statis langsung convert dengan ffmpeg
+            const tempInput = join(tmpdir(), `sticker_${timestamp}.webp`);
             const tempOutput = join(tmpdir(), `converted_${timestamp}.png`);
             
+            await writeFile(tempInput, fileBuffer);
             await execPromise(`ffmpeg -i "${tempInput}" "${tempOutput}"`);
             
             const convertedBuffer = await readFile(tempOutput);
@@ -61,10 +78,9 @@ export default async function ({ m, fileBuffer, reply }) {
                 caption: "✅ Stiker berhasil diubah menjadi gambar"
             });
 
+            await unlink(tempInput).catch(() => {});
             await unlink(tempOutput).catch(() => {});
         }
-
-        await unlink(tempInput).catch(() => {});
 
     } catch (error) {
         console.error("Error converting sticker:", error);
