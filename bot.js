@@ -115,6 +115,7 @@ const connect = async () => {
         logger: Pino({ level: "silent" }),
         syncFullHistory: false,
         markOnlineOnConnect: false,
+        generateHighQualityLinkPreview: true,
         version
     });
 
