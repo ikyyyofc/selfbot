@@ -374,7 +374,8 @@ const connect = async () => {
                     quotedMsg?.imageMessage ||
                     quotedMsg?.videoMessage ||
                     quotedMsg?.documentMessage ||
-                    quotedMsg?.audioMessage
+                    quotedMsg?.audioMessage ||
+                    quotedMsg?.stickerMessage
                 ) {
                     try {
                         fileBuffer = await downloadMediaMessage(
