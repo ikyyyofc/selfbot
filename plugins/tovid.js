@@ -3,6 +3,7 @@ import * as cheerio from "cheerio"
 import fs from "fs"
 import { downloadMediaMessage } from "@whiskeysockets/baileys"
 import upload from "../lib/upload.js"
+import Pino from "pino";
 
 async function converter(url) {
   const res = await axios("https://ezgif.com/webp-to-mp4?url=" + url)
