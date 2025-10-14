@@ -47,7 +47,7 @@ export default async function ({ sock, from, args, text, m, reply }) {
 
     // helper: cek admin
     const isAdmin = (jid) => {
-      const p = metadata.participants?.find((x) => x.id === jid);
+      const p = metadata.participants?.find((x) => x.jid === jid);
       if (!p) return false;
       // beberapa versi pakai 'isAdmin' atau 'admin'
       return !!(p.admin || p.isAdmin || p.isSuperAdmin || p.admin === "admin" || p.admin === "superadmin");
