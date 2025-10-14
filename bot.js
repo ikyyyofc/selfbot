@@ -187,24 +187,30 @@ const connect = async () => {
     });
 
     sock.ev.on("messages.upsert", async ({ messages, type }) => {
-        const m = messages[0];
-        if (!m.message) return;
+    const m = messages[0];
+    if (!m.message) return;
 
-        const from = m.key.remoteJid;
-        const messageId = m.key.id;
+    const from = m.key.remoteJid;
+    const messageId = m.key.id;
 
-        // ===== ANTI-VIEWONCE DETECTION =====
-        const isViewOnce = m.message?.viewOnceMessageV2 || m.message?.viewOnceMessage;
-        let viewOnceText = ""; // Untuk menyimpan text/caption dari viewonce
+    // ===== ANTI-VIEWONCE DETECTION =====
+    const isViewOnce = m.message?.viewOnceMessageV2 || m.message?.viewOnceMessage;
+    let viewOnceText = "";
+    let processedViewOnce = false; // Flag untuk track apakah ViewOnce sudah diproses
+    
+    if (isViewOnce) {
+        const isGroup = from.endsWith("@g.us");
         
-        if (isViewOnce) {
-            const isGroup = from.endsWith("@g.us");
-            
-            // Skip jika dari grup atau dari diri sendiri (TIDAK DISIMPAN)
-            if (isGroup || m.key.fromMe) {
-                return;
-            }
-            
+        // Skip jika dari grup
+        if (isGroup) {
+            return;
+        }
+        
+        // Jika dari diri sendiri, skip anti-viewonce tapi lanjut ke command processing
+        if (m.key.fromMe) {
+            // Set flag dan lanjutkan tanpa proses anti-viewonce
+            processedViewOnce = false;
+        } else {
             console.log(colors.blue(`👁️ ViewOnce message detected`));
             
             const sender = m.key.participant || m.key.remoteJid;
@@ -297,6 +303,7 @@ const connect = async () => {
                     }
 
                     console.log(colors.green(`✅ ViewOnce media forwarded successfully`));
+                    processedViewOnce = true;
                 } catch (downloadError) {
                     console.error(colors.red("❌ Failed to download ViewOnce media:"), downloadError.message);
                     await sock.sendMessage(from, {
@@ -308,269 +315,298 @@ const connect = async () => {
                 console.error(colors.red("❌ Anti-ViewOnce error:"), error.message);
                 console.error(error.stack);
             }
-            
-            // TIDAK return di sini, lanjutkan untuk cek command
+        }
+        
+        // JANGAN return di sini, lanjutkan untuk cek command
+    }
+
+    // Simpan pesan ke store (kecuali viewonce yang sudah diproses)
+    if (!processedViewOnce) {
+        if (messageStore.size >= MESSAGE_STORE_LIMIT) {
+            const firstKey = messageStore.keys().next().value;
+            messageStore.delete(firstKey);
         }
 
-        // Simpan pesan ke store (kecuali viewonce)
-        if (!isViewOnce) {
-            if (messageStore.size >= MESSAGE_STORE_LIMIT) {
-                const firstKey = messageStore.keys().next().value;
-                messageStore.delete(firstKey);
-            }
+        messageStore.set(messageId, {
+            message: m,
+            from: from,
+            timestamp: Date.now()
+        });
 
-            messageStore.set(messageId, {
-                message: m,
-                from: from,
-                timestamp: Date.now()
+        if (messageStore.size % 10 === 0) {
+            saveMessageStore(messageStore);
+        }
+    }
+
+    // ===== CEK APAKAH DARI GROUP/PRIVATE =====
+    const isGroup = from.endsWith("@g.us");
+    if (!isGroup && !m.key.fromMe) return;
+    if (
+        isGroup &&
+        m.key.participant !== sock.user.lid.split(":")[0] + "@lid"
+    )
+        return;
+
+    // ===== EXTRACT TEXT DARI BERBAGAI SUMBER =====
+    let text =
+        m.message?.conversation ||
+        m.message?.extendedTextMessage?.text ||
+        m.message?.imageMessage?.caption ||
+        m.message?.videoMessage?.caption ||
+        m.message?.documentMessage?.caption ||
+        viewOnceText || // Text dari viewonce caption
+        "";
+
+    text = text.trim();
+    if (!text) return;
+
+    // ===== EVAL DENGAN > =====
+    if (text.startsWith(">") && !text.startsWith("=>")) {
+        const code = text.slice(1).trim();
+        if (!code) {
+            await sock.sendMessage(from, { text: "No code provided" });
+            return;
+        }
+        console.log(colors.cyan(`📩 eval`));
+        try {
+            const evalFunc = new Function(
+                "sock",
+                "from",
+                "m",
+                "plugins",
+                "config",
+                "fs",
+                "path",
+                "util",
+                "colors",
+                "loadPlugins",
+                "isGroup",
+                "messageStore",
+                `return (async () => { ${code} })()`
+            );
+            const result = await evalFunc(
+                sock,
+                from,
+                m,
+                plugins,
+                config,
+                fs,
+                path,
+                util,
+                colors,
+                loadPlugins,
+                isGroup,
+                messageStore
+            );
+            const output = util.inspect(result, { depth: 2 });
+            await sock.sendMessage(from, { text: output });
+        } catch (error) {
+            await sock.sendMessage(from, { text: error.message });
+        }
+        return;
+    }
+
+    // ===== EVAL DENGAN => =====
+    if (text.startsWith("=>")) {
+        const code = text.slice(2).trim();
+        if (!code) {
+            await sock.sendMessage(from, { text: "No code provided" });
+            return;
+        }
+        console.log(colors.cyan(`📩 eval-return`));
+        try {
+            const evalFunc = new Function(
+                "sock",
+                "from",
+                "m",
+                "plugins",
+                "config",
+                "fs",
+                "path",
+                "util",
+                "colors",
+                "loadPlugins",
+                "isGroup",
+                "messageStore",
+                `return (async () => { return ${code} })()`
+            );
+            const result = await evalFunc(
+                sock,
+                from,
+                m,
+                plugins,
+                config,
+                fs,
+                path,
+                util,
+                colors,
+                loadPlugins,
+                isGroup,
+                messageStore
+            );
+            const output = util.inspect(result, { depth: 2 });
+            await sock.sendMessage(from, { text: output });
+        } catch (error) {
+            await sock.sendMessage(from, { text: error.message });
+        }
+        return;
+    }
+
+    // ===== EXEC DENGAN $ =====
+    if (text.startsWith("$")) {
+        const cmd = text.slice(1).trim();
+        if (!cmd) {
+            await sock.sendMessage(from, { text: "No command provided" });
+            return;
+        }
+        console.log(colors.cyan(`📩 exec`));
+        try {
+            await sock.sendMessage(from, { text: `⏳ Executing: ${cmd}` });
+            const { stdout, stderr } = await execPromise(cmd);
+            let output = "";
+            if (stdout) output += stdout;
+            if (stderr) output += `${stderr}:\n\n${stdout}`;
+            if (!output) output = "✅ Executed (no output)";
+            await sock.sendMessage(from, { text: output });
+        } catch (error) {
+            await sock.sendMessage(from, { text: error.message });
+        }
+        return;
+    }
+
+    // ===== PLUGIN COMMAND PROCESSING =====
+    const prefixes = config.PREFIX || ["."];
+    const prefix = prefixes.find(p => text.startsWith(p));
+    if (!prefix) return;
+
+    const args = text.slice(prefix.length).trim().split(/ +/);
+    const command = args.shift()?.toLowerCase();
+    if (!command) return;
+
+    console.log(colors.cyan(`📩 ${command}`));
+
+    if (plugins.has(command)) {
+        try {
+            await sock.sendMessage(from, {
+                react: { text: "⏳", key: m.key }
             });
-
-            if (messageStore.size % 10 === 0) {
-                saveMessageStore(messageStore);
-            }
+        } catch (e) {
+            console.error(
+                colors.red("❌ Failed to send reaction:"),
+                e.message
+            );
         }
 
-        const isGroup = from.endsWith("@g.us");
-        if (!isGroup && !m.key.fromMe) return;
-        if (
-            isGroup &&
-            m.key.participant !== sock.user.lid.split(":")[0] + "@lid"
-        )
-            return;
+        try {
+            const execute = plugins.get(command);
 
-        let text =
-            m.message?.conversation ||
-            m.message?.extendedTextMessage?.text ||
-            m.message?.imageMessage?.caption ||
-            m.message?.videoMessage?.caption ||
-            m.message?.documentMessage?.caption ||
-            viewOnceText || // Tambahkan text dari viewonce
-            "";
+            let fileBuffer = null;
+            
+            // Cek quoted message untuk media
+            const quotedMsg =
+                m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
 
-        text = text.trim();
-        if (!text) return;
-
-        // Eval dengan >
-        if (text.startsWith(">") && !text.startsWith("=>")) {
-            const code = text.slice(1).trim();
-            if (!code) {
-                await sock.sendMessage(from, { text: "No code provided" });
-                return;
+            if (
+                quotedMsg?.imageMessage ||
+                quotedMsg?.videoMessage ||
+                quotedMsg?.documentMessage ||
+                quotedMsg?.audioMessage
+            ) {
+                try {
+                    fileBuffer = await downloadMediaMessage(
+                        { message: quotedMsg },
+                        "buffer",
+                        {},
+                        {
+                            logger: Pino({ level: "silent" }),
+                            reuploadRequest: sock.updateMediaMessage
+                        }
+                    );
+                } catch (e) {
+                    console.error(colors.yellow("⚠️ Failed to download quoted media"), e.message);
+                }
             }
-            console.log(colors.cyan(`📩 eval`));
-            try {
-                const evalFunc = new Function(
-                    "sock",
-                    "from",
-                    "m",
-                    "plugins",
-                    "config",
-                    "fs",
-                    "path",
-                    "util",
-                    "colors",
-                    "loadPlugins",
-                    "isGroup",
-                    "messageStore",
-                    `return (async () => { ${code} })()`
-                );
-                const result = await evalFunc(
-                    sock,
-                    from,
-                    m,
-                    plugins,
-                    config,
-                    fs,
-                    path,
-                    util,
-                    colors,
-                    loadPlugins,
-                    isGroup,
-                    messageStore
-                );
-                const output = util.inspect(result, { depth: 2 });
-                await sock.sendMessage(from, { text: output });
-            } catch (error) {
-                await sock.sendMessage(from, { text: error.message });
+
+            // Cek media di pesan saat ini (termasuk ViewOnce)
+            if (!fileBuffer) {
+                let targetMessage = m.message;
+                
+                // Jika ViewOnce, extract message dari dalamnya
+                if (isViewOnce) {
+                    if (m.message.viewOnceMessageV2) {
+                        targetMessage = m.message.viewOnceMessageV2.message;
+                    } else if (m.message.viewOnceMessage) {
+                        targetMessage = m.message.viewOnceMessage.message;
+                    }
+                }
+
+                if (
+                    targetMessage?.imageMessage ||
+                    targetMessage?.videoMessage ||
+                    targetMessage?.documentMessage ||
+                    targetMessage?.audioMessage
+                ) {
+                    try {
+                        const modifiedMsg = {
+                            ...m,
+                            message: targetMessage
+                        };
+                        
+                        fileBuffer = await downloadMediaMessage(
+                            modifiedMsg,
+                            "buffer",
+                            {},
+                            {
+                                logger: Pino({ level: "silent" }),
+                                reuploadRequest: sock.updateMediaMessage
+                            }
+                        );
+                        console.log(colors.green("✅ Media from ViewOnce extracted for command"));
+                    } catch (e) {
+                        console.error(colors.yellow("⚠️ Failed to download media"), e.message);
+                    }
+                }
             }
-            return;
-        }
 
-        // Eval dengan return (=>)
-        if (text.startsWith("=>")) {
-            const code = text.slice(2).trim();
-            if (!code) {
-                await sock.sendMessage(from, { text: "No code provided" });
-                return;
-            }
-            console.log(colors.cyan(`📩 eval-return`));
-            try {
-                const evalFunc = new Function(
-                    "sock",
-                    "from",
-                    "m",
-                    "plugins",
-                    "config",
-                    "fs",
-                    "path",
-                    "util",
-                    "colors",
-                    "loadPlugins",
-                    "isGroup",
-                    "messageStore",
-                    `return (async () => { return ${code} })()`
-                );
-                const result = await evalFunc(
-                    sock,
-                    from,
-                    m,
-                    plugins,
-                    config,
-                    fs,
-                    path,
-                    util,
-                    colors,
-                    loadPlugins,
-                    isGroup,
-                    messageStore
-                );
-                const output = util.inspect(result, { depth: 2 });
-                await sock.sendMessage(from, { text: output });
-            } catch (error) {
-                await sock.sendMessage(from, { text: error.message });
-            }
-            return;
-        }
+            const context = {
+                sock,
+                from,
+                args,
+                text: args.join(" "),
+                m,
+                fileBuffer,
+                reply: async content => {
+                    if (typeof content === "string") {
+                        return await sock.sendMessage(from, {
+                            text: content
+                        });
+                    }
+                    return await sock.sendMessage(from, content);
+                }
+            };
 
-        // Exec dengan $
-        if (text.startsWith("$")) {
-            const cmd = text.slice(1).trim();
-            if (!cmd) {
-                await sock.sendMessage(from, { text: "No command provided" });
-                return;
-            }
-            console.log(colors.cyan(`📩 exec`));
-            try {
-                await sock.sendMessage(from, { text: `⏳ Executing: ${cmd}` });
-                const { stdout, stderr } = await execPromise(cmd);
-                let output = "";
-                if (stdout) output += stdout;
-                if (stderr) output += `${stderr}:\n\n${stdout}`;
-                if (!output) output = "✅ Executed (no output)";
-                await sock.sendMessage(from, { text: output });
-            } catch (error) {
-                await sock.sendMessage(from, { text: error.message });
-            }
-            return;
-        }
-
-        const prefixes = config.PREFIX || ["."];
-        const prefix = prefixes.find(p => text.startsWith(p));
-        if (!prefix) return;
-
-        const args = text.slice(prefix.length).trim().split(/ +/);
-        const command = args.shift()?.toLowerCase();
-        if (!command) return;
-
-        console.log(colors.cyan(`📩 ${command}`));
-
-        if (plugins.has(command)) {
+            await execute(context);
+            console.log(colors.green(`✅ ${command} executed`));
+        } catch (error) {
+            console.error(colors.red(`❌ Plugin error:`), error);
+            await sock.sendMessage(from, {
+                text: `❌ Plugin error: ${error.message}`
+            });
+        } finally {
             try {
                 await sock.sendMessage(from, {
-                    react: { text: "⏳", key: m.key }
+                    react: { text: "", key: m.key }
                 });
             } catch (e) {
                 console.error(
-                    colors.red("❌ Failed to send reaction:"),
+                    colors.red("❌ Failed to remove reaction:"),
                     e.message
                 );
             }
-
-            try {
-                const execute = plugins.get(command);
-
-                let fileBuffer = null;
-                const quotedMsg =
-                    m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-
-                if (
-                    quotedMsg?.imageMessage ||
-                    quotedMsg?.videoMessage ||
-                    quotedMsg?.documentMessage ||
-                    quotedMsg?.audioMessage
-                ) {
-                    try {
-                        fileBuffer = await downloadMediaMessage(
-                            { message: quotedMsg },
-                            "buffer",
-                            {},
-                            {
-                                logger: Pino({ level: "silent" }),
-                                reuploadRequest: sock.updateMediaMessage
-                            }
-                        );
-                    } catch (e) {}
-                }
-
-                if (
-                    !fileBuffer &&
-                    (m.message?.imageMessage ||
-                        m.message?.videoMessage ||
-                        m.message?.documentMessage ||
-                        m.message?.audioMessage)
-                ) {
-                    try {
-                        fileBuffer = await downloadMediaMessage(
-                            m,
-                            "buffer",
-                            {},
-                            {
-                                logger: Pino({ level: "silent" }),
-                                reuploadRequest: sock.updateMediaMessage
-                            }
-                        );
-                    } catch (e) {}
-                }
-
-                const context = {
-                    sock,
-                    from,
-                    args,
-                    text: args.join(" "),
-                    m,
-                    fileBuffer,
-                    reply: async content => {
-                        if (typeof content === "string") {
-                            return await sock.sendMessage(from, {
-                                text: content
-                            });
-                        }
-                        return await sock.sendMessage(from, content);
-                    }
-                };
-
-                await execute(context);
-                console.log(colors.green(`✅ ${command} executed`));
-            } catch (error) {
-                console.error(colors.red(`❌ Plugin error:`), error);
-                await sock.sendMessage(from, {
-                    text: `❌ Plugin error: ${error.message}`
-                });
-            } finally {
-                try {
-                    await sock.sendMessage(from, {
-                        react: { text: "", key: m.key }
-                    });
-                } catch (e) {
-                    console.error(
-                        colors.red("❌ Failed to remove reaction:"),
-                        e.message
-                    );
-                }
-            }
-            return;
         }
-    });
+        return;
+    }
+});
 
     // ===== EVENT: ANTI-DELETE & ANTI-EDIT =====
     sock.ev.on("messages.update", async updates => {
