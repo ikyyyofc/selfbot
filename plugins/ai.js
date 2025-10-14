@@ -10,7 +10,7 @@ export default async function ({ sock, from, args, text, m, fileBuffer, reply })
     const messages = [
       {
         role: "user",
-        content: text || "Jelaskan gambar ini."
+        content: text || ""
       }
     ];
 
