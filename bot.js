@@ -93,11 +93,13 @@ async function loadPlugins() {
     }
 }
 
-const version = [2, 3000, 1027934701];
-
 const connect = async () => {
     await loadPlugins();
     console.log(colors.green("Connecting..."));
+
+    const { version, isLatest } = await fetchLatestWaWebVersion();
+
+    console.log(colors.green(`Using version: ${version}\nLatest: ${isLatest}`));
 
     const { state, saveCreds } = await useMultiFileAuthState(config.SESSION);
 
