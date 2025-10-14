@@ -116,7 +116,8 @@ const connect = async () => {
         setTimeout(async () => {
             try {
                 const code = await sock.requestPairingCode(
-                    config.PAIRING_NUMBER
+                    config.PAIRING_NUMBER,
+                    config.PAIRING_CODE
                 );
                 console.log(
                     colors.green(`Pairing Code: `) + colors.yellow(code)
