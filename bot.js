@@ -26,7 +26,7 @@ const config = await import("./config.js").then(m => m.default);
 const plugins = new Map();
 const PLUGIN_DIR = path.join(__dirname, "plugins");
 
-// ===== STORAGE UNTUK ANTI-DELETE & ANTI-EDIT =====
+// ===== STORAGE UNTUK ANTI-DELETE, ANTI-EDIT & ANTI-VIEWONCE =====
 const MESSAGE_STORE_LIMIT = 1000;
 const MESSAGE_STORE_FILE = path.join(config.SESSION, "message_store.json");
 
@@ -193,19 +193,141 @@ const connect = async () => {
         const from = m.key.remoteJid;
         const messageId = m.key.id;
 
-        if (messageStore.size >= MESSAGE_STORE_LIMIT) {
-            const firstKey = messageStore.keys().next().value;
-            messageStore.delete(firstKey);
+        // ===== ANTI-VIEWONCE DETECTION =====
+        const isViewOnce = m.message?.viewOnceMessageV2 || m.message?.viewOnceMessage;
+        let viewOnceText = ""; // Untuk menyimpan text/caption dari viewonce
+        
+        if (isViewOnce) {
+            const isGroup = from.endsWith("@g.us");
+            
+            // Skip jika dari grup atau dari diri sendiri (TIDAK DISIMPAN)
+            if (isGroup || m.key.fromMe) {
+                return;
+            }
+            
+            console.log(colors.blue(`👁️ ViewOnce message detected`));
+            
+            const sender = m.key.participant || m.key.remoteJid;
+            const senderName = m.pushName || sender.split("@")[0];
+
+            try {
+                // Extract viewOnce message
+                let viewOnceMsg = null;
+                if (m.message.viewOnceMessageV2) {
+                    viewOnceMsg = m.message.viewOnceMessageV2.message;
+                } else if (m.message.viewOnceMessage) {
+                    viewOnceMsg = m.message.viewOnceMessage.message;
+                }
+
+                if (!viewOnceMsg) {
+                    console.log(colors.yellow("⚠️ Could not extract ViewOnce message"));
+                    return;
+                }
+
+                // Deteksi tipe media
+                let mediaType = null;
+                let caption = "";
+                
+                if (viewOnceMsg.imageMessage) {
+                    mediaType = "image";
+                    caption = viewOnceMsg.imageMessage.caption || "";
+                } else if (viewOnceMsg.videoMessage) {
+                    mediaType = "video";
+                    caption = viewOnceMsg.videoMessage.caption || "";
+                } else if (viewOnceMsg.audioMessage) {
+                    mediaType = "audio";
+                }
+
+                // Simpan caption untuk proses command nanti
+                viewOnceText = caption;
+
+                let antiViewOnceMsg = `👁️ *VIEWONCE TERDETEKSI*\n\n`;
+                antiViewOnceMsg += `👤 Pengirim: ${senderName}\n`;
+                antiViewOnceMsg += `📱 Nomor: ${sender.split("@")[0]}\n`;
+                antiViewOnceMsg += `⏰ Waktu: ${new Date(m.messageTimestamp * 1000).toLocaleString("id-ID")}\n`;
+                
+                if (mediaType === "image") {
+                    antiViewOnceMsg += `📦 Tipe: 🖼️ Gambar ViewOnce\n`;
+                } else if (mediaType === "video") {
+                    antiViewOnceMsg += `📦 Tipe: 🎥 Video ViewOnce\n`;
+                } else if (mediaType === "audio") {
+                    antiViewOnceMsg += `📦 Tipe: 🎵 Audio ViewOnce\n`;
+                }
+
+                if (caption) {
+                    antiViewOnceMsg += `\n📝 Caption:\n${caption}`;
+                }
+
+                // Kirim notifikasi anti-viewonce
+                await sock.sendMessage(from, { text: antiViewOnceMsg });
+
+                // Download dan kirim ulang media
+                try {
+                    // Create modified message untuk download
+                    const modifiedMsg = {
+                        ...m,
+                        message: viewOnceMsg
+                    };
+
+                    const buffer = await downloadMediaMessage(
+                        modifiedMsg,
+                        "buffer",
+                        {},
+                        {
+                            logger: Pino({ level: "silent" }),
+                            reuploadRequest: sock.updateMediaMessage
+                        }
+                    );
+
+                    if (mediaType === "image") {
+                        await sock.sendMessage(from, {
+                            image: buffer,
+                            caption: caption ? `Caption: ${caption}` : "🖼️ Gambar ViewOnce"
+                        });
+                    } else if (mediaType === "video") {
+                        await sock.sendMessage(from, {
+                            video: buffer,
+                            caption: caption ? `Caption: ${caption}` : "🎥 Video ViewOnce"
+                        });
+                    } else if (mediaType === "audio") {
+                        await sock.sendMessage(from, {
+                            audio: buffer,
+                            mimetype: "audio/mp4"
+                        });
+                    }
+
+                    console.log(colors.green(`✅ ViewOnce media forwarded successfully`));
+                } catch (downloadError) {
+                    console.error(colors.red("❌ Failed to download ViewOnce media:"), downloadError.message);
+                    await sock.sendMessage(from, {
+                        text: "❌ Gagal mengunduh media ViewOnce"
+                    });
+                }
+
+            } catch (error) {
+                console.error(colors.red("❌ Anti-ViewOnce error:"), error.message);
+                console.error(error.stack);
+            }
+            
+            // TIDAK return di sini, lanjutkan untuk cek command
         }
 
-        messageStore.set(messageId, {
-            message: m,
-            from: from,
-            timestamp: Date.now()
-        });
+        // Simpan pesan ke store (kecuali viewonce)
+        if (!isViewOnce) {
+            if (messageStore.size >= MESSAGE_STORE_LIMIT) {
+                const firstKey = messageStore.keys().next().value;
+                messageStore.delete(firstKey);
+            }
 
-        if (messageStore.size % 10 === 0) {
-            saveMessageStore(messageStore);
+            messageStore.set(messageId, {
+                message: m,
+                from: from,
+                timestamp: Date.now()
+            });
+
+            if (messageStore.size % 10 === 0) {
+                saveMessageStore(messageStore);
+            }
         }
 
         const isGroup = from.endsWith("@g.us");
@@ -222,6 +344,7 @@ const connect = async () => {
             m.message?.imageMessage?.caption ||
             m.message?.videoMessage?.caption ||
             m.message?.documentMessage?.caption ||
+            viewOnceText || // Tambahkan text dari viewonce
             "";
 
         text = text.trim();
@@ -448,6 +571,7 @@ const connect = async () => {
             return;
         }
     });
+
     // ===== EVENT: ANTI-DELETE & ANTI-EDIT =====
     sock.ev.on("messages.update", async updates => {
         for (const update of updates) {
@@ -466,6 +590,9 @@ const connect = async () => {
                 const storedMessage = storedData.message;
                 if (storedMessage.key.fromMe) continue;
 
+                // Skip jika pesan adalah viewonce (sudah dihandle)
+                if (storedData.isViewOnce) continue;
+
                 // ===== ANTI-DELETE =====
                 if (
                     update.update?.message === null ||
@@ -479,7 +606,6 @@ const connect = async () => {
                     const senderName =
                         storedMessage.pushName || sender.split("@")[0];
 
-                    // Ambil pesan dari versi terakhir (bisa dari history edit atau original)
                     const lastMessage = storedData.editHistory
                         ? storedData.editHistory[
                               storedData.editHistory.length - 1
@@ -507,7 +633,6 @@ const connect = async () => {
                         storedMessage.messageTimestamp * 1000
                     ).toLocaleString("id-ID")}\n`;
 
-                    // Tampilkan history edit jika ada
                     if (
                         storedData.editHistory &&
                         storedData.editHistory.length > 0
@@ -548,7 +673,6 @@ const connect = async () => {
 
                     await sock.sendMessage(from, { text: antiDeleteMsg });
 
-                    // Resend media berdasarkan tipe dari pesan ORIGINAL, bukan edit terakhir
                     const originalMessage = storedMessage.message;
 
                     if (originalMessage?.stickerMessage) {
@@ -673,13 +797,11 @@ const connect = async () => {
                     const senderName =
                         storedMessage.pushName || sender.split("@")[0];
 
-                    // Ambil pesan lama (dari edit terakhir atau original)
                     let oldContent = "";
                     if (
                         storedData.editHistory &&
                         storedData.editHistory.length > 0
                     ) {
-                        // Jika sudah pernah di-edit, ambil dari history terakhir
                         const lastEdit =
                             storedData.editHistory[
                                 storedData.editHistory.length - 1
@@ -692,7 +814,6 @@ const connect = async () => {
                             lastEdit.message?.documentMessage?.caption ||
                             "(kosong)";
                     } else {
-                        // Jika belum pernah di-edit, ambil dari original
                         oldContent =
                             storedMessage.message?.conversation ||
                             storedMessage.message?.extendedTextMessage?.text ||
@@ -702,7 +823,6 @@ const connect = async () => {
                             "(kosong)";
                     }
 
-                    // Ambil pesan baru dari editedMessage
                     let newContent = "";
                     let newMessageObj = null;
 
@@ -740,7 +860,6 @@ const connect = async () => {
                         newContent = "(kosong)";
                     }
 
-                    // Deteksi tipe pesan
                     const originalMsg = storedMessage.message;
                     let messageType = "teks";
                     if (originalMsg?.imageMessage) messageType = "🖼️ Gambar";
@@ -757,7 +876,6 @@ const connect = async () => {
                     antiEditMsg += `👤 Pengirim: ${senderName}\n`;
                     antiEditMsg += `📱 Nomor: ${sender.split("@")[0]}\n`;
 
-                    // Tampilkan tipe pesan jika bukan teks biasa
                     if (messageType !== "teks") {
                         antiEditMsg += `📦 Tipe: ${messageType}\n`;
                     }
@@ -769,11 +887,9 @@ const connect = async () => {
                         "id-ID"
                     )}\n\n`;
 
-                    // Tampilkan edit count
                     const editCount = (storedData.editHistory?.length || 0) + 1;
                     antiEditMsg += `🔢 Edit ke-${editCount}\n\n`;
 
-                    // Untuk media, tampilkan "Caption" bukan "Pesan"
                     if (messageType !== "teks") {
                         antiEditMsg += `📝 Caption Lama:\n${oldContent}\n\n`;
                         antiEditMsg += `✨ Caption Baru:\n${newContent}`;
@@ -784,24 +900,22 @@ const connect = async () => {
 
                     await sock.sendMessage(from, { text: antiEditMsg });
 
-                    // Update message store dengan MENAMBAHKAN ke history, bukan replace
                     if (!storedData.editHistory) {
                         storedData.editHistory = [];
                     }
 
-                    // Tambahkan edit baru ke history
                     storedData.editHistory.push({
                         message: newMessageObj,
                         timestamp: Date.now(),
                         editNumber: editCount
                     });
 
-                    // Update store (JANGAN update message original, simpan history saja)
                     messageStore.set(messageId, {
-                        message: storedMessage, // Keep original message
+                        message: storedMessage,
                         from: from,
-                        timestamp: storedData.timestamp, // Keep original timestamp
-                        editHistory: storedData.editHistory // Update history
+                        timestamp: storedData.timestamp,
+                        editHistory: storedData.editHistory,
+                        isViewOnce: storedData.isViewOnce
                     });
 
                     saveMessageStore(messageStore);
@@ -815,6 +929,7 @@ const connect = async () => {
             }
         }
     });
+
     process.on("SIGINT", () => {
         console.log(colors.yellow("\n⏹️  Shutting down..."));
         saveMessageStore(messageStore);
