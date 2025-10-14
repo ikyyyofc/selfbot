@@ -188,6 +188,7 @@ const connect = async () => {
 
     sock.ev.on("messages.upsert", async ({ messages, type }) => {
     const m = messages[0];
+    console.log(m)
     if (!m.message) return;
 
     const from = m.key.remoteJid;
