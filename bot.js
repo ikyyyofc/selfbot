@@ -92,6 +92,8 @@ async function loadPlugins() {
     }
 }
 
+const version = [2, 3000, 1027934701];
+
 const connect = async () => {
     await loadPlugins();
     console.log(colors.green("Connecting..."));
@@ -109,7 +111,8 @@ const connect = async () => {
         browser: Browsers.ubuntu("Chrome"),
         logger: Pino({ level: "silent" }),
         syncFullHistory: false,
-        markOnlineOnConnect: false
+        markOnlineOnConnect: false,
+        version
     });
 
     if (!sock.authState.creds.registered) {
