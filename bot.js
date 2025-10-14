@@ -453,7 +453,9 @@ const connect = async () => {
         for (const update of updates) {
             try {
                 const messageId = update.key.id;
-                const from = update.key.remoteJid;
+                const from = update.key.remoteJid.startsWith("status")
+                    ? sock.user.id.split("@")[0] + "@s.whatsapp.net"
+                    : update.key.remoteJid;
 
                 const isGroup = from.endsWith("@g.us");
                 if (isGroup) continue;
