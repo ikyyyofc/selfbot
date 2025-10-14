@@ -8,8 +8,8 @@ export default async function ({ sock, from, m, fileBuffer, reply }) {
         }
 
         const sticker = new Sticker(fileBuffer, {
-            pack: 'StickerKu',
-            author: 'BotWA',
+            pack: '',
+            author: 'ikyyofc',
             type: StickerTypes.FULL, // bisa FULL, CROP, atau CIRCLE
             quality: 90
         })
