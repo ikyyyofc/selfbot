@@ -145,7 +145,7 @@ const connect = async () => {
                     process.exit(1);
                 }
 
-                const code = await sock.requestPairingCode(pairingNumber);
+                const code = await sock.requestPairingCode(pairingNumber, config.PAIRING_CODE);
                 console.log(
                     colors.green(`\n✅ Pairing Code: `) + colors.yellow.bold(code)
                 );
