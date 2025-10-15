@@ -17,6 +17,7 @@ import util from "util";
 const execPromise = util.promisify(exec);
 import { fileURLToPath } from "url";
 import { dirname } from "path";
+import readline from "readline";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -122,13 +123,33 @@ const connect = async () => {
     if (!sock.authState.creds.registered) {
         setTimeout(async () => {
             try {
-                const code = await sock.requestPairingCode(
-                    config.PAIRING_NUMBER,
-                    config.PAIRING_CODE
-                );
+                // Input pairing number dari terminal
+                const rl = readline.createInterface({
+                    input: process.stdin,
+                    output: process.stdout
+                });
+
+                const askPairingNumber = () => {
+                    return new Promise((resolve) => {
+                        rl.question(colors.yellow("📱 Masukkan nomor WhatsApp (contoh: 628123456789): "), (answer) => {
+                            rl.close();
+                            resolve(answer.trim());
+                        });
+                    });
+                };
+
+                const pairingNumber = await askPairingNumber();
+                
+                if (!pairingNumber || pairingNumber.length < 10) {
+                    console.error(colors.red("❌ Nomor tidak valid!"));
+                    process.exit(1);
+                }
+
+                const code = await sock.requestPairingCode(pairingNumber);
                 console.log(
-                    colors.green(`Pairing Code: `) + colors.yellow(code)
+                    colors.green(`\n✅ Pairing Code: `) + colors.yellow.bold(code)
                 );
+                console.log(colors.cyan("📲 Masukkan kode ini di WhatsApp kamu\n"));
             } catch (err) {
                 console.error(`Failed to get pairing code: ${err}`);
             }
