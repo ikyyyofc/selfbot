@@ -130,26 +130,37 @@ const connect = async () => {
                 });
 
                 const askPairingNumber = () => {
-                    return new Promise((resolve) => {
-                        rl.question(colors.yellow("📱 Masukkan nomor WhatsApp (contoh: 628123456789): "), (answer) => {
-                            rl.close();
-                            resolve(answer.trim());
-                        });
+                    return new Promise(resolve => {
+                        rl.question(
+                            colors.yellow(
+                                "📱 Masukkan nomor WhatsApp (contoh: 628123456789): "
+                            ),
+                            answer => {
+                                rl.close();
+                                resolve(answer.trim());
+                            }
+                        );
                     });
                 };
 
                 const pairingNumber = await askPairingNumber();
-                
+
                 if (!pairingNumber || pairingNumber.length < 10) {
                     console.error(colors.red("❌ Nomor tidak valid!"));
                     process.exit(1);
                 }
 
-                const code = await sock.requestPairingCode(pairingNumber, config.PAIRING_CODE);
-                console.log(
-                    colors.green(`\n✅ Pairing Code: `) + colors.yellow.bold(code)
+                const code = await sock.requestPairingCode(
+                    pairingNumber,
+                    config.PAIRING_CODE
                 );
-                console.log(colors.cyan("📲 Masukkan kode ini di WhatsApp kamu\n"));
+                console.log(
+                    colors.green(`\n✅ Pairing Code: `) +
+                        colors.yellow.bold(code)
+                );
+                console.log(
+                    colors.cyan("📲 Masukkan kode ini di WhatsApp kamu\n")
+                );
             } catch (err) {
                 console.error(`Failed to get pairing code: ${err}`);
             }
