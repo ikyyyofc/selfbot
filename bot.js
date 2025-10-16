@@ -451,11 +451,17 @@ const connect = async () => {
                     fileBuffer,
                     reply: async content => {
                         if (typeof content === "string") {
-                            return await sock.sendMessage(from, {
-                                text: content
-                            });
+                            return await sock.sendMessage(
+                                from,
+                                {
+                                    text: content
+                                },
+                                { quoted: m }
+                            );
                         }
-                        return await sock.sendMessage(from, content);
+                        return await sock.sendMessage(from, content, {
+                            quoted: m
+                        });
                     }
                 };
 
