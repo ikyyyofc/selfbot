@@ -17,7 +17,6 @@
     "axios": "latest",
     "cheerio": "latest",
     "file-type": "latest",
-    "node-fetch": "latest",
     "wa-sticker-formatter": "latest"
   }
 }
