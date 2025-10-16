@@ -5,7 +5,7 @@ export default async function ({ sock, from, text, args, reply }) {
   try {
     if (!text)
       return reply(
-        "❌ Masukkan prompt untuk membuat video.\n\nContoh:\n.sora wanita sedang berlari di pantai --ratio landscape"
+        "❌ Masukkan prompt untuk membuat video.\n\nContoh:\n.txt2vid wanita sedang berlari di pantai --ratio landscape"
       );
 
     // ambil rasio jika ada
