@@ -1,40 +1,32 @@
 import axios from "axios";
 import crypto from "crypto";
 
-export default async function ({ sock, from, text, args, reply }) {
+export default async function ({ sock, from, args, text, reply }) {
   try {
-    if (!text)
-      return reply(
-        "❌ Masukkan prompt untuk membuat video.\n\nContoh:\n.txt2vid wanita sedang berlari di pantai --ratio landscape"
-      );
+    if (!text) return reply("⚠️ Masukkan prompt untuk membuat video.\n\nContoh:\n.txt2vid seorang wanita sedang duduk di pantai");
 
-    // ambil rasio jika ada
-    const ratioArg = args.find(a => a.includes("--ratio"));
-    const ratio = ratioArg
-      ? ratioArg.split(" ")[1] || ratioArg.split("=")[1] || "portrait"
+    const ratio = text.includes("--landscape")
+      ? "landscape"
       : "portrait";
+    const prompt = text.replace("--landscape", "").trim();
 
-    if (!["portrait", "landscape"].includes(ratio))
-      return reply("❌ Rasio harus `portrait` atau `landscape`");
+    reply("⏳ Sedang membuat video AI, mohon tunggu sebentar...");
 
     const api = axios.create({
       baseURL: "https://api.bylo.ai/aimodels/api/v1/ai",
       headers: {
-        accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
         "content-type": "application/json; charset=UTF-8",
         "user-agent":
           "Mozilla/5.0 (Linux; Android 15; SM-F958 Build/AP3A.240905.015) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.86 Mobile Safari/537.36",
-        origin: "https://bylo.ai",
         referer: "https://bylo.ai/features/sora-2",
+        origin: "https://bylo.ai",
         uniqueId: crypto.randomUUID().replace(/-/g, ""),
       },
     });
 
-    await reply("⏳ Membuat video dengan AI, mohon tunggu beberapa saat...");
-
     const { data: task } = await api.post("/video/create", {
-      prompt: text,
+      prompt,
       channel: "SORA2",
       pageId: 536,
       source: "bylo.ai",
@@ -47,27 +39,25 @@ export default async function ({ sock, from, text, args, reply }) {
       aspectRatio: ratio,
     });
 
-    const taskId = task?.data;
-    if (!taskId) throw new Error("Gagal membuat task video.");
-
-    // polling status
+    let videoUrl;
     while (true) {
-      const { data } = await api.get(`/${taskId}?channel=SORA2`);
+      const { data } = await api.get(`/${task.data}?channel=SORA2'`);
       if (data?.data?.state > 0) {
         const result = JSON.parse(data.data.completeData);
-        const videoUrl = result?.data?.videoUrl || result?.videoUrl;
-        if (!videoUrl) throw new Error("Video tidak ditemukan di hasil.");
-
-        await sock.sendMessage(from, {
-          video: { url: videoUrl },
-          caption: "🎬 Video berhasil dibuat oleh AI!",
-        });
+        videoUrl = result?.data?.result_urls?.[0];
         break;
       }
-      await new Promise(res => setTimeout(res, 3000)); // jeda 3 detik
+      await new Promise((res) => setTimeout(res, 2000));
     }
-  } catch (e) {
-    console.error(e);
-    reply("❌ Terjadi kesalahan: " + e.message);
+
+    if (!videoUrl) return reply("❌ Gagal membuat video, coba lagi nanti.");
+
+    await sock.sendMessage(from, {
+      video: { url: videoUrl },
+      caption: `🎬 *Video AI Berhasil Dibuat!*\n\nPrompt: ${prompt}\nRasio: ${ratio}`,
+    });
+  } catch (err) {
+    console.error(err);
+    reply("❌ Terjadi kesalahan saat membuat video: " + err.message);
   }
 }
