@@ -4,7 +4,6 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { exec } from "child_process";
 import util from "util";
-import fetch from "node-fetch";
 const execAsync = util.promisify(exec);
 
 // fungsi mp4ToWebp
