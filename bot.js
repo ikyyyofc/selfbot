@@ -43,11 +43,16 @@ class BotState {
                 const data = fs.readFileSync(MESSAGE_STORE_FILE, "utf8");
                 const parsed = JSON.parse(data);
                 const store = new Map(Object.entries(parsed));
-                console.log(colors.cyan(`💾 Loaded ${store.size} messages from storage`));
+                console.log(
+                    colors.cyan(`💾 Loaded ${store.size} messages from storage`)
+                );
                 return store;
             }
         } catch (error) {
-            console.error(colors.red("❌ Failed to load message store:"), error.message);
+            console.error(
+                colors.red("❌ Failed to load message store:"),
+                error.message
+            );
         }
         return new Map();
     }
@@ -57,7 +62,10 @@ class BotState {
             const obj = Object.fromEntries(this.messageStore);
             fs.writeFileSync(MESSAGE_STORE_FILE, JSON.stringify(obj, null, 2));
         } catch (error) {
-            console.error(colors.red("❌ Failed to save message store:"), error.message);
+            console.error(
+                colors.red("❌ Failed to save message store:"),
+                error.message
+            );
         }
     }
 
@@ -108,15 +116,22 @@ class PluginManager {
             }
 
             this.state.plugins.clear();
-            const files = fs.readdirSync(PLUGIN_DIR).filter(f => f.endsWith(".js"));
+            const files = fs
+                .readdirSync(PLUGIN_DIR)
+                .filter(f => f.endsWith(".js"));
 
             for (const file of files) {
                 await this.loadPlugin(file);
             }
 
-            console.log(colors.cyan(`🔌 ${this.state.plugins.size} plugins loaded`));
+            console.log(
+                colors.cyan(`🔌 ${this.state.plugins.size} plugins loaded`)
+            );
         } catch (error) {
-            console.error(colors.red("❌ Plugin loading error:"), error.message);
+            console.error(
+                colors.red("❌ Plugin loading error:"),
+                error.message
+            );
         }
     }
 
@@ -164,7 +179,10 @@ class PluginManager {
                     react: { text: "", key: context.m.key }
                 });
             } catch (e) {
-                console.error(colors.red("❌ Failed to remove reaction:"), e.message);
+                console.error(
+                    colors.red("❌ Failed to remove reaction:"),
+                    e.message
+                );
             }
         }
     }
@@ -193,7 +211,11 @@ class MessageHandler {
         // Check if should process
         const isGroup = from.endsWith("@g.us");
         if (!isGroup && !m.key.fromMe) return;
-        if (isGroup && m.key.participant !== sock.user.lid.split(":")[0] + "@lid") return;
+        if (
+            isGroup &&
+            m.key.participant !== sock.user.lid.split(":")[0] + "@lid"
+        )
+            return;
 
         // Extract text
         const text = this.extractText(m);
@@ -208,7 +230,8 @@ class MessageHandler {
     }
 
     extractText(m) {
-        const text = m.message?.conversation ||
+        const text =
+            m.message?.conversation ||
             m.message?.extendedTextMessage?.text ||
             m.message?.imageMessage?.caption ||
             m.message?.videoMessage?.caption ||
@@ -249,13 +272,31 @@ class MessageHandler {
         try {
             const wrappedCode = withReturn ? `return ${code}` : code;
             const evalFunc = new Function(
-                "sock", "from", "m", "plugins", "config", "fs", "path",
-                "util", "colors", "loadPlugins", "messageStore",
+                "sock",
+                "from",
+                "m",
+                "plugins",
+                "config",
+                "fs",
+                "path",
+                "util",
+                "colors",
+                "loadPlugins",
+                "messageStore",
                 `return (async () => { ${wrappedCode} })()`
             );
             const result = await evalFunc(
-                sock, from, m, this.state.plugins, config, fs, path,
-                util, colors, () => this.pluginManager.loadPlugins(), this.state.messageStore
+                sock,
+                from,
+                m,
+                this.state.plugins,
+                config,
+                fs,
+                path,
+                util,
+                colors,
+                () => this.pluginManager.loadPlugins(),
+                this.state.messageStore
             );
             const output = util.inspect(result, { depth: 2 });
             await sock.sendMessage(from, { text: output });
@@ -310,7 +351,11 @@ class MessageHandler {
                 isGroup,
                 reply: async content => {
                     if (typeof content === "string") {
-                        return await sock.sendMessage(from, { text: content }, { quoted: m });
+                        return await sock.sendMessage(
+                            from,
+                            { text: content },
+                            { quoted: m }
+                        );
                     }
                     return await sock.sendMessage(from, content, { quoted: m });
                 }
@@ -321,11 +366,17 @@ class MessageHandler {
     }
 
     async getFileBuffer(m) {
-        const quotedMsg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+        const quotedMsg =
+            m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
 
         // Try quoted message first
-        if (quotedMsg?.imageMessage || quotedMsg?.videoMessage ||
-            quotedMsg?.documentMessage || quotedMsg?.audioMessage || quotedMsg?.stickerMessage) {
+        if (
+            quotedMsg?.imageMessage ||
+            quotedMsg?.videoMessage ||
+            quotedMsg?.documentMessage ||
+            quotedMsg?.audioMessage ||
+            quotedMsg?.stickerMessage
+        ) {
             try {
                 return await downloadMediaMessage(
                     { message: quotedMsg },
@@ -334,13 +385,19 @@ class MessageHandler {
                     { logger: Pino({ level: "silent" }) }
                 );
             } catch (e) {
-                console.error(colors.yellow("⚠️ Failed to download quoted media"));
+                console.error(
+                    colors.yellow("⚠️ Failed to download quoted media")
+                );
             }
         }
 
         // Try current message
-        if (m.message?.imageMessage || m.message?.videoMessage ||
-            m.message?.documentMessage || m.message?.audioMessage) {
+        if (
+            m.message?.imageMessage ||
+            m.message?.videoMessage ||
+            m.message?.documentMessage ||
+            m.message?.audioMessage
+        ) {
             try {
                 return await downloadMediaMessage(
                     m,
@@ -378,16 +435,30 @@ class AntiDeleteEditHandler {
             if (!storedData || storedData.message.key.fromMe) return;
 
             // Check for deletion
-            if (update.update?.message === null || update.update?.messageStubType === 68) {
+            if (
+                update.update?.message === null ||
+                update.update?.messageStubType === 68
+            ) {
                 await this.handleDelete(sock, from, storedData, isStatus);
             }
             // Check for edit
-            else if (update.update?.message?.editedMessage ||
-                update.update?.message?.protocolMessage?.type === 14) {
-                await this.handleEdit(sock, from, messageId, storedData, update);
+            else if (
+                update.update?.message?.editedMessage ||
+                update.update?.message?.protocolMessage?.type === 14
+            ) {
+                await this.handleEdit(
+                    sock,
+                    from,
+                    messageId,
+                    storedData,
+                    update
+                );
             }
         } catch (error) {
-            console.error(colors.red("❌ Anti-delete/edit error:"), error.message);
+            console.error(
+                colors.red("❌ Anti-delete/edit error:"),
+                error.message
+            );
         }
     }
 
@@ -395,7 +466,8 @@ class AntiDeleteEditHandler {
         console.log(colors.magenta(`🗑️ Message deleted detected`));
 
         const storedMessage = storedData.message;
-        const sender = storedMessage.key.participant || storedMessage.key.remoteJid;
+        const sender =
+            storedMessage.key.participant || storedMessage.key.remoteJid;
         const senderName = storedMessage.pushName || sender.split("@")[0];
 
         const lastMessage = storedData.editHistory
@@ -404,7 +476,12 @@ class AntiDeleteEditHandler {
 
         const messageInfo = this.getMessageInfo(lastMessage);
         let antiDeleteMsg = this.buildDeleteMessage(
-            isStatus, senderName, sender, storedMessage, storedData, messageInfo
+            isStatus,
+            senderName,
+            sender,
+            storedMessage,
+            storedData,
+            messageInfo
         );
 
         await sock.sendMessage(from, { text: antiDeleteMsg });
@@ -415,7 +492,8 @@ class AntiDeleteEditHandler {
         console.log(colors.yellow(`✏️ Message edited detected`));
 
         const storedMessage = storedData.message;
-        const sender = storedMessage.key.participant || storedMessage.key.remoteJid;
+        const sender =
+            storedMessage.key.participant || storedMessage.key.remoteJid;
         const senderName = storedMessage.pushName || sender.split("@")[0];
 
         const oldContent = this.getOldContent(storedData);
@@ -424,7 +502,13 @@ class AntiDeleteEditHandler {
         const editCount = (storedData.editHistory?.length || 0) + 1;
 
         const antiEditMsg = this.buildEditMessage(
-            senderName, sender, storedMessage, messageType, editCount, oldContent, newContent
+            senderName,
+            sender,
+            storedMessage,
+            messageType,
+            editCount,
+            oldContent,
+            newContent
         );
 
         await sock.sendMessage(from, { text: antiEditMsg });
@@ -432,11 +516,13 @@ class AntiDeleteEditHandler {
     }
 
     getMessageInfo(message) {
-        const content = message?.conversation ||
+        const content =
+            message?.conversation ||
             message?.extendedTextMessage?.text ||
             message?.imageMessage?.caption ||
             message?.videoMessage?.caption ||
-            message?.documentMessage?.caption || "";
+            message?.documentMessage?.caption ||
+            "";
 
         return {
             content,
@@ -448,17 +534,30 @@ class AntiDeleteEditHandler {
         };
     }
 
-    buildDeleteMessage(isStatus, senderName, sender, storedMessage, storedData, messageInfo) {
+    buildDeleteMessage(
+        isStatus,
+        senderName,
+        sender,
+        storedMessage,
+        storedData,
+        messageInfo
+    ) {
         let msg = `🚫 *${isStatus ? "STATUS" : "PESAN"} DIHAPUS*\n\n`;
         msg += `👤 Pengirim: ${senderName}\n`;
         msg += `📱 Nomor: ${sender.split("@")[0]}\n`;
-        msg += `⏰ Waktu: ${new Date(storedMessage.messageTimestamp * 1000).toLocaleString("id-ID")}\n`;
+        msg += `⏰ Waktu: ${new Date(
+            storedMessage.messageTimestamp * 1000
+        ).toLocaleString("id-ID")}\n`;
 
         if (storedData.editHistory?.length > 0) {
             msg += `\n📝 *Riwayat Edit (${storedData.editHistory.length}x):*\n`;
             storedData.editHistory.forEach((edit, index) => {
-                const content = this.getMessageInfo(edit.message).content || "(media/sticker)";
-                msg += `\n${index + 1}. ${content}\n   ⏰ ${new Date(edit.timestamp).toLocaleString("id-ID")}`;
+                const content =
+                    this.getMessageInfo(edit.message).content ||
+                    "(media/sticker)";
+                msg += `\n${index + 1}. ${content}\n   ⏰ ${new Date(
+                    edit.timestamp
+                ).toLocaleString("id-ID")}`;
             });
             msg += `\n`;
         } else {
@@ -482,7 +581,15 @@ class AntiDeleteEditHandler {
         return msg;
     }
 
-    buildEditMessage(senderName, sender, storedMessage, messageType, editCount, oldContent, newContent) {
+    buildEditMessage(
+        senderName,
+        sender,
+        storedMessage,
+        messageType,
+        editCount,
+        oldContent,
+        newContent
+    ) {
         let msg = `✏️ *PESAN DIEDIT*\n\n`;
         msg += `👤 Pengirim: ${senderName}\n`;
         msg += `📱 Nomor: ${sender.split("@")[0]}\n`;
@@ -491,7 +598,9 @@ class AntiDeleteEditHandler {
             msg += `📦 Tipe: ${messageType}\n`;
         }
 
-        msg += `⏰ Waktu Original: ${new Date(storedMessage.messageTimestamp * 1000).toLocaleString("id-ID")}\n`;
+        msg += `⏰ Waktu Original: ${new Date(
+            storedMessage.messageTimestamp * 1000
+        ).toLocaleString("id-ID")}\n`;
         msg += `⏰ Waktu Edit: ${new Date().toLocaleString("id-ID")}\n\n`;
         msg += `🔢 Edit ke-${editCount}\n\n`;
 
@@ -504,10 +613,14 @@ class AntiDeleteEditHandler {
 
     getOldContent(storedData) {
         if (storedData.editHistory?.length > 0) {
-            const lastEdit = storedData.editHistory[storedData.editHistory.length - 1];
+            const lastEdit =
+                storedData.editHistory[storedData.editHistory.length - 1];
             return this.getMessageInfo(lastEdit.message).content || "(kosong)";
         }
-        return this.getMessageInfo(storedData.message.message).content || "(kosong)";
+        return (
+            this.getMessageInfo(storedData.message.message).content ||
+            "(kosong)"
+        );
     }
 
     getNewContent(update) {
@@ -518,13 +631,16 @@ class AntiDeleteEditHandler {
             const editedMsg = update.update.message.editedMessage.message;
             if (editedMsg) {
                 newMessageObj = editedMsg;
-                newContent = this.getMessageInfo(editedMsg).content || "(kosong)";
+                newContent =
+                    this.getMessageInfo(editedMsg).content || "(kosong)";
             }
         } else if (update.update.message?.protocolMessage) {
-            const editedMsg = update.update.message.protocolMessage.editedMessage;
+            const editedMsg =
+                update.update.message.protocolMessage.editedMessage;
             if (editedMsg) {
                 newMessageObj = editedMsg;
-                newContent = this.getMessageInfo(editedMsg).content || "(kosong)";
+                newContent =
+                    this.getMessageInfo(editedMsg).content || "(kosong)";
             }
         }
 
@@ -549,19 +665,53 @@ class AntiDeleteEditHandler {
 
         try {
             if (originalMessage?.stickerMessage) {
-                const buffer = await downloadMediaMessage(storedMessage, "buffer", {}, downloadOptions);
+                const buffer = await downloadMediaMessage(
+                    storedMessage,
+                    "buffer",
+                    {},
+                    downloadOptions
+                );
                 await sock.sendMessage(from, { sticker: buffer });
             } else if (originalMessage?.imageMessage) {
-                const buffer = await downloadMediaMessage(storedMessage, "buffer", {}, downloadOptions);
-                await sock.sendMessage(from, { image: buffer, caption: "🖼️ Gambar yang dihapus" });
+                const buffer = await downloadMediaMessage(
+                    storedMessage,
+                    "buffer",
+                    {},
+                    downloadOptions
+                );
+                await sock.sendMessage(from, {
+                    image: buffer,
+                    caption: "🖼️ Gambar yang dihapus"
+                });
             } else if (originalMessage?.videoMessage) {
-                const buffer = await downloadMediaMessage(storedMessage, "buffer", {}, downloadOptions);
-                await sock.sendMessage(from, { video: buffer, caption: "🎥 Video yang dihapus" });
+                const buffer = await downloadMediaMessage(
+                    storedMessage,
+                    "buffer",
+                    {},
+                    downloadOptions
+                );
+                await sock.sendMessage(from, {
+                    video: buffer,
+                    caption: "🎥 Video yang dihapus"
+                });
             } else if (originalMessage?.audioMessage) {
-                const buffer = await downloadMediaMessage(storedMessage, "buffer", {}, downloadOptions);
-                await sock.sendMessage(from, { audio: buffer, mimetype: "audio/mp4" });
+                const buffer = await downloadMediaMessage(
+                    storedMessage,
+                    "buffer",
+                    {},
+                    downloadOptions
+                );
+                await sock.sendMessage(from, {
+                    audio: buffer,
+                    mimetype: "audio/mp4"
+                });
             } else if (originalMessage?.documentMessage) {
-                const buffer = await downloadMediaMessage(storedMessage, "buffer", {}, downloadOptions);
+                const buffer = await downloadMediaMessage(
+                    storedMessage,
+                    "buffer",
+                    {},
+                    downloadOptions
+                );
                 await sock.sendMessage(from, {
                     document: buffer,
                     mimetype: originalMessage.documentMessage.mimetype,
@@ -592,7 +742,9 @@ class ConnectionManager {
             });
 
             rl.question(
-                colors.yellow("📱 Masukkan nomor WhatsApp (contoh: 628123456789): "),
+                colors.yellow(
+                    "📱 Masukkan nomor WhatsApp (contoh: 628123456789): "
+                ),
                 answer => {
                     rl.close();
                     resolve(answer.trim());
@@ -606,9 +758,13 @@ class ConnectionManager {
         console.log(colors.green("Connecting..."));
 
         const { version, isLatest } = await fetchLatestWaWebVersion();
-        console.log(colors.green(`Using version: ${version}\nLatest: ${isLatest}`));
+        console.log(
+            colors.green(`Using version: ${version}\nLatest: ${isLatest}`)
+        );
 
-        const { state, saveCreds } = await useMultiFileAuthState(config.SESSION);
+        const { state, saveCreds } = await useMultiFileAuthState(
+            config.SESSION
+        );
 
         const sock = makeWASocket({
             auth: {
@@ -637,9 +793,17 @@ class ConnectionManager {
                         process.exit(1);
                     }
 
-                    const code = await sock.requestPairingCode(pairingNumber, config.PAIRING_CODE);
-                    console.log(colors.green(`\n✅ Pairing Code: `) + colors.yellow.bold(code));
-                    console.log(colors.cyan("📲 Masukkan kode ini di WhatsApp kamu\n"));
+                    const code = await sock.requestPairingCode(
+                        pairingNumber,
+                        config.PAIRING_CODE
+                    );
+                    console.log(
+                        colors.green(`\n✅ Pairing Code: `) +
+                            colors.yellow.bold(code)
+                    );
+                    console.log(
+                        colors.cyan("📲 Masukkan kode ini di WhatsApp kamu\n")
+                    );
                 } catch (err) {
                     console.error(`Failed to get pairing code: ${err}`);
                 }
@@ -647,7 +811,9 @@ class ConnectionManager {
         }
 
         sock.ev.on("creds.update", saveCreds);
-        sock.ev.on("connection.update", update => this.handleConnectionUpdate(update, sock));
+        sock.ev.on("connection.update", update =>
+            this.handleConnectionUpdate(update, sock)
+        );
         sock.ev.on("messages.upsert", async ({ messages }) => {
             await this.messageHandler.handleMessage(sock, messages[0]);
         });
@@ -664,15 +830,29 @@ class ConnectionManager {
         const { connection, lastDisconnect } = update;
 
         if (connection === "open") {
-            console.log(colors.green("✅ Connected as ") + colors.cyan(sock.user.name));
+            console.log(
+                colors.green("✅ Connected as ") + colors.cyan(sock.user.name)
+            );
         }
 
         if (connection === "close") {
-            const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
+            const statusCode = new Boom(lastDisconnect?.error)?.output
+                ?.statusCode;
 
-            if (statusCode === 401 || statusCode === 403 || statusCode === 405) {
-                console.warn(colors.red(`⚠️ Session invalid (${statusCode}), resetting...`));
-                fs.rmSync(`./${config.SESSION}`, { recursive: true, force: true });
+            if (
+                statusCode === 401 ||
+                statusCode === 403 ||
+                statusCode === 405
+            ) {
+                console.warn(
+                    colors.red(
+                        `⚠️ Session invalid (${statusCode}), resetting...`
+                    )
+                );
+                fs.rmSync(`./${config.SESSION}`, {
+                    recursive: true,
+                    force: true
+                });
             } else {
                 console.log(colors.yellow("🔄 Reconnecting..."));
             }
