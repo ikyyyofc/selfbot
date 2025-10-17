@@ -38,8 +38,6 @@ export default async function ({ sock, from, args, reply }) {
       });
     }
 
-    // kalau gagal umum
-    reply("❌ Gagal menambahkan pengguna, coba lagi nanti.");
   } catch (err) {
     console.error(err);
     reply("❌ Terjadi kesalahan: " + err.message);
