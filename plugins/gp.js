@@ -5,75 +5,64 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const PLUGIN_DIR = __dirname; // file ini ditempatkan di folder "plugins"
+const PLUGIN_DIR = __dirname; // folder plugin
 
 export default async function (context) {
-  const { args = [], reply, from } = context;
+  const { args = [], reply } = context;
 
   try {
-    // sanitize input helper
+    // Helper untuk sanitize nama file
     const safeName = name => path.basename(name).replace(/\0/g, "");
 
-    // no args -> list plugins
+    // Kalau tanpa argumen → tampilkan daftar plugin
     if (!args[0]) {
       const files = fs.existsSync(PLUGIN_DIR)
         ? fs.readdirSync(PLUGIN_DIR).filter(f => f.endsWith(".js"))
         : [];
 
-      if (files.length === 0) {
-        return reply("⚠️ Tidak ada plugin di folder plugins.");
-      }
+      if (files.length === 0) return reply("⚠️ Tidak ada plugin ditemukan di folder plugins.");
 
-      let msg = "🔌 *Daftar Plugin*:\n\n";
-      files.forEach((f, i) => {
-        msg += `${i + 1}. ${f}\n`;
-      });
-      msg += `\nGunakan:\n.inspect <nama> (untuk download file)\n.inspect preview <nama> (lihat 15 baris pertama)`;
+      let msg = "🔌 *Daftar Plugin:*\n\n";
+      files.forEach((f, i) => (msg += `${i + 1}. ${f}\n`));
+      msg += `\nGunakan perintah:\n.inspect <nama> → kirim file plugin\n.inspect preview <nama> → lihat isi plugin lengkap`;
       return reply(msg);
     }
 
-    // subcommands
     const sub = args[0].toLowerCase();
 
+    // Mode preview
     if (sub === "preview" || sub === "p") {
       const name = args[1];
       if (!name) return reply("❗ Contoh: .inspect preview ping");
 
-      const fileName = safeName(name).endsWith(".js")
-        ? safeName(name)
-        : `${safeName(name)}.js`;
+      const fileName = safeName(name).endsWith(".js") ? safeName(name) : `${safeName(name)}.js`;
       const fullPath = path.join(PLUGIN_DIR, fileName);
 
       if (!fs.existsSync(fullPath)) return reply("❌ File tidak ditemukan.");
 
       const content = fs.readFileSync(fullPath, "utf8");
-      const lines = content.split(/\r?\n/).slice(0, 15);
-      const preview = lines.join("\n");
-      const header = `📄 Preview ${fileName} (15 baris pertama):\n\n`;
-      // jika terlalu panjang untuk teks, kirim sebagai document fallback
-      if (header.length + preview.length > 6000) {
-        // kirim sebagai dokumen
-        const buffer = Buffer.from(preview, "utf8");
+
+      // Jika terlalu panjang untuk dikirim sebagai teks, kirim dokumen
+      if (content.length > 6000) {
+        const buffer = Buffer.from(content, "utf8");
         return reply({
           document: buffer,
-          fileName: `${fileName}.preview.txt`,
-          caption: `Preview ${fileName} (15 baris)`
+          fileName: `${fileName}.txt`,
+          caption: `📄 Isi lengkap plugin: ${fileName}`
         });
       }
-      return reply(header + "```js\n" + preview + "\n```");
+
+      return reply(`📄 *Isi plugin ${fileName}:*\n\n\`\`\`js\n${content}\n\`\`\``);
     }
 
-    // otherwise treat first arg as filename to send
+    // Mode kirim file plugin langsung
     const nameArg = args[0];
-    const fileName = safeName(nameArg).endsWith(".js")
-      ? safeName(nameArg)
-      : `${safeName(nameArg)}.js`;
+    const fileName = safeName(nameArg).endsWith(".js") ? safeName(nameArg) : `${safeName(nameArg)}.js`;
     const fullPath = path.join(PLUGIN_DIR, fileName);
 
     if (!fs.existsSync(fullPath)) return reply("❌ File plugin tidak ditemukan.");
 
     const buffer = fs.readFileSync(fullPath);
-    // send as document so user bisa download / buka
     return reply({
       document: buffer,
       fileName,
