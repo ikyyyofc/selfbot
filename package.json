@@ -13,7 +13,7 @@
   "description": "",
   "dependencies": {
     "@colors/colors": "latest",
-    "@whiskeysockets/baileys": "7.0.0-rc.5",
+    "@whiskeysockets/baileys": "latest",
     "crypto": "latest",
     "axios": "latest",
     "cheerio": "latest",
