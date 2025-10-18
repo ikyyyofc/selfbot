@@ -272,13 +272,13 @@ class MessageHandler {
     }
 
     async executeEval(sock, from, m, code, withReturn) {
-      jsonparse(str) {
-        try {
-            return JSON.parse(str);
-        } catch {
-            return str;
+        function jsonparse(str) {
+            try {
+                return JSON.parse(str);
+            } catch (e) {
+                return str;
+            }
         }
-    }
         try {
             const wrappedCode = withReturn ? `return ${code}` : code;
             const evalFunc = new Function(
