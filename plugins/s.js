@@ -74,13 +74,13 @@ export default async function (context) {
             return;
         }
 
-        // Try image -> ffmpeg (preserves aspect ratio without padding)
+        // Try image -> ffmpeg (preserves exact aspect ratio, max 512px)
         if (mime.startsWith("image/")) {
             try {
                 const ffmpegCmd = [
                     `ffmpeg -y -i "${inputPath}"`,
                     `-vcodec libwebp`,
-                    `-vf "scale='if(gt(iw,ih),512,-1)':'if(gt(iw,ih),-1,512)':force_original_aspect_ratio=decrease"`,
+                    `-vf "scale='min(512,iw)':'min(512,ih)':force_original_aspect_ratio=decrease"`,
                     `-lossless 0 -qscale 75 -preset default -an -vsync 0`,
                     `"${outputPath}"`
                 ].join(" ");
@@ -110,14 +110,14 @@ export default async function (context) {
         }
 
         // Video / GIF handling via ffmpeg -> webp (animated sticker)
-        // Preserves aspect ratio without padding/cropping
+        // Preserves exact aspect ratio, max 512px on longest side
         if (mime.startsWith("video/") || mime === "image/gif") {
             try {
-                // ffmpeg command yang mempertahankan aspect ratio tanpa padding
+                // ffmpeg command yang mempertahankan aspect ratio asli
                 const ffmpegCmd = [
                     `ffmpeg -y -i "${inputPath}"`,
                     `-vcodec libwebp`,
-                    `-vf "scale='if(gt(iw,ih),512,-1)':'if(gt(iw,ih),-1,512)':force_original_aspect_ratio=decrease,fps=15"`,
+                    `-vf "scale='min(512,iw)':'min(512,ih)':force_original_aspect_ratio=decrease,fps=15"`,
                     `-loop 0 -preset default -an -vsync 0`,
                     `"${outputPath}"`
                 ].join(" ");
