@@ -1,43 +1,92 @@
-import { performance } from "perf_hooks";
+// plugins/serverinfo.js
 import os from "os";
+import si from "systeminformation";
 
-function formatMem() {
-    const total = os.totalmem();
-    const free = os.freemem();
+export default async function ({ reply }) {
+  try {
+    const [cpu, mem, osInfo, disk, net, battery, time, temp, load] = await Promise.all([
+      si.cpu(),
+      si.mem(),
+      si.osInfo(),
+      si.diskLayout(),
+      si.networkInterfaces(),
+      si.battery(),
+      si.time(),
+      si.cpuTemperature(),
+      si.currentLoad(),
+    ]);
 
-    const toGB = bytes => (bytes / 1024 / 1024 / 1024).toFixed(2) + " GB";
+    const uptime = os.uptime();
+    const uptimeStr = new Date(uptime * 1000).toISOString().substr(11, 8);
 
-    return {
-        total: toGB(total),
-        free: toGB(free),
-        used: toGB(total - free),
-        percentUsed: ((1 - free / total) * 100).toFixed(1) + "%"
-    };
+    const msg = `
+🖥️ *SERVER INFORMATION*
+──────────────────────
+🏷️ *Hostname:* ${os.hostname()}
+💻 *Platform:* ${osInfo.platform} (${osInfo.arch})
+🧠 *Distro:* ${osInfo.distro} ${osInfo.release}
+⚙️ *Kernel:* ${osInfo.kernel}
+📦 *Build:* ${osInfo.build}
+
+⏱️ *Uptime:* ${uptimeStr}
+🪫 *Battery:* ${battery.hasBattery ? `${battery.percent}% (${battery.isCharging ? "Charging" : "Discharging"})` : "N/A"}
+
+──────────────────────
+🧩 *CPU INFORMATION*
+──────────────────────
+🧠 *Model:* ${cpu.manufacturer} ${cpu.brand}
+📈 *Cores:* ${cpu.cores} (${cpu.physicalCores} Physical)
+⚡ *Speed:* ${cpu.speed} GHz
+🌡️ *Temperature:* ${temp.main ? temp.main + "°C" : "N/A"}
+📊 *Load (1/5/15min):* ${os.loadavg().map(n => n.toFixed(2)).join(" / ")}
+🔥 *Current Load:* ${load.currentload.toFixed(2)}%
+🧮 *Cache:* L1:${cpu.cache.l1d} KB L2:${cpu.cache.l2} KB L3:${cpu.cache.l3} KB
+
+──────────────────────
+💾 *MEMORY INFORMATION*
+──────────────────────
+🪣 *Total:* ${(mem.total / 1073741824).toFixed(2)} GB
+📉 *Used:* ${(mem.active / 1073741824).toFixed(2)} GB
+📊 *Free:* ${(mem.available / 1073741824).toFixed(2)} GB
+💢 *Usage:* ${((mem.active / mem.total) * 100).toFixed(2)}%
+
+──────────────────────
+🗄️ *STORAGE INFORMATION*
+──────────────────────
+${disk
+  .map(
+    d =>
+      `💽 *${d.name || d.device}*\nType: ${d.type}\nSize: ${(d.size / 1073741824).toFixed(2)} GB\nInterface: ${d.interfaceType}\n`
+  )
+  .join("\n")}
+
+──────────────────────
+🌐 *NETWORK INFORMATION*
+──────────────────────
+${net
+  .map(
+    n =>
+      `🔌 *${n.iface}*\nIP: ${n.ip4 || "N/A"}\nMAC: ${n.mac}\nSpeed: ${n.speed || "?"} Mbps\nStatus: ${n.operstate}\n`
+  )
+  .join("\n")}
+
+──────────────────────
+🧾 *NODE & ENVIRONMENT*
+──────────────────────
+📦 *Node.js:* ${process.version}
+🪄 *V8 Version:* ${process.versions.v8}
+⚙️ *Arch:* ${process.arch}
+🧭 *PID:* ${process.pid}
+📂 *CWD:* ${process.cwd()}
+🌍 *Timezone:* ${time.timezoneName}
+🕓 *Current Time:* ${time.current}
+
+──────────────────────
+✅ _Generated Automatically by System Info Plugin_
+`;
+
+    await reply(msg.trim());
+  } catch (err) {
+    await reply(`❌ Gagal mendapatkan informasi server: ${err.message}`);
+  }
 }
-
-export default async function ({ reply, sock, from }) {
-    const start = performance.now();
-    const end = performance.now();
-    const speed = end - start;
-    const mem = formatMem();
-    reply(
-        `🏓 Pong!\n\n•Latency:\n  ${speed.toFixed(4)}ms\n\n•RAM:\n  Total: ${
-            mem.total
-        }\n  Free: ${mem.free}\n  Used: ${mem.used} (${mem.percentUsed})`
-    );
-}
-
-// Contoh plugin lain:
-// File: plugins/test.js
-
-// export default async function ({ reply, args, text, fileBuffer }) {
-//     await reply(`Test command`);
-//
-//     if (args.length > 0) {
-//         await reply(`Args: ${args.join(", ")}`);
-//     }
-//
-//     if (fileBuffer) {
-//         await reply("Ada file yang dikirim!");
-//     }
-// }
