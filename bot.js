@@ -273,9 +273,7 @@ class MessageHandler {
 
     async executeEval(sock, from, m, code, withReturn) {
         try {
-            const wrappedCode = withReturn
-                ? `return ${JSON.stringify(code, null, 2)}`
-                : JSON.stringify(code, null, 2);
+            const wrappedCode = withReturn ? `return ${code}` : code;
             const evalFunc = new Function(
                 "sock",
                 "from",
