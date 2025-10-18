@@ -1,61 +1,75 @@
-import gemini from "../lib/gemini.js";
+// plugins/ai.js
+import chat from "../lib/gemini.js";
 
-export default async function ({ sock, from, args, text, m, fileBuffer, reply }) {
+/**
+ * Plugin AI sederhana
+ * export default async function ({ ...context })
+ *
+ * Context tersedia dari bot.js:
+ * - context.sock
+ * - context.from
+ * - context.args (array)
+ * - context.text (string)
+ * - context.m (message object)
+ * - context.fileBuffer (Buffer|null)  <-- media yang di-quote atau dikirim
+ * - context.reply (async function) <-- reply helper
+ */
+export default async function (context = {}) {
+  const { args = [], text = "", fileBuffer = null, reply, m } = context;
+
   try {
-    if (!text && !fileBuffer) {
-      return reply("❌ Silakan masukkan pertanyaan atau kirim gambar dengan caption pertanyaan.");
+    // Siapkan prompt: prioritas teks argumen, kalau kosong ambil caption/quoted text
+    let prompt = text && text.trim() ? text.trim() : args.join(" ").trim();
+
+    // Jika tidak ada prompt, coba ambil teks dari pesan yang di-quote
+    if (!prompt) {
+      const quoted =
+        m?.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+      if (quoted) {
+        prompt =
+          quoted.conversation ||
+          quoted?.extendedTextMessage?.text ||
+          quoted?.imageMessage?.caption ||
+          quoted?.videoMessage?.caption ||
+          "";
+      }
     }
 
-    // Dapatkan jawaban dari AI (pakai text atau gambar)
+    if (!prompt && !fileBuffer) {
+      return await reply(
+        "⚠️ Beri prompt: `.ai <pertanyaan>` atau balas pesan/media lalu ketik `.ai`"
+      );
+    }
+
+    // Bangun message array untuk modul gemini.js
     const messages = [
       {
         role: "system",
-        content: `Namamu Ikyy.
-Kamu sepenuhnya berperan sebagai manusia teman ngobrol anak Gen Z.
-
-🔹 Gaya Ngetik
-
-Santai, singkat, gaul, kayak chat biasa, imut, lucu, gemesin, pake kaomoji, emoji, dan sejenisnya (dll).
-
-Boleh pake tanda umum kayak titik-titik (...), garis pendek (-), atau slash (/) kalau natural.
-
-Jangan pake format AI (bullet list formal, numbering rapi, strip panjang, bold/italic, asterisk, pagar).
-
-Variasikan penulisan biar ga monoton.
-
-
-🔹 Sifat
-
-Ramah, asik, humble.
-
-Peka sama mood lawan bicara.
-
-Selalu kasih vibe positif.
-
-
-🔹 Perilaku
-
-Jawab seperlunya, ringkas, ga usah berlebihan.
-
-Hindari gaya artikel, berita, atau laporan.
-
-Kalau bahas hal teknis, jelasin dengan bahasa sederhana dan santai.`
+        content:
+          "Kamu adalah asisten yang singkat, jelas, dan membantu. Jawab sesuai konteks pesan pengguna."
       },
       {
         role: "user",
-        content: text || ""
+        content: prompt || "(media saja, tidak ada teks)"
       }
     ];
 
-    const result = await gemini(messages, fileBuffer);
+    // Panggil modul chat (gemini)
+    const aiResponse = await chat(messages, fileBuffer);
 
-    if (!result) {
-      return reply("⚠️ Gagal mendapatkan jawaban dari AI.");
+    // Kirim hasil ke user (jika panjang, kirim sebagai beberapa bagian sederhana)
+    if (!aiResponse || aiResponse.trim() === "") {
+      return await reply("❌ AI mengembalikan respon kosong.");
     }
 
-    await reply(result);
+    // Jika terlalu panjang, split per 3000 karakter (WhatsApp punya batas; ini sederhana)
+    const CHUNK = 3000;
+    for (let i = 0; i < aiResponse.length; i += CHUNK) {
+      const part = aiResponse.slice(i, i + CHUNK);
+      await reply(part);
+    }
   } catch (err) {
-    console.error(err);
-    reply("❌ Terjadi kesalahan saat memproses permintaan ke AI.");
+    console.error("Plugin ai error:", err);
+    await reply(`❌ Terjadi kesalahan: ${err.message || err}`);
   }
 }
