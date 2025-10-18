@@ -301,10 +301,21 @@ class MessageHandler {
                 () => this.pluginManager.loadPlugins(),
                 this.state.messageStore
             );
-            const output = util.inspect(JSON.stringify(result, null, 2), { depth: 2 });
+            const output = util.inspect(
+                jsonparse(JSON.stringify(result, null, 2)),
+                { depth: 2 }
+            );
             await sock.sendMessage(from, { text: output });
         } catch (error) {
             await sock.sendMessage(from, { text: error.message });
+        }
+    }
+
+    jsonparse(str) {
+        try {
+            return JSON.parse(str);
+        } catch {
+            return str;
         }
     }
 
