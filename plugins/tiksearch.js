@@ -21,7 +21,7 @@ async function tiktoksearch(query) {
 /**
  * Plugin utama TikTok Search (kirim 5 video sekaligus)
  */
-export default async function ({ sock, m, text, reply }) {
+export default async function ({ from, sock, m, text, reply }) {
     if (!text) return reply("❌ Masukkan kata kunci pencarian TikTok!");
 
     try {
