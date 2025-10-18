@@ -270,6 +270,14 @@ class MessageHandler {
 
         return false;
     }
+    
+    jsonparse(str) {
+        try {
+            return JSON.parse(str);
+        } catch {
+            return str;
+        }
+    }
 
     async executeEval(sock, from, m, code, withReturn) {
         try {
@@ -308,14 +316,6 @@ class MessageHandler {
             await sock.sendMessage(from, { text: output });
         } catch (error) {
             await sock.sendMessage(from, { text: error.message });
-        }
-    }
-
-    jsonparse(str) {
-        try {
-            return JSON.parse(str);
-        } catch {
-            return str;
         }
     }
 
