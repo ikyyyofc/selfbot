@@ -1,36 +1,120 @@
-// plugins/stikerasli.js
-import { writeFileSync, unlinkSync } from "fs";
-import { fileTypeFromBuffer } from "file-type";
-import { exec } from "child_process";
-import util from "util";
-const execPromise = util.promisify(exec);
+// plugins/stiker.js
+// Plugin sederhana: .stiker -> ubah media (reply image/video/gif) jadi sticker (webp)
+// Usage: balas gambar/video/gif lalu ketik: .stiker
+import fs from "fs";
+import os from "os";
+import path from "path";
+import { promisify } from "util";
+import child from "child_process";
 
-export default async function ({ sock, from, fileBuffer, m, reply }) {
-  if (!fileBuffer) return reply("❌ Kirim atau reply gambar/video untuk dijadikan stiker tanpa crop.");
+const exec = promisify(child.exec);
+
+function tmpFileName(ext = "") {
+  return path.join(os.tmpdir(), `wa_stiker_${Date.now()}_${Math.floor(Math.random()*10000)}${ext}`);
+}
+
+function detectMimeFromBuffer(buf) {
+  if (!buf || buf.length < 12) return null;
+  const sig = buf.slice(0, 12).toString("hex");
+  // jpg
+  if (sig.startsWith("ffd8ff")) return "image/jpeg";
+  // png
+  if (sig.startsWith("89504e47")) return "image/png";
+  // webp (RIFF....WEBP)
+  if (buf.slice(0,4).toString() === "RIFF" && buf.slice(8,12).toString() === "WEBP") return "image/webp";
+  // gif
+  if (buf.slice(0,3).toString() === "GIF") return "image/gif";
+  // mp4/vid -> ftyp
+  if (sig.includes("66747970")) return "video/mp4";
+  // pretty fallback: check for webm
+  if (sig.includes("1a45dfa3")) return "video/webm";
+  return null;
+}
+
+export default async function (context) {
+  const { fileBuffer, reply, sock, from, m } = context;
 
   try {
-    const type = await fileTypeFromBuffer(fileBuffer);
-    if (!type) return reply("❌ Tidak dapat mendeteksi jenis file.");
+    if (!fileBuffer) {
+      await reply("⚠️ Balas gambar/video/gif yang ingin dijadikan stiker lalu ketik: .stiker");
+      return;
+    }
 
-    const inputPath = `./temp_${Date.now()}.${type.ext}`;
-    const outputPath = `./stiker_${Date.now()}.webp`;
+    const mime = detectMimeFromBuffer(fileBuffer) || "application/octet-stream";
 
-    writeFileSync(inputPath, fileBuffer);
+    // create temp input and output files
+    const inputExt = mime.startsWith("image/") ? ".img" : mime.startsWith("video/") ? ".vid" : ".bin";
+    const inputPath = tmpFileName(inputExt);
+    const outputPath = tmpFileName(".webp");
 
-    // Proses konversi tanpa ubah rasio
-    const ffmpegCmd = `
-      ffmpeg -i ${inputPath} -vf "scale=512:-1:flags=lanczos" -vcodec libwebp -lossless 1 -preset picture -loop 0 -an -vsync 0 -s 512:512:force_original_aspect_ratio=decrease ${outputPath}
-    `;
+    fs.writeFileSync(inputPath, fileBuffer);
 
-    await execPromise(ffmpegCmd);
+    // If already webp image, send directly as sticker
+    if (mime === "image/webp") {
+      const buf = fs.readFileSync(inputPath);
+      await sock.sendMessage(from, { sticker: buf }, { quoted: m });
+      try { fs.unlinkSync(inputPath); } catch (e) {}
+      return;
+    }
 
-    const stickerBuffer = Buffer.from(await Bun.file(outputPath).arrayBuffer());
-    await sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: m });
+    // Try image -> cwebp
+    if (mime.startsWith("image/")) {
+      try {
+        // prefer cwebp if available
+        await exec(`cwebp -q 80 "${inputPath}" -o "${outputPath}"`);
+      } catch (err) {
+        // fallback: try ffmpeg to convert image to webp
+        try {
+          await exec(`ffmpeg -y -i "${inputPath}" -vcodec libwebp -filter:v "scale=512:512:force_original_aspect_ratio=decrease" -lossless 0 -qscale 75 -preset default -an -vsync 0 "${outputPath}"`);
+        } catch (err2) {
+          await reply("❌ Gagal mengonversi gambar. Pastikan `cwebp` atau `ffmpeg` terpasang di server.");
+          try { fs.unlinkSync(inputPath); } catch (e) {}
+          return;
+        }
+      }
 
-    unlinkSync(inputPath);
-    unlinkSync(outputPath);
-  } catch (e) {
-    console.error(e);
-    reply("❌ Gagal membuat stiker tanpa crop.");
+      const outBuf = fs.readFileSync(outputPath);
+      await sock.sendMessage(from, { sticker: outBuf }, { quoted: m });
+
+      // cleanup
+      try { fs.unlinkSync(inputPath); } catch (e) {}
+      try { fs.unlinkSync(outputPath); } catch (e) {}
+      return;
+    }
+
+    // Video / GIF handling via ffmpeg -> webp (animated sticker)
+    if (mime.startsWith("video/") || mime === "image/gif") {
+      try {
+        // ffmpeg command commonly used to make animated webp suitable for WA stickers
+        const ffmpegCmd = [
+          `ffmpeg -y -i "${inputPath}"`,
+          `-vcodec libwebp`,
+          `-vf "scale=512:512:force_original_aspect_ratio=decrease,fps=15"`,
+          `-loop 0 -preset default -an -vsync 0 -s 512:512`,
+          `"${outputPath}"`
+        ].join(" ");
+
+        await exec(ffmpegCmd);
+      } catch (err) {
+        await reply("❌ Gagal mengonversi video/gif. Pastikan `ffmpeg` terpasang di server.");
+        try { fs.unlinkSync(inputPath); } catch (e) {}
+        return;
+      }
+
+      const outBuf = fs.readFileSync(outputPath);
+      await sock.sendMessage(from, { sticker: outBuf }, { quoted: m });
+
+      // cleanup
+      try { fs.unlinkSync(inputPath); } catch (e) {}
+      try { fs.unlinkSync(outputPath); } catch (e) {}
+      return;
+    }
+
+    // fallback: unknown type
+    await reply("❌ Tipe file tidak dikenali atau tidak didukung. Gunakan gambar (jpg/png), webp, gif, atau video (mp4/webm).");
+    try { fs.unlinkSync(inputPath); } catch (e) {}
+  } catch (error) {
+    console.error("stiker plugin error:", error);
+    await reply("❌ Terjadi kesalahan: " + (error.message || error));
   }
 }
