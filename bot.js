@@ -200,16 +200,17 @@ class MessageHandler {
 
         const from = m.key.remoteJid;
         const messageId = m.key.id;
+        const isGroup = from.endsWith("@g.us");
 
         // Store message
-        this.state.addMessage(messageId, {
-            message: m,
-            from: from,
-            timestamp: Date.now()
-        });
+        if (!isGroup) {
+            this.state.addMessage(messageId, {
+                message: m,
+                from: from,
+                timestamp: Date.now()
+            });
+        }
 
-        // Check if should process
-        const isGroup = from.endsWith("@g.us");
         if (!isGroup && !m.key.fromMe) return;
         if (
             isGroup &&
