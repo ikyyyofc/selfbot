@@ -1,42 +1,36 @@
-// plugins/stiker.js
+// plugins/stikerasli.js
 import { writeFileSync, unlinkSync } from "fs";
 import { fileTypeFromBuffer } from "file-type";
 import { exec } from "child_process";
 import util from "util";
-
 const execPromise = util.promisify(exec);
 
 export default async function ({ sock, from, fileBuffer, m, reply }) {
-  try {
-    if (!fileBuffer) return reply("⚠️ Kirim atau balas gambar/video dengan caption *.stiker*");
+  if (!fileBuffer) return reply("❌ Kirim atau reply gambar/video untuk dijadikan stiker tanpa crop.");
 
-    const { ext, mime } = await fileTypeFromBuffer(fileBuffer);
-    const inputPath = `./temp_${Date.now()}.${ext}`;
+  try {
+    const type = await fileTypeFromBuffer(fileBuffer);
+    if (!type) return reply("❌ Tidak dapat mendeteksi jenis file.");
+
+    const inputPath = `./temp_${Date.now()}.${type.ext}`;
     const outputPath = `./stiker_${Date.now()}.webp`;
 
     writeFileSync(inputPath, fileBuffer);
 
-    if (mime.startsWith("image/")) {
-      // ⬇️ Gambar — tanpa ubah rasio
-      await execPromise(
-        `ffmpeg -i ${inputPath} -vf "scale=iw:ih,format=rgba,fps=15" -y ${outputPath}`
-      );
-    } else if (mime.startsWith("video/")) {
-      // ⬇️ Video — tetap rasio asli, max durasi 10 detik
-      await execPromise(
-        `ffmpeg -i ${inputPath} -vf "scale=iw:ih,format=rgba,fps=15" -t 10 -loop 0 -y ${outputPath}`
-      );
-    } else {
-      unlinkSync(inputPath);
-      return reply("❌ Format file tidak didukung. Gunakan gambar atau video.");
-    }
+    // Proses konversi tanpa ubah rasio
+    const ffmpegCmd = `
+      ffmpeg -i ${inputPath} -vf "scale=512:-1:flags=lanczos" -vcodec libwebp -lossless 1 -preset picture -loop 0 -an -vsync 0 -s 512:512:force_original_aspect_ratio=decrease ${outputPath}
+    `;
 
-    await sock.sendMessage(from, { sticker: { url: outputPath } }, { quoted: m });
+    await execPromise(ffmpegCmd);
+
+    const stickerBuffer = Buffer.from(await Bun.file(outputPath).arrayBuffer());
+    await sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: m });
 
     unlinkSync(inputPath);
     unlinkSync(outputPath);
-  } catch (err) {
-    console.error("Sticker error:", err);
-    reply("❌ Gagal membuat stiker: " + err.message);
+  } catch (e) {
+    console.error(e);
+    reply("❌ Gagal membuat stiker tanpa crop.");
   }
 }
