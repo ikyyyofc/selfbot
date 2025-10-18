@@ -11,15 +11,15 @@ async function tiktoksearch(query) {
         "keywords=" + encodeURIComponent(query),
         {
             headers: {
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
+                "Content-Type": "application/x-www-form-urlencoded"
+            }
         }
     );
     return res.data.data.videos;
 }
 
 /**
- * Plugin utama TikTok Search (kirim 5 video sekaligus)
+ * Plugin utama TikTok Search (kirim 5 video tanpa link)
  */
 export default async function ({ from, sock, m, text, reply }) {
     if (!text) return reply("❌ Masukkan kata kunci pencarian TikTok!");
@@ -38,13 +38,12 @@ export default async function ({ from, sock, m, text, reply }) {
                 `🎬 *${v.title || "Tanpa judul"}*`,
                 `👤 ${v.author.nickname} (@${v.author.unique_id})`,
                 `❤️ ${v.digg_count} | 💬 ${v.comment_count} | 🔁 ${v.share_count}`,
-                `▶️ ${v.play_count} views`,
-                `🔗 ${v.play}`,
+                `▶️ ${v.play_count} views`
             ].join("\n");
 
             await sock.sendMessage(from, {
                 video: { url: v.play },
-                caption,
+                caption
             });
         }
 
