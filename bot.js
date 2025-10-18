@@ -272,13 +272,6 @@ class MessageHandler {
     }
 
     async executeEval(sock, from, m, code, withReturn) {
-        function jsonparse(str) {
-            try {
-                return JSON.parse(str);
-            } catch (e) {
-                return str;
-            }
-        }
         try {
             const wrappedCode = withReturn ? `return ${code}` : code;
             const evalFunc = new Function(
@@ -308,10 +301,7 @@ class MessageHandler {
                 () => this.pluginManager.loadPlugins(),
                 this.state.messageStore
             );
-            const output = util.inspect(
-                jsonparse(JSON.stringify(result, null, 2)),
-                { depth: 2 }
-            );
+            const output = util.inspect(result, { depth: 2 });
             await sock.sendMessage(from, { text: output });
         } catch (error) {
             await sock.sendMessage(from, { text: error.message });
