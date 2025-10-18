@@ -301,7 +301,7 @@ class MessageHandler {
                 () => this.pluginManager.loadPlugins(),
                 this.state.messageStore
             );
-            const output = util.inspect(result, { depth: 2 });
+            const output = util.inspect(result, { depth: null, maxArrayLength: null, maxStringLength: null });
             await sock.sendMessage(from, { text: output });
         } catch (error) {
             await sock.sendMessage(from, { text: error.message });
