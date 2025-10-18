@@ -1,6 +1,7 @@
 // plugins/stiker.js
 // Plugin sederhana: .stiker -> ubah media (reply image/video/gif) jadi sticker (webp)
 // Usage: balas gambar/video/gif lalu ketik: .stiker
+// Fixed: Mempertahankan rasio aspek asli, tidak memotong gambar
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -73,26 +74,26 @@ export default async function (context) {
             return;
         }
 
-        // Try image -> cwebp
+        // Try image -> ffmpeg (preserves aspect ratio without padding)
         if (mime.startsWith("image/")) {
             try {
-                // prefer cwebp if available
-                await exec(`cwebp -q 80 "${inputPath}" -o "${outputPath}"`);
+                const ffmpegCmd = [
+                    `ffmpeg -y -i "${inputPath}"`,
+                    `-vcodec libwebp`,
+                    `-vf "scale='if(gt(iw,ih),512,-1)':'if(gt(iw,ih),-1,512)':force_original_aspect_ratio=decrease"`,
+                    `-lossless 0 -qscale 75 -preset default -an -vsync 0`,
+                    `"${outputPath}"`
+                ].join(" ");
+
+                await exec(ffmpegCmd);
             } catch (err) {
-                // fallback: try ffmpeg to convert image to webp
+                await reply(
+                    "❌ Gagal mengonversi gambar. Pastikan `ffmpeg` terpasang di server."
+                );
                 try {
-                    await exec(
-                        `ffmpeg -y -i "${inputPath}" -vcodec libwebp -filter:v "scale=512:512:force_original_aspect_ratio=decrease" -lossless 0 -qscale 75 -preset default -an -vsync 0 "${outputPath}"`
-                    );
-                } catch (err2) {
-                    await reply(
-                        "❌ Gagal mengonversi gambar. Pastikan `cwebp` atau `ffmpeg` terpasang di server."
-                    );
-                    try {
-                        fs.unlinkSync(inputPath);
-                    } catch (e) {}
-                    return;
-                }
+                    fs.unlinkSync(inputPath);
+                } catch (e) {}
+                return;
             }
 
             const outBuf = fs.readFileSync(outputPath);
@@ -109,14 +110,15 @@ export default async function (context) {
         }
 
         // Video / GIF handling via ffmpeg -> webp (animated sticker)
+        // Preserves aspect ratio without padding/cropping
         if (mime.startsWith("video/") || mime === "image/gif") {
             try {
-                // ffmpeg command commonly used to make animated webp suitable for WA stickers
+                // ffmpeg command yang mempertahankan aspect ratio tanpa padding
                 const ffmpegCmd = [
                     `ffmpeg -y -i "${inputPath}"`,
                     `-vcodec libwebp`,
-                    `-vf "scale=512:512:force_original_aspect_ratio=decrease,fps=15"`,
-                    `-loop 0 -preset default -an -vsync 0 -s 512:512`,
+                    `-vf "scale='if(gt(iw,ih),512,-1)':'if(gt(iw,ih),-1,512)':force_original_aspect_ratio=decrease,fps=15"`,
+                    `-loop 0 -preset default -an -vsync 0`,
                     `"${outputPath}"`
                 ].join(" ");
 
