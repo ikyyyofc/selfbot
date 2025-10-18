@@ -886,5 +886,5 @@ const main = async () => {
 
 main().catch(error => {
     console.error(colors.red("❌ Fatal error:"), error);
-    process.exit(1);
+    process.exit(0);
 });
