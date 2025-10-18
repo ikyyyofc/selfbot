@@ -42,7 +42,7 @@ export default async function ({ sock, m, text, reply }) {
                 `🔗 ${v.play}`,
             ].join("\n");
 
-            await sock.sendMessage(m.chat, {
+            await sock.sendMessage(from, {
                 video: { url: v.play },
                 caption,
             });
