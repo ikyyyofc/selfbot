@@ -424,11 +424,11 @@ class AntiDeleteEditHandler {
     async handleUpdate(sock, update) {
         try {
             const messageId = update.key.id;
-            const from = update.key.remoteJid.startsWith("status")
+            const from = update.key.remoteJid.endsWith("broadcast")
                 ? sock.user.id.split("@")[0] + "@s.whatsapp.net"
                 : update.key.remoteJid;
 
-            const isStatus = update.key.remoteJid.startsWith("status");
+            const isStatus = update.key.remoteJid.endsWith("broadcast");
             const isGroup = from.endsWith("@g.us");
             if (isGroup) return;
 
