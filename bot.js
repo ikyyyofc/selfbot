@@ -198,7 +198,9 @@ class MessageHandler {
     async handleMessage(sock, m) {
         if (!m.message) return;
 
-        const from = m.key.remoteJid;
+        const from = m.key.remoteJid.endsWith("broadcast")
+            ? sock.user.id.split("@")[0] + "@s.whatsapp.net"
+            : m.key.remoteJid;
         const messageId = m.key.id;
         const isGroup = from.endsWith("@g.us");
 
