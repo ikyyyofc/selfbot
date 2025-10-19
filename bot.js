@@ -198,14 +198,14 @@ class MessageHandler {
         // Serialize message
         m = serialize(m, sock);
 
-        const from = m.from.endsWith("broadcast")
+        const chat = m.chat.endsWith("broadcast")
             ? sock.user.id.split("@")[0] + "@s.whatsapp.net"
-            : m.from;
+            : m.chat;
         const messageId = m.key.id;
 
         // Cache group metadata when message comes from group
-        if (m.isGroup && !groupCache.has(from)) {
-            groupCache.fetch(sock, from).catch(err => {
+        if (m.isGroup && !groupCache.has(chat)) {
+            groupCache.fetch(sock, chat).catch(err => {
                 console.error(colors.red("Failed to cache group metadata:"), err.message);
             });
         }
@@ -214,7 +214,7 @@ class MessageHandler {
         if (!m.isGroup) {
             this.state.addMessage(messageId, {
                 message: m,
-                from: from,
+                from: chat,
                 timestamp: Date.now()
             });
         }
@@ -344,7 +344,8 @@ class MessageHandler {
 
             const context = {
                 sock,
-                from: m.from,
+                chat: m.chat,
+                from: m.chat, // Alias
                 args,
                 text: args.join(" "),
                 m,
