@@ -732,7 +732,7 @@ class ConnectionManager {
         });
 
         // Extend socket with helper functions
-        extendSocket(sock);
+        await extendSocket(sock);
 
         // Handle pairing
         if (!sock.authState.creds.registered) {
