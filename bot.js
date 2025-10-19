@@ -17,6 +17,8 @@ import util from "util";
 import readline from "readline";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
+import serialize from "./lib/serialize.js";
+import { extendSocket } from "./lib/socket.js";
 
 const execPromise = util.promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
@@ -27,7 +29,7 @@ const config = await import("./config.js").then(m => m.default);
 const PLUGIN_DIR = path.join(__dirname, "plugins");
 const MESSAGE_STORE_LIMIT = 1000;
 const MESSAGE_STORE_FILE = path.join(config.SESSION, "message_store.json");
-const MESSAGE_SAVE_INTERVAL = 10; // Save every 10 messages
+const MESSAGE_SAVE_INTERVAL = 10;
 
 // ===== STATE MANAGEMENT =====
 class BotState {
@@ -156,9 +158,7 @@ class PluginManager {
         if (!execute) return false;
 
         try {
-            await context.sock.sendMessage(context.from, {
-                react: { text: "⏳", key: context.m.key }
-            });
+            await context.m.react("⏳");
         } catch (e) {
             console.error(colors.red("❌ Failed to send reaction:"), e.message);
         }
@@ -169,15 +169,11 @@ class PluginManager {
             return true;
         } catch (error) {
             console.error(colors.red(`❌ Plugin error:`), error);
-            await context.sock.sendMessage(context.from, {
-                text: `❌ Plugin error: ${error.message}`
-            });
+            await context.m.reply(`❌ Plugin error: ${error.message}`);
             return false;
         } finally {
             try {
-                await context.sock.sendMessage(context.from, {
-                    react: { text: "", key: context.m.key }
-                });
+                await context.m.react("");
             } catch (e) {
                 console.error(
                     colors.red("❌ Failed to remove reaction:"),
@@ -198,14 +194,16 @@ class MessageHandler {
     async handleMessage(sock, m) {
         if (!m.message) return;
 
-        const from = m.key.remoteJid.endsWith("broadcast")
-            ? sock.user.id.split("@")[0] + "@s.whatsapp.net"
-            : m.key.remoteJid;
-        const messageId = m.key.id;
-        const isGroup = from.endsWith("@g.us");
+        // Serialize message
+        m = serialize(m, sock);
 
-        // Store message
-        if (!isGroup) {
+        const from = m.from.endsWith("broadcast")
+            ? sock.user.id.split("@")[0] + "@s.whatsapp.net"
+            : m.from;
+        const messageId = m.key.id;
+
+        // Store message (non-group only)
+        if (!m.isGroup) {
             this.state.addMessage(messageId, {
                 message: m,
                 from: from,
@@ -213,46 +211,32 @@ class MessageHandler {
             });
         }
 
-        if (!isGroup && !m.key.fromMe) return;
-        if (
-            isGroup &&
-            m.key.participant !== sock.user.lid.split(":")[0] + "@lid"
-        )
-            return;
+        // Filter: only process self messages in groups, all messages in private
+        if (!m.isGroup && !m.fromMe) return;
+        if (m.isGroup && m.key.participant !== sock.user.lid.split(":")[0] + "@lid") return;
 
-        // Extract text
-        const text = this.extractText(m);
-        if (!text) return;
+        if (!m.text) return;
 
         // Handle special commands
-        if (await this.handleEval(sock, from, m, text)) return;
-        if (await this.handleExec(sock, from, text)) return;
+        if (await this.handleEval(sock, m)) return;
+        if (await this.handleExec(sock, m)) return;
 
         // Handle plugin commands
-        await this.handlePluginCommand(sock, from, m, text, isGroup);
+        await this.handlePluginCommand(sock, m);
     }
 
-    extractText(m) {
-        const text =
-            m.message?.conversation ||
-            m.message?.extendedTextMessage?.text ||
-            m.message?.imageMessage?.caption ||
-            m.message?.videoMessage?.caption ||
-            m.message?.documentMessage?.caption ||
-            "";
-        return text.trim();
-    }
+    async handleEval(sock, m) {
+        const text = m.text;
 
-    async handleEval(sock, from, m, text) {
         // Eval with >
         if (text.startsWith(">") && !text.startsWith("=>")) {
             const code = text.slice(1).trim();
             if (!code) {
-                await sock.sendMessage(from, { text: "No code provided" });
+                await m.reply("No code provided");
                 return true;
             }
             console.log(colors.cyan(`📩 eval`));
-            await this.executeEval(sock, from, m, code, false);
+            await this.executeEval(sock, m, code, false);
             return true;
         }
 
@@ -260,23 +244,22 @@ class MessageHandler {
         if (text.startsWith("=>")) {
             const code = text.slice(2).trim();
             if (!code) {
-                await sock.sendMessage(from, { text: "No code provided" });
+                await m.reply("No code provided");
                 return true;
             }
             console.log(colors.cyan(`📩 eval-return`));
-            await this.executeEval(sock, from, m, code, true);
+            await this.executeEval(sock, m, code, true);
             return true;
         }
 
         return false;
     }
 
-    async executeEval(sock, from, m, code, withReturn) {
+    async executeEval(sock, m, code, withReturn) {
         try {
             const wrappedCode = withReturn ? `return ${code}` : code;
             const evalFunc = new Function(
                 "sock",
-                "from",
                 "m",
                 "plugins",
                 "config",
@@ -290,7 +273,6 @@ class MessageHandler {
             );
             const result = await evalFunc(
                 sock,
-                from,
                 m,
                 this.state.plugins,
                 config,
@@ -302,118 +284,70 @@ class MessageHandler {
                 this.state.messageStore
             );
             const output = util.inspect(result, { depth: null, maxArrayLength: null, maxStringLength: null });
-            await sock.sendMessage(from, { text: output });
+            await m.reply(output);
         } catch (error) {
-            await sock.sendMessage(from, { text: error.message });
+            await m.reply(error.message);
         }
     }
 
-    async handleExec(sock, from, text) {
+    async handleExec(sock, m) {
+        const text = m.text;
         if (!text.startsWith("$")) return false;
 
         const cmd = text.slice(1).trim();
         if (!cmd) {
-            await sock.sendMessage(from, { text: "No command provided" });
+            await m.reply("No command provided");
             return true;
         }
 
         console.log(colors.cyan(`📩 exec`));
         try {
-            await sock.sendMessage(from, { text: `⏳ Executing: ${cmd}` });
+            await m.reply(`⏳ Executing: ${cmd}`);
             const { stdout, stderr } = await execPromise(cmd);
             let output = stdout || "";
             if (stderr) output += `Error:\n${stderr}`;
             if (!output) output = "✅ Executed (no output)";
-            await sock.sendMessage(from, { text: output });
+            await m.reply(output);
         } catch (error) {
-            await sock.sendMessage(from, { text: error.message });
+            await m.reply(error.message);
         }
         return true;
     }
 
-    async handlePluginCommand(sock, from, m, text, isGroup) {
+    async handlePluginCommand(sock, m) {
         const prefixes = config.PREFIX || ["."];
-        const prefix = prefixes.find(p => text.startsWith(p));
+        const prefix = prefixes.find(p => m.text.startsWith(p));
         if (!prefix) return;
 
-        const args = text.slice(prefix.length).trim().split(/ +/);
+        const args = m.text.slice(prefix.length).trim().split(/ +/);
         const command = args.shift()?.toLowerCase();
         if (!command) return;
 
         console.log(colors.cyan(`📩 ${command}`));
 
         if (this.state.plugins.has(command)) {
-            const fileBuffer = await this.getFileBuffer(m);
+            // Try to get file buffer from quoted or current message
+            let fileBuffer = null;
+            if (m.quoted && m.quoted.isMedia) {
+                fileBuffer = await m.quoted.download();
+            } else if (m.isMedia) {
+                fileBuffer = await m.download();
+            }
+
             const context = {
                 sock,
-                from,
+                from: m.from,
                 args,
                 text: args.join(" "),
                 m,
                 fileBuffer,
-                isGroup,
-                reply: async content => {
-                    if (typeof content === "string") {
-                        return await sock.sendMessage(
-                            from,
-                            { text: content },
-                            { quoted: m }
-                        );
-                    }
-                    return await sock.sendMessage(from, content, { quoted: m });
-                }
+                isGroup: m.isGroup,
+                sender: m.sender,
+                reply: async (content, options) => await m.reply(content, options)
             };
 
             await this.pluginManager.executePlugin(command, context);
         }
-    }
-
-    async getFileBuffer(m) {
-        const quotedMsg =
-            m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-
-        // Try quoted message first
-        if (
-            quotedMsg?.imageMessage ||
-            quotedMsg?.videoMessage ||
-            quotedMsg?.documentMessage ||
-            quotedMsg?.audioMessage ||
-            quotedMsg?.stickerMessage
-        ) {
-            try {
-                return await downloadMediaMessage(
-                    { message: quotedMsg },
-                    "buffer",
-                    {},
-                    { logger: Pino({ level: "silent" }) }
-                );
-            } catch (e) {
-                console.error(
-                    colors.yellow("⚠️ Failed to download quoted media")
-                );
-            }
-        }
-
-        // Try current message
-        if (
-            m.message?.imageMessage ||
-            m.message?.videoMessage ||
-            m.message?.documentMessage ||
-            m.message?.audioMessage
-        ) {
-            try {
-                return await downloadMediaMessage(
-                    m,
-                    "buffer",
-                    {},
-                    { logger: Pino({ level: "silent" }) }
-                );
-            } catch (e) {
-                console.error(colors.yellow("⚠️ Failed to download media"));
-            }
-        }
-
-        return null;
     }
 }
 
@@ -784,6 +718,9 @@ class ConnectionManager {
             generateHighQualityLinkPreview: true,
             version
         });
+
+        // Extend socket with helper functions
+        extendSocket(sock);
 
         // Handle pairing
         if (!sock.authState.creds.registered) {
