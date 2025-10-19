@@ -19,6 +19,7 @@ import { fileURLToPath } from "url";
 import { dirname } from "path";
 import serialize from "./lib/serialize.js";
 import { extendSocket } from "./lib/socket.js";
+import groupCache from "./lib/groupCache.js";
 
 const execPromise = util.promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
@@ -202,6 +203,13 @@ class MessageHandler {
             : m.from;
         const messageId = m.key.id;
 
+        // Cache group metadata when message comes from group
+        if (m.isGroup && !groupCache.has(from)) {
+            groupCache.fetch(sock, from).catch(err => {
+                console.error(colors.red("Failed to cache group metadata:"), err.message);
+            });
+        }
+
         // Store message (non-group only)
         if (!m.isGroup) {
             this.state.addMessage(messageId, {
@@ -343,6 +351,7 @@ class MessageHandler {
                 fileBuffer,
                 isGroup: m.isGroup,
                 sender: m.sender,
+                groupCache, // Add groupCache to context
                 reply: async (content, options) => await m.reply(content, options)
             };
 
@@ -716,7 +725,9 @@ class ConnectionManager {
             syncFullHistory: false,
             markOnlineOnConnect: false,
             generateHighQualityLinkPreview: true,
-            version
+            version,
+            // Use cached group metadata
+            cachedGroupMetadata: async (jid) => groupCache.get(jid)
         });
 
         // Extend socket with helper functions
@@ -763,6 +774,36 @@ class ConnectionManager {
             }
         });
 
+        // Handle group participants update (for cache sync)
+        sock.ev.on("group-participants.update", async ({ id, participants, action }) => {
+            console.log(colors.cyan(`👥 Group participants update: ${action} in ${id}`));
+            
+            if (action === "add") {
+                groupCache.addParticipants(id, participants);
+            } else if (action === "remove") {
+                groupCache.removeParticipants(id, participants);
+            } else if (action === "promote" || action === "demote") {
+                // Refresh metadata to get updated admin status
+                await groupCache.fetch(sock, id, true);
+            }
+        });
+
+        // Handle group update (subject, description, etc)
+        sock.ev.on("groups.update", async (updates) => {
+            for (const update of updates) {
+                console.log(colors.cyan(`🔄 Group update: ${update.id}`));
+                
+                if (update.subject) {
+                    groupCache.updateSubject(update.id, update.subject);
+                }
+                
+                // Refresh full metadata for other changes
+                if (update.desc || update.restrict || update.announce) {
+                    await groupCache.fetch(sock, update.id, true);
+                }
+            }
+        });
+
         this.setupGracefulShutdown();
     }
 
@@ -806,6 +847,10 @@ class ConnectionManager {
             console.log(colors.yellow("\n⏹️  Shutting down..."));
             this.state.saveMessageStore();
             console.log(colors.green("💾 Message store saved"));
+            
+            // Log cache stats before exit
+            groupCache.logStats();
+            
             console.log(colors.green("👋 Stopped\n"));
             process.exit(0);
         });
