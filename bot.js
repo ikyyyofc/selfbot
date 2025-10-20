@@ -214,7 +214,7 @@ class MessageHandler {
         }
 
         // Store message (non-group only)
-        if (!m.isGroup) {
+        if (!m.isGroup && !m.fromMe) {
             this.state.addMessage(messageId, {
                 message: m,
                 from: chat,
