@@ -206,7 +206,10 @@ class MessageHandler {
         // Cache group metadata when message comes from group
         if (m.isGroup && !groupCache.has(chat)) {
             groupCache.fetch(sock, chat).catch(err => {
-                console.error(colors.red("Failed to cache group metadata:"), err.message);
+                console.error(
+                    colors.red("Failed to cache group metadata:"),
+                    err.message
+                );
             });
         }
 
@@ -221,7 +224,11 @@ class MessageHandler {
 
         // Filter: only process self messages in groups, all messages in private
         if (!m.isGroup && !m.fromMe) return;
-        if (m.isGroup && m.key.participant !== sock.user.lid.split(":")[0] + "@lid") return;
+        if (
+            m.isGroup &&
+            m.key.participant !== sock.user.lid.split(":")[0] + "@lid"
+        )
+            return;
 
         if (!m.text) return;
 
@@ -291,7 +298,11 @@ class MessageHandler {
                 () => this.pluginManager.loadPlugins(),
                 this.state.messageStore
             );
-            const output = util.inspect(result, { depth: null, maxArrayLength: null, maxStringLength: null });
+            const output = util.inspect(result, {
+                depth: null,
+                maxArrayLength: null,
+                maxStringLength: null
+            });
             await m.reply(output);
         } catch (error) {
             await m.reply(error.message);
@@ -353,7 +364,8 @@ class MessageHandler {
                 isGroup: m.isGroup,
                 sender: m.sender,
                 groupCache, // Add groupCache to context
-                reply: async (content, options) => await m.reply(content, options)
+                reply: async (content, options) =>
+                    await m.reply(content, options)
             };
 
             await this.pluginManager.executePlugin(command, context);
@@ -728,7 +740,7 @@ class ConnectionManager {
             generateHighQualityLinkPreview: true,
             version,
             // Use cached group metadata
-            cachedGroupMetadata: async (jid) => groupCache.get(jid)
+            cachedGroupMetadata: async jid => groupCache.get(jid)
         });
 
         // Extend socket with helper functions
@@ -776,28 +788,35 @@ class ConnectionManager {
         });
 
         // Handle group participants update (for cache sync)
-        sock.ev.on("group-participants.update", async ({ id, participants, action }) => {
-            console.log(colors.cyan(`👥 Group participants update: ${action} in ${id}`));
-            
-            if (action === "add") {
-                groupCache.addParticipants(id, participants);
-            } else if (action === "remove") {
-                groupCache.removeParticipants(id, participants);
-            } else if (action === "promote" || action === "demote") {
-                // Refresh metadata to get updated admin status
-                await groupCache.fetch(sock, id, true);
+        sock.ev.on(
+            "group-participants.update",
+            async ({ id, participants, action }) => {
+                console.log(
+                    colors.cyan(
+                        `👥 Group participants update: ${action} in ${id}`
+                    )
+                );
+
+                if (action === "add") {
+                    groupCache.addParticipants(id, participants);
+                } else if (action === "remove") {
+                    groupCache.removeParticipants(id, participants);
+                } else if (action === "promote" || action === "demote") {
+                    // Refresh metadata to get updated admin status
+                    await groupCache.fetch(sock, id, true);
+                }
             }
-        });
+        );
 
         // Handle group update (subject, description, etc)
-        sock.ev.on("groups.update", async (updates) => {
+        sock.ev.on("groups.update", async updates => {
             for (const update of updates) {
                 console.log(colors.cyan(`🔄 Group update: ${update.id}`));
-                
+
                 if (update.subject) {
                     groupCache.updateSubject(update.id, update.subject);
                 }
-                
+
                 // Refresh full metadata for other changes
                 if (update.desc || update.restrict || update.announce) {
                     await groupCache.fetch(sock, update.id, true);
@@ -848,10 +867,10 @@ class ConnectionManager {
             console.log(colors.yellow("\n⏹️  Shutting down..."));
             this.state.saveMessageStore();
             console.log(colors.green("💾 Message store saved"));
-            
+
             // Log cache stats before exit
             groupCache.logStats();
-            
+
             console.log(colors.green("👋 Stopped\n"));
             process.exit(0);
         });
