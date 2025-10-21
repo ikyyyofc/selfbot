@@ -19,7 +19,7 @@ export default async function ({ sock, text, reply, m }) {
                     thumbnailUrl: proses.result.metadata.cover,
                     mediaType: 1,
                     showAdAttribution: false,
-                    renderlargerThumbnail: true
+                    renderLargerThumbnail: true
                 }
             }
         });
