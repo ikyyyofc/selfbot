@@ -199,7 +199,7 @@ class MessageHandler {
         m = await serialize(m, sock);
 
         const chat = m.chat.endsWith("broadcast")
-            ? sock.user.id.split("@")[0] + "@s.whatsapp.net"
+            ? sock.user.id.split(":")[0] + "@s.whatsapp.net"
             : m.chat;
         const messageId = m.key.id;
 
