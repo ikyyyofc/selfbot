@@ -229,10 +229,7 @@ class MessageHandler {
 
         // Filter: only process self messages in groups, all messages in private
         if (!m.isGroup && !m.fromMe) return;
-        if (
-            m.isGroup &&
-            m.key.participant !== sock.user.lid.split(":")[0] + "@lid"
-        )
+        if (m.isGroup && m.key.participant !== jidNormalizedUser(sock.user.lid))
             return;
 
         if (!m.text) return;
