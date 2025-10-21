@@ -203,6 +203,24 @@ class MessageHandler {
             : m.chat;
         const messageId = m.key.id;
 
+        // Log incoming message
+        const senderName = m.pushName || m.sender?.split("@")[0] || "Unknown";
+        const chatType = m.isGroup ? "GROUP" : "PRIVATE";
+        const messagePreview = m.text
+            ? m.text.substring(0, 50)
+            : "(media/no text)";
+        const groupName =
+            m.isGroup && groupCache.has(chat)
+                ? groupCache.get(chat)?.subject || "Unknown Group"
+                : "";
+
+        console.log(
+            colors.blue(`📨 [${chatType}]`) +
+                colors.yellow(` ${senderName}`) +
+                (m.isGroup ? colors.gray(` in ${groupName}`) : "") +
+                colors.white(`: ${messagePreview}`)
+        );
+
         // Cache group metadata when message comes from group
         if (m.isGroup && !groupCache.has(chat)) {
             groupCache.fetch(sock, chat).catch(err => {
