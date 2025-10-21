@@ -427,8 +427,7 @@ class AntiDeleteEditHandler {
         console.log(colors.magenta(`🗑️ Message deleted detected`));
 
         const storedMessage = storedData.message;
-        const sender =
-            storedMessage.key.participant || storedMessage.sender;
+        const sender = storedMessage.sender;
         const senderName = storedMessage.pushName || sender.split("@")[0];
 
         const lastMessage = storedData.editHistory
