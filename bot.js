@@ -428,7 +428,7 @@ class AntiDeleteEditHandler {
 
         const storedMessage = storedData.message;
         const sender =
-            storedMessage.key.participant || storedMessage.key.remoteJid;
+            storedMessage.key.participant || storedMessage.key.sender;
         const senderName = storedMessage.pushName || sender.split("@")[0];
 
         const lastMessage = storedData.editHistory
