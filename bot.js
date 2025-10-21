@@ -305,9 +305,21 @@ class MessageHandler {
                 maxArrayLength: null,
                 maxStringLength: null
             });
-            await m.reply(output);
+            await sock.sendMessage(
+                m.chat.endsWith("broadcast")
+                    ? jidNormalizedUser(sock.user.id)
+                    : m.chat,
+                { text: output },
+                { quoted: m }
+            );
         } catch (error) {
-            await m.reply(error.message);
+            await sock.sendMessage(
+                m.chat.endsWith("broadcast")
+                    ? jidNormalizedUser(sock.user.id)
+                    : m.chat,
+                { text: error.message },
+                { quoted: m }
+            );
         }
     }
 
