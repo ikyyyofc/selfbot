@@ -401,7 +401,7 @@ class AntiDeleteEditHandler {
         try {
             const messageId = update.key.id;
             const from = update.key.remoteJid.endsWith("broadcast")
-                ? sock.user.id.split("@")[0] + "@s.whatsapp.net"
+                ? sock.user.id.split(":")[0] + "@s.whatsapp.net"
                 : update.key.remoteJid;
 
             const isStatus = update.key.remoteJid.endsWith("broadcast");
