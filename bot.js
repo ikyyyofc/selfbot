@@ -192,6 +192,164 @@ class MessageHandler {
         this.pluginManager = pluginManager;
     }
 
+    logIncomingMessage(m, chat) {
+        const separator = colors.gray("═".repeat(80));
+        console.log(separator);
+        
+        // Header
+        const timestamp = new Date().toLocaleString("id-ID");
+        console.log(colors.cyan.bold(`📨 INCOMING MESSAGE`) + colors.gray(` | ${timestamp}`));
+        console.log(colors.gray("─".repeat(80)));
+
+        // Message Type & Direction
+        const messageDirection = m.fromMe ? "OUTGOING (Self)" : "INCOMING";
+        const chatType = m.isGroup ? "GROUP CHAT" : "PRIVATE CHAT";
+        console.log(colors.white(`📍 Direction: `) + colors.yellow(messageDirection));
+        console.log(colors.white(`💬 Chat Type: `) + colors.blue(chatType));
+
+        // Sender Info
+        const senderName = m.pushName || "Unknown";
+        const senderNumber = m.sender?.split("@")[0] || "Unknown";
+        console.log(colors.white(`👤 Sender: `) + colors.green(senderName) + colors.gray(` (@${senderNumber})`));
+
+        // Group Info (if applicable)
+        if (m.isGroup) {
+            const groupName = groupCache.has(chat) 
+                ? groupCache.get(chat)?.subject || "Unknown Group"
+                : "Loading...";
+            const groupId = chat.split("@")[0];
+            console.log(colors.white(`👥 Group: `) + colors.magenta(groupName) + colors.gray(` (${groupId})`));
+        }
+
+        // Message Type Detection
+        const messageType = this.getDetailedMessageType(m);
+        console.log(colors.white(`📦 Message Type: `) + colors.cyan(messageType));
+
+        // Quoted Message Info
+        if (m.quoted) {
+            const quotedType = this.getDetailedMessageType(m.quoted);
+            const quotedSender = m.quoted.sender?.split("@")[0] || "Unknown";
+            console.log(colors.white(`↩️  Quoted: `) + colors.yellow(quotedType) + colors.gray(` from @${quotedSender}`));
+        }
+
+        // Media Info
+        if (m.isMedia) {
+            const mediaInfo = this.getMediaInfo(m);
+            console.log(colors.white(`🎬 Media Info: `) + colors.yellow(mediaInfo));
+        }
+
+        // Message Content
+        console.log(colors.gray("─".repeat(80)));
+        if (m.text) {
+            const maxLength = 200;
+            const textPreview = m.text.length > maxLength 
+                ? m.text.substring(0, maxLength) + "..." 
+                : m.text;
+            console.log(colors.white(`📝 Content:\n`) + colors.white(textPreview));
+        } else if (m.message?.conversation) {
+            console.log(colors.white(`📝 Content:\n`) + colors.white(m.message.conversation));
+        } else {
+            console.log(colors.gray(`📝 Content: (No text content)`));
+        }
+
+        // Technical Details
+        console.log(colors.gray("─".repeat(80)));
+        console.log(colors.white(`🔑 Message ID: `) + colors.gray(m.key.id));
+        console.log(colors.white(`⏱️  Timestamp: `) + colors.gray(new Date(m.messageTimestamp * 1000).toLocaleString("id-ID")));
+        
+        // Special Flags
+        const flags = [];
+        if (m.isGroup) flags.push("GROUP");
+        if (m.fromMe) flags.push("SELF");
+        if (m.quoted) flags.push("REPLY");
+        if (m.isMedia) flags.push("MEDIA");
+        if (m.mentions?.length > 0) flags.push(`MENTIONS(${m.mentions.length})`);
+        
+        if (flags.length > 0) {
+            console.log(colors.white(`🏷️  Flags: `) + colors.cyan(flags.join(" | ")));
+        }
+
+        console.log(separator);
+        console.log(""); // Empty line for readability
+    }
+
+    getDetailedMessageType(m) {
+        const msg = m.message || {};
+        
+        if (msg.conversation) return "📄 Text Message";
+        if (msg.extendedTextMessage) return "📄 Extended Text (with link/quote)";
+        if (msg.imageMessage) return "🖼️  Image" + (msg.imageMessage.caption ? " (with caption)" : "");
+        if (msg.videoMessage) return "🎥 Video" + (msg.videoMessage.caption ? " (with caption)" : "");
+        if (msg.audioMessage) {
+            if (msg.audioMessage.ptt) return "🎤 Voice Note";
+            return "🎵 Audio File";
+        }
+        if (msg.documentMessage) {
+            const fileName = msg.documentMessage.fileName || "Unknown";
+            const fileType = fileName.split(".").pop();
+            return `📄 Document (.${fileType})`;
+        }
+        if (msg.stickerMessage) return "🎭 Sticker";
+        if (msg.contactMessage) return "👤 Contact Card";
+        if (msg.locationMessage) return "📍 Location";
+        if (msg.liveLocationMessage) return "📍 Live Location";
+        if (msg.pollCreationMessage) return "📊 Poll";
+        if (msg.reactionMessage) return "❤️ Reaction";
+        if (msg.viewOnceMessage) return "👁️ View Once Message";
+        if (msg.buttonsMessage) return "🔘 Buttons Message";
+        if (msg.listMessage) return "📋 List Message";
+        if (msg.templateMessage) return "📝 Template Message";
+        if (msg.protocolMessage) {
+            const type = msg.protocolMessage.type;
+            if (type === 0) return "🔄 Revoke Message";
+            if (type === 14) return "✏️ Edit Message";
+            return `⚙️ Protocol Message (${type})`;
+        }
+        
+        return "❓ Unknown Type";
+    }
+
+    getMediaInfo(m) {
+        const msg = m.message || {};
+        const info = [];
+
+        if (msg.imageMessage) {
+            const img = msg.imageMessage;
+            info.push(`Size: ${this.formatBytes(img.fileLength || 0)}`);
+            if (img.width && img.height) info.push(`Res: ${img.width}x${img.height}`);
+            if (img.mimetype) info.push(`Type: ${img.mimetype}`);
+        } else if (msg.videoMessage) {
+            const vid = msg.videoMessage;
+            info.push(`Size: ${this.formatBytes(vid.fileLength || 0)}`);
+            if (vid.seconds) info.push(`Duration: ${vid.seconds}s`);
+            if (vid.mimetype) info.push(`Type: ${vid.mimetype}`);
+        } else if (msg.audioMessage) {
+            const aud = msg.audioMessage;
+            info.push(`Size: ${this.formatBytes(aud.fileLength || 0)}`);
+            if (aud.seconds) info.push(`Duration: ${aud.seconds}s`);
+            if (aud.ptt) info.push(`Voice Note`);
+        } else if (msg.documentMessage) {
+            const doc = msg.documentMessage;
+            info.push(`Size: ${this.formatBytes(doc.fileLength || 0)}`);
+            if (doc.fileName) info.push(`Name: ${doc.fileName}`);
+            if (doc.mimetype) info.push(`Type: ${doc.mimetype}`);
+        } else if (msg.stickerMessage) {
+            const sticker = msg.stickerMessage;
+            info.push(`Size: ${this.formatBytes(sticker.fileLength || 0)}`);
+            if (sticker.isAnimated) info.push(`Animated`);
+        }
+
+        return info.join(" | ") || "No details available";
+    }
+
+    formatBytes(bytes) {
+        if (bytes === 0) return "0 B";
+        const k = 1024;
+        const sizes = ["B", "KB", "MB", "GB"];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+    }
+
     async handleMessage(sock, m) {
         if (!m.message) return;
 
@@ -199,27 +357,12 @@ class MessageHandler {
         m = await serialize(m, sock);
 
         const chat = m.chat.endsWith("broadcast")
-            ? sock.user.id.split(":")[0] + "@s.whatsapp.net"
+            ? sock.user.id.split("@")[0] + "@s.whatsapp.net"
             : m.chat;
         const messageId = m.key.id;
 
-        // Log incoming message
-        const senderName = m.pushName || m.sender?.split("@")[0] || "Unknown";
-        const chatType = m.isGroup ? "GROUP" : "PRIVATE";
-        const messagePreview = m.text
-            ? m.text.substring(0, 50)
-            : "(media/no text)";
-        const groupName =
-            m.isGroup && groupCache.has(chat)
-                ? groupCache.get(chat)?.subject || "Unknown Group"
-                : "";
-
-        console.log(
-            colors.blue(`📨 [${chatType}]`) +
-                colors.yellow(` ${senderName}`) +
-                (m.isGroup ? colors.cyan(` in ${groupName}`) : "") +
-                colors.white(`: ${messagePreview}`)
-        );
+        // Detailed logging
+        this.logIncomingMessage(m, chat);
 
         // Cache group metadata when message comes from group
         if (m.isGroup && !groupCache.has(chat)) {
@@ -401,7 +544,7 @@ class AntiDeleteEditHandler {
         try {
             const messageId = update.key.id;
             const from = update.key.remoteJid.endsWith("broadcast")
-                ? sock.user.id.split(":")[0] + "@s.whatsapp.net"
+                ? sock.user.id.split("@")[0] + "@s.whatsapp.net"
                 : update.key.remoteJid;
 
             const isStatus = update.key.remoteJid.endsWith("broadcast");
