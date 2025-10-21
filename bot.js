@@ -217,7 +217,7 @@ class MessageHandler {
         console.log(
             colors.blue(`📨 [${chatType}]`) +
                 colors.yellow(` ${senderName}`) +
-                (m.isGroup ? colors.gray(` in ${groupName}`) : "") +
+                (m.isGroup ? colors.cyan(` in ${groupName}`) : "") +
                 colors.white(`: ${messagePreview}`)
         );
 
