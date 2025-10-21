@@ -2,5 +2,6 @@
 export default {
     SESSION: "session",
     PAIRING_CODE: "IKYYSELF",
-    PREFIX: [".", "!", "/"] // Multi prefix
+    PREFIX: [".", "!", "/"],
+    TITLE: "IKYY"
 };
