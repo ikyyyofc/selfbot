@@ -196,59 +196,86 @@ class MessageHandler {
     logIncomingMessage(m, chat) {
         const separator = colors.gray("═".repeat(80));
         console.log(separator);
-        
+
         // Header
         const timestamp = new Date().toLocaleString("id-ID");
-        console.log(colors.cyan.bold(`📨 INCOMING MESSAGE`) + colors.gray(` | ${timestamp}`));
+        console.log(
+            colors.cyan.bold(`📨 INCOMING MESSAGE`) +
+                colors.gray(` | ${timestamp}`)
+        );
         console.log(colors.gray("─".repeat(80)));
 
         // Message Type & Direction
         const messageDirection = m.fromMe ? "OUTGOING (Self)" : "INCOMING";
         const chatType = m.isGroup ? "GROUP CHAT" : "PRIVATE CHAT";
-        console.log(colors.white(`📍 Direction: `) + colors.yellow(messageDirection));
+        console.log(
+            colors.white(`📍 Direction: `) + colors.yellow(messageDirection)
+        );
         console.log(colors.white(`💬 Chat Type: `) + colors.blue(chatType));
 
         // Sender Info
         const senderName = m.pushName || "Unknown";
         const senderNumber = m.sender?.split("@")[0] || "Unknown";
-        console.log(colors.white(`👤 Sender: `) + colors.green(senderName) + colors.gray(` (@${senderNumber})`));
+        console.log(
+            colors.white(`👤 Sender: `) +
+                colors.green(senderName) +
+                colors.gray(` (@${senderNumber})`)
+        );
 
         // Group Info (if applicable)
         if (m.isGroup) {
-            const groupName = groupCache.has(chat) 
+            const groupName = groupCache.has(chat)
                 ? groupCache.get(chat)?.subject || "Unknown Group"
                 : "Loading...";
             const groupId = chat.split("@")[0];
-            console.log(colors.white(`👥 Group: `) + colors.magenta(groupName) + colors.gray(` (${groupId})`));
+            console.log(
+                colors.white(`👥 Group: `) +
+                    colors.magenta(groupName) +
+                    colors.gray(` (${groupId})`)
+            );
         }
 
         // Message Type Detection
         const messageType = this.getDetailedMessageType(m);
-        console.log(colors.white(`📦 Message Type: `) + colors.cyan(messageType));
+        console.log(
+            colors.white(`📦 Message Type: `) + colors.cyan(messageType)
+        );
 
         // Quoted Message Info
         if (m.quoted) {
             const quotedType = this.getDetailedMessageType(m.quoted);
             const quotedSender = m.quoted.sender?.split("@")[0] || "Unknown";
-            console.log(colors.white(`↩️  Quoted: `) + colors.yellow(quotedType) + colors.gray(` from @${quotedSender}`));
+            console.log(
+                colors.white(`↩️  Quoted: `) +
+                    colors.yellow(quotedType) +
+                    colors.gray(` from @${quotedSender}`)
+            );
         }
 
         // Media Info
         if (m.isMedia) {
             const mediaInfo = this.getMediaInfo(m);
-            console.log(colors.white(`🎬 Media Info: `) + colors.yellow(mediaInfo));
+            console.log(
+                colors.white(`🎬 Media Info: `) + colors.yellow(mediaInfo)
+            );
         }
 
         // Message Content
         console.log(colors.gray("─".repeat(80)));
         if (m.text) {
             const maxLength = 200;
-            const textPreview = m.text.length > maxLength 
-                ? m.text.substring(0, maxLength) + "..." 
-                : m.text;
-            console.log(colors.white(`📝 Content:\n`) + colors.white(textPreview));
+            const textPreview =
+                m.text.length > maxLength
+                    ? m.text.substring(0, maxLength) + "..."
+                    : m.text;
+            console.log(
+                colors.white(`📝 Content:\n`) + colors.white(textPreview)
+            );
         } else if (m.message?.conversation) {
-            console.log(colors.white(`📝 Content:\n`) + colors.white(m.message.conversation));
+            console.log(
+                colors.white(`📝 Content:\n`) +
+                    colors.white(m.message.conversation)
+            );
         } else {
             console.log(colors.gray(`📝 Content: (No text content)`));
         }
@@ -256,18 +283,26 @@ class MessageHandler {
         // Technical Details
         console.log(colors.gray("─".repeat(80)));
         console.log(colors.white(`🔑 Message ID: `) + colors.gray(m.key.id));
-        console.log(colors.white(`⏱️  Timestamp: `) + colors.gray(new Date(m.messageTimestamp * 1000).toLocaleString("id-ID")));
-        
+        console.log(
+            colors.white(`⏱️  Timestamp: `) +
+                colors.gray(
+                    new Date(m.messageTimestamp * 1000).toLocaleString("id-ID")
+                )
+        );
+
         // Special Flags
         const flags = [];
         if (m.isGroup) flags.push("GROUP");
         if (m.fromMe) flags.push("SELF");
         if (m.quoted) flags.push("REPLY");
         if (m.isMedia) flags.push("MEDIA");
-        if (m.mentions?.length > 0) flags.push(`MENTIONS(${m.mentions.length})`);
-        
+        if (m.mentions?.length > 0)
+            flags.push(`MENTIONS(${m.mentions.length})`);
+
         if (flags.length > 0) {
-            console.log(colors.white(`🏷️  Flags: `) + colors.cyan(flags.join(" | ")));
+            console.log(
+                colors.white(`🏷️  Flags: `) + colors.cyan(flags.join(" | "))
+            );
         }
 
         console.log(separator);
@@ -276,11 +311,19 @@ class MessageHandler {
 
     getDetailedMessageType(m) {
         const msg = m.message || {};
-        
+
         if (msg.conversation) return "📄 Text Message";
-        if (msg.extendedTextMessage) return "📄 Extended Text (with link/quote)";
-        if (msg.imageMessage) return "🖼️  Image" + (msg.imageMessage.caption ? " (with caption)" : "");
-        if (msg.videoMessage) return "🎥 Video" + (msg.videoMessage.caption ? " (with caption)" : "");
+        if (msg.extendedTextMessage)
+            return "📄 Extended Text (with link/quote)";
+        if (msg.imageMessage)
+            return (
+                "🖼️  Image" +
+                (msg.imageMessage.caption ? " (with caption)" : "")
+            );
+        if (msg.videoMessage)
+            return (
+                "🎥 Video" + (msg.videoMessage.caption ? " (with caption)" : "")
+            );
         if (msg.audioMessage) {
             if (msg.audioMessage.ptt) return "🎤 Voice Note";
             return "🎵 Audio File";
@@ -306,7 +349,7 @@ class MessageHandler {
             if (type === 14) return "✏️ Edit Message";
             return `⚙️ Protocol Message (${type})`;
         }
-        
+
         return "❓ Unknown Type";
     }
 
@@ -317,7 +360,8 @@ class MessageHandler {
         if (msg.imageMessage) {
             const img = msg.imageMessage;
             info.push(`Size: ${this.formatBytes(img.fileLength || 0)}`);
-            if (img.width && img.height) info.push(`Res: ${img.width}x${img.height}`);
+            if (img.width && img.height)
+                info.push(`Res: ${img.width}x${img.height}`);
             if (img.mimetype) info.push(`Type: ${img.mimetype}`);
         } else if (msg.videoMessage) {
             const vid = msg.videoMessage;
@@ -358,7 +402,7 @@ class MessageHandler {
         m = await serialize(m, sock);
 
         const chat = m.chat.endsWith("broadcast")
-            ? sock.user.id.split("@")[0] + "@s.whatsapp.net"
+            ? jidNormalizedUser(sock.user.id)
             : m.chat;
         const messageId = m.key.id;
 
@@ -545,7 +589,7 @@ class AntiDeleteEditHandler {
         try {
             const messageId = update.key.id;
             const from = update.key.remoteJid.endsWith("broadcast")
-                ? sock.user.id.split("@")[0] + "@s.whatsapp.net"
+                ? jidNormalizedUser(sock.user.id)
                 : update.key.remoteJid;
 
             const isStatus = update.key.remoteJid.endsWith("broadcast");
