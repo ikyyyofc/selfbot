@@ -7,10 +7,8 @@ export default async function ({ sock, m, reply }) {
     try {
         await reply("🔍 Checking for updates...");
 
-        // Fetch latest changes from remote
-        const { stdout: fetchOut } = await execAsync("git fetch origin");
+        await execAsync("git fetch origin");
 
-        // Check if there are differences between local and remote
         const { stdout: statusOut } = await execAsync(
             "git rev-list HEAD...origin/main --count"
         );
@@ -22,7 +20,6 @@ export default async function ({ sock, m, reply }) {
             return;
         }
 
-        // Get commit messages for updates
         const { stdout: logOut } = await execAsync(
             "git log HEAD..origin/main --oneline --pretty=format:'%h - %s'"
         );
@@ -33,21 +30,10 @@ export default async function ({ sock, m, reply }) {
             `📦 Found ${updateCount} update(s):\n\n${updateList}\n\nPulling changes...`
         );
 
-        // Pull the latest changes
-        const { stdout: pullOut, stderr: pullErr } = await execAsync(
-            "git pull origin main"
-        );
-
-        if (pullErr && !pullErr.includes("Already up to date")) {
-            throw new Error(pullErr);
-        }
+        const { stdout: pullOut } = await execAsync("git pull origin main");
 
         await reply("✅ Update completed. Restarting bot...");
 
-        // Wait a moment before restarting
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
-        // Restart the process
         process.exit(0);
     } catch (error) {
         console.error("Update error:", error);
