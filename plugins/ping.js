@@ -7,6 +7,7 @@ export default async function ({ m, reply }) {
     const startTime = performance.now();
     
     try {
+        await m.react("🔍");
 
         // System Information
         const platform = os.platform();
@@ -16,7 +17,12 @@ export default async function ({ m, reply }) {
         const nodeVersion = process.version;
         const homeDir = os.homedir();
         const tmpDir = os.tmpdir();
-        const userInfo = os.userInfo();
+        let userInfo = { username: "N/A", uid: "N/A", gid: "N/A" };
+        try {
+            userInfo = os.userInfo();
+        } catch (e) {
+            console.error("Unable to get user info:", e.message);
+        }
         const endianness = os.endianness();
         const type = os.type();
         const release = os.release();
