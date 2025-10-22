@@ -1,89 +1,38 @@
-// plugins/fitur.js
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { dirname } from "path";
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = dirname(__filename);
 
-export default async function fitur(context) {
-  const { reply } = context;
-
-  try {
-    const pluginsDir = path.join(process.cwd(), "plugins");
-
-    // Baca file plugin
-    let files = [];
+export default async function ({ sock, m, args }) {
     try {
-      files = fs.readdirSync(pluginsDir).filter(f => f.endsWith(".js"));
-    } catch (e) {
-      // Jika folder plugins tidak ada atau tidak bisa dibaca
-      files = [];
+        const pluginDir = path.join(__dirname, "../plugins");
+        const files = fs
+            .readdirSync(pluginDir)
+            .filter(f => f.endsWith(".js") && f !== "menu.js");
+
+        const config = await import("../config.js").then(mod => mod.default);
+        const prefix = config.PREFIX?.[0] || ".";
+
+        let menu = `╭━━━『 *MENU BOT* 』━━━╮\n`;
+        menu += `│ 👤 *User:* ${m.pushName}\n`;
+        menu += `│ 📱 *Number:* ${m.sender.split("@")[0]}\n`;
+        menu += `│ 🤖 *Total Plugins:* ${files.length}\n`;
+        menu += `╰━━━━━━━━━━━━━━━━╯\n\n`;
+
+        menu += `╭━━━『 *COMMAND LIST* 』━━━╮\n`;
+        files.forEach((file, index) => {
+            const cmd = path.basename(file, ".js");
+            menu += `│ ${index + 1}. ${prefix}${cmd}\n`;
+        });
+        menu += `╰━━━━━━━━━━━━━━━━╯\n\n`;
+
+        menu += `_Gunakan ${prefix}<command> untuk menggunakan fitur_`;
+
+        await m.reply(menu);
+    } catch (error) {
+        await m.reply(`❌ Error: ${error.message}`);
     }
-
-    const pluginsInfo = [];
-    for (const file of files) {
-      // jangan sertakan file fitur itu sendiri pada daftar
-      if (file === path.basename(__filename)) continue;
-
-      const cmd = path.basename(file, ".js");
-      let desc = "";
-
-      try {
-        // import dinamis untuk mencoba ambil metadata jika ada
-        const modPath = `file://${path.join(pluginsDir, file)}?update=${Date.now()}`;
-        const mod = await import(modPath);
-        // cek beberapa nama property umum untuk deskripsi
-        desc =
-          mod.help ||
-          mod.description ||
-          mod.info ||
-          (typeof mod.default === "function" && mod.default.description) ||
-          "";
-        if (typeof desc === "function") desc = "";
-        desc = String(desc || "").trim();
-      } catch (err) {
-        // gagal import -> tidak masalah, tetap tampilkan command name
-        desc = "";
-      }
-
-      pluginsInfo.push({ cmd, desc });
-    }
-
-    // Fitur internal/inti bot (berdasarkan bot.js)
-    const coreFeatures = [
-      "🔸 Anti-delete (menangkap & menampilkan pesan yang dihapus)",
-      "🔸 Anti-edit (mencatat & menampilkan riwayat edit pesan)",
-      "🔸 Eval code: \">\" (eksekusi code) dan \"=>\" (return expression)",
-      "🔸 Exec shell: prefix \"$\" (menjalankan perintah shell)",
-      "🔸 Sistem plugin: perintah di folder plugins (prefix sesuai config)",
-      "🔸 Penyimpanan pesan lokal (message store dengan limit & riwayat edit)",
-      "🔸 Pairing code untuk setup awal (pairing WhatsApp)",
-      "🔸 Auto-reconnect dan penanganan sesi invalid",
-      "🔸 Graceful shutdown (menyimpan message store saat SIGINT)"
-    ];
-
-    // Build message
-    let msg = "📋 *Daftar Fitur Bot*\n\n";
-    msg += "*Fitur Inti:*\n";
-    coreFeatures.forEach(f => {
-      msg += `• ${f}\n`;
-    });
-
-    msg += `\n🔌 *Plugins Terdeteksi (${pluginsInfo.length}):*\n`;
-    if (pluginsInfo.length === 0) {
-      msg += "_(Tidak ada plugin .js di folder plugins atau belum dapat dibaca)_\n";
-    } else {
-      for (const p of pluginsInfo) {
-        msg += `• *${p.cmd}*${p.desc ? " — " + p.desc : ""}\n`;
-      }
-    }
-
-    msg += `\n📌 Cara pakai: kirim pesan dengan prefix yang dipakai bot (misal \".\") diikuti command.\n`;
-    msg += `Contoh: .fitur\n`;
-
-    await reply(msg);
-  } catch (err) {
-    await reply(`❌ Gagal mendapatkan daftar fitur: ${err.message}`);
-  }
 }
