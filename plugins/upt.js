@@ -1,32 +1,67 @@
-import { execSync } from "child_process";
+import { exec } from "child_process";
+import { promisify } from "util";
 
-export default async function ({ reply }) {
-  try {
-    // Cek hash commit lokal dan remote
-    const localHash = execSync("git rev-parse HEAD").toString().trim();
-    execSync("git fetch origin main"); // ganti 'main' kalau branch lain
-    const remoteHash = execSync("git rev-parse origin/main").toString().trim();
+const execAsync = promisify(exec);
 
-    if (localHash !== remoteHash) {
-      await reply("🔄 Update baru terdeteksi!\nMenarik perubahan dari repository...");
+export default async function ({ sock, m, reply }) {
+    try {
+        await reply("🔍 Checking for updates...");
 
-      // Jalankan git pull dan pastikan selesai sebelum lanjut
-      execSync("git pull origin main", { stdio: "inherit" });
+        // Fetch latest changes from remote
+        const { stdout: fetchOut } = await execAsync("git fetch origin");
 
-      await reply("✅ Update berhasil! Bot akan restart sekarang...");
+        // Check if there are differences between local and remote
+        const { stdout: statusOut } = await execAsync(
+            "git rev-list HEAD...origin/main --count"
+        );
 
-      // Pastikan semua pesan dan proses async selesai dulu
-      await new Promise(resolve => setImmediate(resolve));
+        const updateCount = parseInt(statusOut.trim());
 
-      console.log("⚙️ Restarting bot dengan aman...");
-      process.exit(0);
-    } else {
-      // Tidak ada update, tidak perlu melakukan apa pun
-      reply("🟢 Repository sudah versi terbaru.");
-      console.log("🟢 Repository sudah versi terbaru.");
+        if (updateCount === 0) {
+            await reply("✅ Bot is already up to date. No restart needed.");
+            return;
+        }
+
+        // Get commit messages for updates
+        const { stdout: logOut } = await execAsync(
+            "git log HEAD..origin/main --oneline --pretty=format:'%h - %s'"
+        );
+
+        const updateList = logOut.trim().split("\n").join("\n");
+
+        await reply(
+            `📦 Found ${updateCount} update(s):\n\n${updateList}\n\nPulling changes...`
+        );
+
+        // Pull the latest changes
+        const { stdout: pullOut, stderr: pullErr } = await execAsync(
+            "git pull origin main"
+        );
+
+        if (pullErr && !pullErr.includes("Already up to date")) {
+            throw new Error(pullErr);
+        }
+
+        await reply("✅ Update completed. Restarting bot...");
+
+        // Wait a moment before restarting
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Restart the process
+        process.exit(0);
+    } catch (error) {
+        console.error("Update error:", error);
+
+        if (error.message.includes("CONFLICT")) {
+            await reply(
+                "❌ Update failed: Git conflict detected. Please resolve manually."
+            );
+        } else if (error.message.includes("not a git repository")) {
+            await reply(
+                "❌ Update failed: Not a git repository. Please initialize git first."
+            );
+        } else {
+            await reply(`❌ Update failed: ${error.message}`);
+        }
     }
-  } catch (err) {
-    console.error("❌ Gagal memeriksa atau menarik update:", err);
-    await reply("❌ Terjadi kesalahan saat memeriksa update repository.");
-  }
 }
