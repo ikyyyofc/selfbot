@@ -16,6 +16,7 @@
     "@whiskeysockets/baileys": "latest",
     "crypto": "latest",
     "axios": "latest",
+    "bycf": "latest",
     "cheerio": "latest",
     "file-type": "latest",
     "node-cache": "latest",
