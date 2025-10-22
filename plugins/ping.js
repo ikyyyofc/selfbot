@@ -7,7 +7,6 @@ export default async function ({ m, reply }) {
     const startTime = performance.now();
     
     try {
-        await m.react("🔍");
 
         // System Information
         const platform = os.platform();
