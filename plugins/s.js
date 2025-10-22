@@ -1,162 +1,55 @@
-// plugins/stiker.js
-// Plugin sederhana: .stiker -> ubah media (reply image/video/gif) jadi sticker (webp)
-// Usage: balas gambar/video/gif lalu ketik: .stiker
-// Fixed: Mempertahankan rasio aspek asli, tidak memotong gambar
-import fs from "fs";
-import os from "os";
-import path from "path";
-import { promisify } from "util";
-import child from "child_process";
+import { Sticker } from "wa-sticker-formatter";
 
-const exec = promisify(child.exec);
-
-function tmpFileName(ext = "") {
-    return path.join(
-        os.tmpdir(),
-        `wa_stiker_${Date.now()}_${Math.floor(Math.random() * 10000)}${ext}`
-    );
-}
-
-function detectMimeFromBuffer(buf) {
-    if (!buf || buf.length < 12) return null;
-    const sig = buf.slice(0, 12).toString("hex");
-    // jpg
-    if (sig.startsWith("ffd8ff")) return "image/jpeg";
-    // png
-    if (sig.startsWith("89504e47")) return "image/png";
-    // webp (RIFF....WEBP)
-    if (
-        buf.slice(0, 4).toString() === "RIFF" &&
-        buf.slice(8, 12).toString() === "WEBP"
-    )
-        return "image/webp";
-    // gif
-    if (buf.slice(0, 3).toString() === "GIF") return "image/gif";
-    // mp4/vid -> ftyp
-    if (sig.includes("66747970")) return "video/mp4";
-    // pretty fallback: check for webm
-    if (sig.includes("1a45dfa3")) return "video/webm";
-    return null;
-}
-
-export default async function (context) {
-    const { fileBuffer, reply, sock, from, m } = context;
-
+export default async function ({ sock, m, text, fileBuffer }) {
     try {
-        if (!fileBuffer) {
-            await reply(
-                "⚠️ Balas gambar/video/gif yang ingin dijadikan stiker lalu ketik: .stiker"
+        let buffer = fileBuffer;
+
+        // Jika tidak ada file di message saat ini, cek quoted message
+        if (!buffer && m.quoted?.isMedia) {
+            await m.reply("⏳ Downloading media...");
+            buffer = await m.quoted.download();
+        }
+
+        // Jika masih tidak ada buffer
+        if (!buffer) {
+            return await m.reply(
+                "❌ Kirim/Reply gambar, video, atau GIF dengan caption .sticker\n\n" +
+                "Contoh:\n" +
+                "• Kirim gambar + caption: .sticker\n" +
+                "• Reply gambar: .sticker\n" +
+                "• Dengan teks: .sticker Nama | Author"
             );
-            return;
         }
 
-        const mime =
-            detectMimeFromBuffer(fileBuffer) || "application/octet-stream";
+        // Parse pack name dan author dari text
+        let packname = "Sticker";
+        let author = "Selfbot";
 
-        // create temp input and output files
-        const inputExt = mime.startsWith("image/")
-            ? ".img"
-            : mime.startsWith("video/")
-            ? ".vid"
-            : ".bin";
-        const inputPath = tmpFileName(inputExt);
-        const outputPath = tmpFileName(".webp");
-
-        fs.writeFileSync(inputPath, fileBuffer);
-
-        // If already webp image, send directly as sticker
-        if (mime === "image/webp") {
-            const buf = fs.readFileSync(inputPath);
-            await sock.sendMessage(from, { sticker: buf }, { quoted: m });
-            try {
-                fs.unlinkSync(inputPath);
-            } catch (e) {}
-            return;
+        if (text) {
+            const parts = text.split("|").map(p => p.trim());
+            if (parts[0]) packname = parts[0];
+            if (parts[1]) author = parts[1];
         }
 
-        // Try image -> ffmpeg (preserves aspect ratio with transparent padding)
-        if (mime.startsWith("image/")) {
-            try {
-                const ffmpegCmd = [
-                    `ffmpeg -y -i "${inputPath}"`,
-                    `-vcodec libwebp`,
-                    `-vf "scale='min(512,iw)':'min(512,ih)':force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000"`,
-                    `-lossless 0 -qscale 75 -preset default -an -vsync 0`,
-                    `"${outputPath}"`
-                ].join(" ");
+        await m.reply("⏳ Membuat sticker...");
 
-                await exec(ffmpegCmd);
-            } catch (err) {
-                await reply(
-                    "❌ Gagal mengonversi gambar. Pastikan `ffmpeg` terpasang di server."
-                );
-                try {
-                    fs.unlinkSync(inputPath);
-                } catch (e) {}
-                return;
-            }
+        // Buat sticker menggunakan wa-sticker-formatter
+        const sticker = new Sticker(buffer, {
+            pack: packname,
+            author: author,
+            type: "full",
+            quality: 50
+        });
 
-            const outBuf = fs.readFileSync(outputPath);
-            await sock.sendMessage(from, { sticker: outBuf }, { quoted: m });
+        const stickerBuffer = await sticker.toBuffer();
 
-            // cleanup
-            try {
-                fs.unlinkSync(inputPath);
-            } catch (e) {}
-            try {
-                fs.unlinkSync(outputPath);
-            } catch (e) {}
-            return;
-        }
+        // Kirim sticker
+        await sock.sendMessage(m.chat, {
+            sticker: stickerBuffer
+        });
 
-        // Video / GIF handling via ffmpeg -> webp (animated sticker)
-        // Fixed: Mempertahankan rasio aspek tanpa cropping
-        if (mime.startsWith("video/") || mime === "image/gif") {
-            try {
-                // ffmpeg command yang mempertahankan aspect ratio
-                // scale akan resize proporsional dengan max 512px
-                // pad menambahkan area transparan agar jadi 512x512 tanpa crop
-                const ffmpegCmd = [
-                    `ffmpeg -y -i "${inputPath}"`,
-                    `-vcodec libwebp`,
-                    `-vf "scale='min(512,iw)':'min(512,ih)':force_original_aspect_ratio=decrease,fps=15,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000"`,
-                    `-loop 0 -preset default -an -vsync 0`,
-                    `"${outputPath}"`
-                ].join(" ");
-
-                await exec(ffmpegCmd);
-            } catch (err) {
-                await reply(
-                    "❌ Gagal mengonversi video/gif. Pastikan `ffmpeg` terpasang di server."
-                );
-                try {
-                    fs.unlinkSync(inputPath);
-                } catch (e) {}
-                return;
-            }
-
-            const outBuf = fs.readFileSync(outputPath);
-            await sock.sendMessage(from, { sticker: outBuf }, { quoted: m });
-
-            // cleanup
-            try {
-                fs.unlinkSync(inputPath);
-            } catch (e) {}
-            try {
-                fs.unlinkSync(outputPath);
-            } catch (e) {}
-            return;
-        }
-
-        // fallback: unknown type
-        await reply(
-            "❌ Tipe file tidak dikenali atau tidak didukung. Gunakan gambar (jpg/png), webp, gif, atau video (mp4/webm)."
-        );
-        try {
-            fs.unlinkSync(inputPath);
-        } catch (e) {}
     } catch (error) {
-        console.error("stiker plugin error:", error);
-        await reply("❌ Terjadi kesalahan: " + (error.message || error));
+        console.error("Sticker error:", error);
+        await m.reply(`❌ Gagal membuat sticker: ${error.message}`);
     }
 }
