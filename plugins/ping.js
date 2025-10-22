@@ -8,8 +8,6 @@ export default async function ({ m, reply }) {
     const startTime = performance.now();
     
     try {
-        await m.react("🔍");
-
         // System Information
         const platform = os.platform();
         const arch = os.arch();
@@ -112,14 +110,6 @@ export default async function ({ m, reply }) {
                         });
                     }
                 });
-
-                // Disk I/O stats
-                try {
-                    const iostat = execSync("iostat -x 1 2 | tail -n +4").toString();
-                    // Parse iostat if available
-                } catch (e) {
-                    // iostat not available
-                }
             }
         } catch (e) {
             console.error("Disk info error:", e.message);
@@ -142,7 +132,6 @@ export default async function ({ m, reply }) {
         const shell = env.SHELL || "N/A";
         const term = env.TERM || "N/A";
         const nodeEnv = env.NODE_ENV || "production";
-        const path = env.PATH || "N/A";
 
         // System Limits (Linux)
         let limits = {};
@@ -222,239 +211,180 @@ export default async function ({ m, reply }) {
         const endTime = performance.now();
         const responseTime = (endTime - startTime).toFixed(2);
 
-        // Build message - SPLIT MENJADI BEBERAPA PESAN
-        let messages = [];
-        
-        // Message 1: Performance & System
-        let msg1 = "╭━━━『 🖥️ *SERVER SPECS* 』━━━╮\n\n";
-        msg1 += "┏━━━ *⚡ PERFORMANCE* ━━━\n";
-        msg1 += `┃ • Response Time: ${responseTime}ms\n`;
-        msg1 += `┃ • CPU Usage: ${avgCpuUsage}%\n`;
-        msg1 += `┃ • Memory Usage: ${memUsagePercent}%\n`;
-        msg1 += `┃ • Load [1m/5m/15m]: ${loadAvg.join(" / ")}\n`;
-        msg1 += "┗━━━━━━━━━━━━━━━━━━\n\n";
+        // Build complete message
+        let msg = "╭━━━『 🖥️ *SERVER SPECIFICATIONS* 』━━━╮\n\n";
 
-        msg1 += "┏━━━ *💻 SYSTEM INFO* ━━━\n";
-        msg1 += `┃ • OS: ${osRelease}\n`;
-        msg1 += `┃ • Kernel: ${kernelVersion}\n`;
-        msg1 += `┃ • Type: ${type}\n`;
-        msg1 += `┃ • Platform: ${platform}\n`;
-        msg1 += `┃ • Architecture: ${arch}\n`;
-        msg1 += `┃ • Endianness: ${endianness}\n`;
-        msg1 += `┃ • Hostname: ${hostname}\n`;
-        msg1 += `┃ • User: ${userInfo.username}\n`;
-        msg1 += `┃ • UID: ${userInfo.uid}\n`;
-        msg1 += `┃ • GID: ${userInfo.gid}\n`;
-        msg1 += `┃ • Shell: ${shell}\n`;
-        msg1 += `┃ • Terminal: ${term}\n`;
-        msg1 += `┃ • System Uptime: ${uptime}\n`;
-        msg1 += "┗━━━━━━━━━━━━━━━━━━\n\n";
-        msg1 += "╰━━━━━━━━━━━━━━━━━━━╯";
-        messages.push(msg1);
-
-        // Message 2: CPU Details - PER CORE
-        let msg2 = "╭━━━『 🔧 *CPU DETAILS* 』━━━╮\n\n";
-        msg2 += "┏━━━ *CPU INFO* ━━━\n";
-        msg2 += `┃ • Model: ${cpuModel}\n`;
-        msg2 += `┃ • Cores: ${cpuCores}\n`;
-        msg2 += `┃ • Speed: ${cpuSpeed} MHz\n`;
-        msg2 += `┃ • Average Usage: ${avgCpuUsage}%\n`;
-        msg2 += "┗━━━━━━━━━━━━━━━━━━\n\n";
-
-        cpuDetails.forEach(cpu => {
-            msg2 += `┏━━━ *CORE ${cpu.core}* ━━━\n`;
-            msg2 += `┃ • Speed: ${cpu.speed} MHz\n`;
-            msg2 += `┃ • Usage: ${cpu.usage}%\n`;
-            msg2 += `┃ • User Time: ${cpu.times.user}ms\n`;
-            msg2 += `┃ • Nice Time: ${cpu.times.nice}ms\n`;
-            msg2 += `┃ • System Time: ${cpu.times.sys}ms\n`;
-            msg2 += `┃ • Idle Time: ${cpu.times.idle}ms\n`;
-            msg2 += `┃ • IRQ Time: ${cpu.times.irq}ms\n`;
-            msg2 += "┗━━━━━━━━━━━━━━━━━━\n";
-            if (cpu.core < cpuDetails.length - 1) msg2 += "\n";
-        });
-        
+        // Performance
+        msg += "┏━━━ *⚡ PERFORMANCE* ━━━\n";
+        msg += `┃ • Response: ${responseTime}ms\n`;
+        msg += `┃ • CPU: ${avgCpuUsage}%\n`;
+        msg += `┃ • Memory: ${memUsagePercent}%\n`;
+        msg += `┃ • Load: ${loadAvg.join(" / ")}\n`;
         if (temperatures.length > 0) {
-            msg2 += "\n┏━━━ *🌡️ TEMPERATURES* ━━━\n";
             temperatures.forEach(temp => {
-                msg2 += `┃ • ${temp.sensor}: ${temp.temp}\n`;
+                msg += `┃ • ${temp.sensor}: ${temp.temp}\n`;
             });
-            msg2 += "┗━━━━━━━━━━━━━━━━━━\n";
         }
-        msg2 += "\n╰━━━━━━━━━━━━━━━━━━━╯";
-        messages.push(msg2);
+        msg += "┗━━━━━━━━━━━━━━━━━━\n\n";
 
-        // Message 3: Memory Details
-        let msg3 = "╭━━━『 💾 *MEMORY DETAILS* 』━━━╮\n\n";
-        msg3 += "┏━━━ *SYSTEM MEMORY* ━━━\n";
-        msg3 += `┃ • Total: ${formatBytes(totalMem)}\n`;
-        msg3 += `┃ • Used: ${formatBytes(usedMem)} (${memUsagePercent}%)\n`;
-        msg3 += `┃ • Free: ${formatBytes(freeMem)}\n`;
-        
+        // System Info
+        msg += "┏━━━ *💻 SYSTEM* ━━━\n";
+        msg += `┃ • OS: ${osRelease}\n`;
+        msg += `┃ • Kernel: ${kernelVersion}\n`;
+        msg += `┃ • Platform: ${platform} (${arch})\n`;
+        msg += `┃ • Type: ${type}\n`;
+        msg += `┃ • Endian: ${endianness}\n`;
+        msg += `┃ • Host: ${hostname}\n`;
+        msg += `┃ • User: ${userInfo.username}\n`;
+        msg += `┃ • UID/GID: ${userInfo.uid}/${userInfo.gid}\n`;
+        msg += `┃ • Shell: ${shell}\n`;
+        msg += `┃ • Uptime: ${uptime}\n`;
+        msg += "┗━━━━━━━━━━━━━━━━━━\n\n";
+
+        // CPU Summary
+        msg += "┏━━━ *🔧 CPU* ━━━\n";
+        msg += `┃ • Model: ${cpuModel}\n`;
+        msg += `┃ • Cores: ${cpuCores}\n`;
+        msg += `┃ • Speed: ${cpuSpeed} MHz\n`;
+        msg += `┃ • Avg Usage: ${avgCpuUsage}%\n`;
+        msg += "┃\n";
+        cpuDetails.forEach(cpu => {
+            msg += `┃ Core ${cpu.core}: ${cpu.usage}% @ ${cpu.speed}MHz\n`;
+        });
+        msg += "┗━━━━━━━━━━━━━━━━━━\n\n";
+
+        // Memory
+        msg += "┏━━━ *💾 MEMORY* ━━━\n";
+        msg += `┃ Total: ${formatBytes(totalMem)}\n`;
+        msg += `┃ Used: ${formatBytes(usedMem)} (${memUsagePercent}%)\n`;
+        msg += `┃ Free: ${formatBytes(freeMem)}\n`;
         if (memoryDetails) {
-            msg3 += `┃ • Available: ${formatBytes(memoryDetails.MemAvailable)}\n`;
-            msg3 += `┃ • Buffers: ${formatBytes(memoryDetails.Buffers)}\n`;
-            msg3 += `┃ • Cached: ${formatBytes(memoryDetails.Cached)}\n`;
-            msg3 += `┃ • Active: ${formatBytes(memoryDetails.Active)}\n`;
-            msg3 += `┃ • Inactive: ${formatBytes(memoryDetails.Inactive)}\n`;
-            msg3 += `┃ • Dirty: ${formatBytes(memoryDetails.Dirty)}\n`;
-            msg3 += `┃ • Writeback: ${formatBytes(memoryDetails.Writeback)}\n`;
-            msg3 += `┃ • Slab: ${formatBytes(memoryDetails.Slab)}\n`;
+            msg += `┃ Available: ${formatBytes(memoryDetails.MemAvailable)}\n`;
+            msg += `┃ Buffers: ${formatBytes(memoryDetails.Buffers)}\n`;
+            msg += `┃ Cached: ${formatBytes(memoryDetails.Cached)}\n`;
+            msg += `┃ Active: ${formatBytes(memoryDetails.Active)}\n`;
+            msg += `┃ Inactive: ${formatBytes(memoryDetails.Inactive)}\n`;
             if (memoryDetails.SwapTotal > 0) {
-                msg3 += "┃\n";
-                msg3 += `┃ • Swap Total: ${formatBytes(memoryDetails.SwapTotal)}\n`;
-                msg3 += `┃ • Swap Free: ${formatBytes(memoryDetails.SwapFree)}\n`;
-                msg3 += `┃ • Swap Used: ${formatBytes(memoryDetails.SwapTotal - memoryDetails.SwapFree)}\n`;
+                msg += `┃ Swap: ${formatBytes(memoryDetails.SwapTotal - memoryDetails.SwapFree)}/${formatBytes(memoryDetails.SwapTotal)}\n`;
             }
         }
-        msg3 += "┗━━━━━━━━━━━━━━━━━━\n\n";
+        msg += "┗━━━━━━━━━━━━━━━━━━\n\n";
 
-        msg3 += "┏━━━ *PROCESS MEMORY* ━━━\n";
-        msg3 += `┃ • RSS: ${formatBytes(memUsage.rss)}\n`;
-        msg3 += `┃ • Heap Total: ${formatBytes(memUsage.heapTotal)}\n`;
-        msg3 += `┃ • Heap Used: ${formatBytes(memUsage.heapUsed)}\n`;
-        msg3 += `┃ • External: ${formatBytes(memUsage.external)}\n`;
-        msg3 += `┃ • Array Buffers: ${formatBytes(memUsage.arrayBuffers)}\n`;
-        msg3 += "┗━━━━━━━━━━━━━━━━━━\n\n";
+        // Process Memory
+        msg += "┏━━━ *🚀 PROCESS* ━━━\n";
+        msg += `┃ PID: ${pid} | PPID: ${ppid}\n`;
+        msg += `┃ Uptime: ${processUptime}\n`;
+        msg += `┃ Node: ${nodeVersion}\n`;
+        msg += `┃ V8: ${v8Versions.v8}\n`;
+        msg += "┃\n";
+        msg += `┃ RSS: ${formatBytes(memUsage.rss)}\n`;
+        msg += `┃ Heap: ${formatBytes(memUsage.heapUsed)}/${formatBytes(memUsage.heapTotal)}\n`;
+        msg += `┃ External: ${formatBytes(memUsage.external)}\n`;
+        msg += `┃ Buffers: ${formatBytes(memUsage.arrayBuffers)}\n`;
+        msg += "┃\n";
+        msg += `┃ V8 Heap: ${formatBytes(v8HeapStats.used_heap_size)}/${formatBytes(v8HeapStats.heap_size_limit)}\n`;
+        msg += `┃ Physical: ${formatBytes(v8HeapStats.total_physical_size)}\n`;
+        msg += `┃ Available: ${formatBytes(v8HeapStats.total_available_size)}\n`;
+        msg += "┗━━━━━━━━━━━━━━━━━━\n\n";
 
-        msg3 += "┏━━━ *V8 HEAP* ━━━\n";
-        msg3 += `┃ • Total: ${formatBytes(v8HeapStats.total_heap_size)}\n`;
-        msg3 += `┃ • Executable: ${formatBytes(v8HeapStats.total_heap_size_executable)}\n`;
-        msg3 += `┃ • Physical: ${formatBytes(v8HeapStats.total_physical_size)}\n`;
-        msg3 += `┃ • Available: ${formatBytes(v8HeapStats.total_available_size)}\n`;
-        msg3 += `┃ • Used: ${formatBytes(v8HeapStats.used_heap_size)}\n`;
-        msg3 += `┃ • Limit: ${formatBytes(v8HeapStats.heap_size_limit)}\n`;
-        msg3 += `┃ • Malloced: ${formatBytes(v8HeapStats.malloced_memory)}\n`;
-        msg3 += `┃ • Peak Malloced: ${formatBytes(v8HeapStats.peak_malloced_memory)}\n`;
-        msg3 += "┗━━━━━━━━━━━━━━━━━━\n\n";
-
-        msg3 += "┏━━━ *V8 HEAP SPACES* ━━━\n";
-        v8HeapSpaceStats.forEach(space => {
-            msg3 += `┃ • ${space.space_name}:\n`;
-            msg3 += `┃   Size: ${formatBytes(space.space_size)}\n`;
-            msg3 += `┃   Used: ${formatBytes(space.space_used_size)}\n`;
-            msg3 += `┃   Available: ${formatBytes(space.space_available_size)}\n`;
-            msg3 += `┃   Physical: ${formatBytes(space.physical_space_size)}\n`;
-        });
-        msg3 += "┗━━━━━━━━━━━━━━━━━━\n\n";
-        msg3 += "╰━━━━━━━━━━━━━━━━━━━╯";
-        messages.push(msg3);
-
-        // Message 4: Disk & Network
-        let msg4 = "╭━━━『 💿 *STORAGE & NETWORK* 』━━━╮\n\n";
-        
+        // Disk
         if (diskInfo.length > 0) {
+            msg += "┏━━━ *💿 DISK* ━━━\n";
             diskInfo.forEach((disk, i) => {
-                msg4 += `┏━━━ *DISK ${i + 1}* ━━━\n`;
-                msg4 += `┃ • Filesystem: ${disk.filesystem}\n`;
-                msg4 += `┃ • Mount: ${disk.mount}\n`;
-                msg4 += `┃ • Total: ${disk.total}\n`;
-                msg4 += `┃ • Used: ${disk.used} (${disk.usePercent})\n`;
-                msg4 += `┃ • Available: ${disk.available}\n`;
-                msg4 += "┗━━━━━━━━━━━━━━━━━━\n";
-                if (i < diskInfo.length - 1) msg4 += "\n";
+                if (i > 0) msg += "┃\n";
+                msg += `┃ ${disk.filesystem}\n`;
+                msg += `┃ Mount: ${disk.mount}\n`;
+                msg += `┃ ${disk.used}/${disk.total} (${disk.usePercent})\n`;
+                msg += `┃ Free: ${disk.available}\n`;
             });
-            msg4 += "\n";
+            msg += "┗━━━━━━━━━━━━━━━━━━\n\n";
         }
 
-        networkInfo.forEach((net, i) => {
-            msg4 += `┏━━━ *NETWORK ${i + 1}* ━━━\n`;
-            msg4 += `┃ • Interface: ${net.name}\n`;
-            msg4 += `┃ • Type: ${net.family}\n`;
-            msg4 += `┃ • Address: ${net.address}\n`;
-            msg4 += `┃ • Netmask: ${net.netmask}\n`;
-            msg4 += `┃ • MAC: ${net.mac}\n`;
-            msg4 += `┃ • CIDR: ${net.cidr || "N/A"}\n`;
-            msg4 += `┃ • Internal: ${net.internal ? "Yes" : "No"}\n`;
-            if (net.scopeid) msg4 += `┃ • Scope ID: ${net.scopeid}\n`;
-            msg4 += "┗━━━━━━━━━━━━━━━━━━\n";
-            if (i < networkInfo.length - 1) msg4 += "\n";
-        });
-        
-        msg4 += "\n╰━━━━━━━━━━━━━━━━━━━╯";
-        messages.push(msg4);
+        // Network
+        msg += "┏━━━ *🌐 NETWORK* ━━━\n";
+        const externalNets = networkInfo.filter(n => !n.internal);
+        if (externalNets.length > 0) {
+            externalNets.forEach((net, i) => {
+                if (i > 0) msg += "┃\n";
+                msg += `┃ ${net.name} (${net.family})\n`;
+                msg += `┃ IP: ${net.address}\n`;
+                msg += `┃ MAC: ${net.mac}\n`;
+                msg += `┃ Mask: ${net.netmask}\n`;
+            });
+        } else {
+            msg += `┃ No external interfaces\n`;
+        }
+        msg += "┗━━━━━━━━━━━━━━━━━━\n\n";
 
-        // Message 5: Process & Environment
-        let msg5 = "╭━━━『 🚀 *PROCESS & ENV* 』━━━╮\n\n";
-        msg5 += "┏━━━ *PROCESS INFO* ━━━\n";
-        msg5 += `┃ • PID: ${pid}\n`;
-        msg5 += `┃ • PPID: ${ppid}\n`;
-        msg5 += `┃ • Uptime: ${processUptime}\n`;
-        msg5 += `┃ • Title: ${process.title}\n`;
-        msg5 += `┃ • Exec Path: ${process.execPath}\n`;
-        msg5 += `┃ • Working Dir: ${process.cwd()}\n`;
-        msg5 += "┗━━━━━━━━━━━━━━━━━━\n\n";
-
-        msg5 += "┏━━━ *VERSIONS* ━━━\n";
+        // Versions
+        msg += "┏━━━ *📦 VERSIONS* ━━━\n";
         Object.keys(v8Versions).forEach(key => {
-            msg5 += `┃ • ${key}: ${v8Versions[key]}\n`;
+            msg += `┃ ${key}: ${v8Versions[key]}\n`;
         });
-        msg5 += "┗━━━━━━━━━━━━━━━━━━\n\n";
+        msg += "┗━━━━━━━━━━━━━━━━━━\n\n";
 
-        msg5 += "┏━━━ *RESOURCE USAGE* ━━━\n";
-        msg5 += `┃ • User CPU Time: ${(resourceUsage.userCPUTime / 1000).toFixed(2)}ms\n`;
-        msg5 += `┃ • System CPU Time: ${(resourceUsage.systemCPUTime / 1000).toFixed(2)}ms\n`;
-        msg5 += `┃ • Max RSS: ${formatBytes(resourceUsage.maxRSS * 1024)}\n`;
-        msg5 += `┃ • Shared Memory: ${formatBytes(resourceUsage.sharedMemorySize)}\n`;
-        msg5 += `┃ • Minor Page Fault: ${resourceUsage.minorPageFault}\n`;
-        msg5 += `┃ • Major Page Fault: ${resourceUsage.majorPageFault}\n`;
-        msg5 += `┃ • Swapped Out: ${resourceUsage.swappedOut}\n`;
-        msg5 += `┃ • FS Read: ${resourceUsage.fsRead}\n`;
-        msg5 += `┃ • FS Write: ${resourceUsage.fsWrite}\n`;
-        msg5 += `┃ • IPC Sent: ${resourceUsage.ipcSent}\n`;
-        msg5 += `┃ • IPC Received: ${resourceUsage.ipcReceived}\n`;
-        msg5 += `┃ • Signals: ${resourceUsage.signalsCount}\n`;
-        msg5 += `┃ • Context Switches (V): ${resourceUsage.voluntaryContextSwitches}\n`;
-        msg5 += `┃ • Context Switches (IV): ${resourceUsage.involuntaryContextSwitches}\n`;
-        msg5 += "┗━━━━━━━━━━━━━━━━━━\n\n";
+        // Resource Usage
+        msg += "┏━━━ *📊 RESOURCES* ━━━\n";
+        msg += `┃ User CPU: ${(resourceUsage.userCPUTime / 1000).toFixed(2)}ms\n`;
+        msg += `┃ System CPU: ${(resourceUsage.systemCPUTime / 1000).toFixed(2)}ms\n`;
+        msg += `┃ Max RSS: ${formatBytes(resourceUsage.maxRSS * 1024)}\n`;
+        msg += `┃ Page Faults: ${resourceUsage.minorPageFault}/${resourceUsage.majorPageFault}\n`;
+        msg += `┃ FS Read: ${resourceUsage.fsRead}\n`;
+        msg += `┃ FS Write: ${resourceUsage.fsWrite}\n`;
+        msg += `┃ IPC: ${resourceUsage.ipcSent}/${resourceUsage.ipcReceived}\n`;
+        msg += `┃ Context Switch: ${resourceUsage.voluntaryContextSwitches}/${resourceUsage.involuntaryContextSwitches}\n`;
+        msg += "┗━━━━━━━━━━━━━━━━━━\n\n";
 
-        msg5 += "┏━━━ *ENVIRONMENT* ━━━\n";
-        msg5 += `┃ • NODE_ENV: ${nodeEnv}\n`;
-        msg5 += `┃ • Home Dir: ${homeDir}\n`;
-        msg5 += `┃ • Temp Dir: ${tmpDir}\n`;
-        msg5 += `┃ • Shell: ${shell}\n`;
-        msg5 += `┃ • Terminal: ${term}\n`;
-        msg5 += "┗━━━━━━━━━━━━━━━━━━\n\n";
+        // Directories
+        msg += "┏━━━ *📁 PATHS* ━━━\n";
+        msg += `┃ Home: ${homeDir}\n`;
+        msg += `┃ Temp: ${tmpDir}\n`;
+        msg += `┃ CWD: ${process.cwd()}\n`;
+        msg += `┃ Exec: ${process.execPath}\n`;
+        msg += "┗━━━━━━━━━━━━━━━━━━\n\n";
 
+        // V8 Heap Spaces
+        msg += "┏━━━ *🔧 V8 HEAP SPACES* ━━━\n";
+        v8HeapSpaceStats.forEach(space => {
+            msg += `┃ ${space.space_name}:\n`;
+            msg += `┃ ${formatBytes(space.space_used_size)}/${formatBytes(space.space_size)}\n`;
+        });
+        msg += "┗━━━━━━━━━━━━━━━━━━\n\n";
+
+        // Limits (if available)
         if (Object.keys(limits).length > 0) {
-            msg5 += "┏━━━ *SYSTEM LIMITS* ━━━\n";
+            msg += "┏━━━ *⚙️ LIMITS* ━━━\n";
+            const importantLimits = ["Max open files", "Max processes", "Max locked memory"];
             Object.keys(limits).forEach(key => {
-                msg5 += `┃ • ${key}:\n`;
-                msg5 += `┃   Soft: ${limits[key].soft}\n`;
-                msg5 += `┃   Hard: ${limits[key].hard}\n`;
+                if (importantLimits.some(l => key.includes(l))) {
+                    msg += `┃ ${key}:\n`;
+                    msg += `┃ ${limits[key].soft} / ${limits[key].hard}\n`;
+                }
             });
-            msg5 += "┗━━━━━━━━━━━━━━━━━━\n\n";
+            msg += "┗━━━━━━━━━━━━━━━━━━\n\n";
         }
 
+        // Battery (if available)
         if (batteryInfo.length > 0) {
             batteryInfo.forEach((bat, i) => {
-                msg5 += `┏━━━ *BATTERY ${i + 1}* ━━━\n`;
-                msg5 += `┃ • Name: ${bat.name}\n`;
-                msg5 += `┃ • Capacity: ${bat.capacity}\n`;
-                msg5 += `┃ • Status: ${bat.status}\n`;
-                msg5 += `┃ • Voltage: ${bat.voltage}\n`;
-                msg5 += `┃ • Current: ${bat.current}\n`;
-                msg5 += "┗━━━━━━━━━━━━━━━━━━\n";
-                if (i < batteryInfo.length - 1) msg5 += "\n";
+                msg += `┏━━━ *🔋 ${bat.name}* ━━━\n`;
+                msg += `┃ Capacity: ${bat.capacity}\n`;
+                msg += `┃ Status: ${bat.status}\n`;
+                msg += `┃ Voltage: ${bat.voltage}\n`;
+                msg += `┃ Current: ${bat.current}\n`;
+                msg += "┗━━━━━━━━━━━━━━━━━━\n";
+                if (i < batteryInfo.length - 1) msg += "\n";
             });
-            msg5 += "\n";
+            msg += "\n";
         }
 
-        msg5 += "╰━━━━━━━━━━━━━━━━━━━╯";
-        messages.push(msg5);
+        msg += "╰━━━━━━━━━━━━━━━━━━━╯";
 
-        // Send all messages
-        for (let i = 0; i < messages.length; i++) {
-            await reply(messages[i]);
-            if (i < messages.length - 1) {
-                await new Promise(resolve => setTimeout(resolve, 500)); // Delay between messages
-            }
-        }
-
+        await reply(msg);
         await m.react("✅");
     } catch (error) {
         await m.react("❌");
-        await reply(`❌ Error: ${error.message}\n\nStack: ${error.stack}`);
+        await reply(`❌ Error: ${error.message}`);
         console.error(error);
     }
 }
