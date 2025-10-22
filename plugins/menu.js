@@ -23,9 +23,9 @@ export default async function ({ sock, m, args }) {
         menu += `╰━━━━━━━━━━━━━━━━╯\n\n`;
 
         menu += `╭━━━『 *COMMAND LIST* 』━━━╮\n`;
-        files.forEach((file, index) => {
+        files.forEach(file => {
             const cmd = path.basename(file, ".js");
-            menu += `│ ${index + 1}. ${prefix}${cmd}\n`;
+            menu += `│ ◦ ${prefix}${cmd}\n`;
         });
         menu += `╰━━━━━━━━━━━━━━━━╯\n\n`;
 
