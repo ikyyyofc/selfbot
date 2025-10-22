@@ -19,6 +19,7 @@
     "cheerio": "latest",
     "file-type": "latest",
     "node-cache": "latest",
-    "systeminformation": "latest"
+    "systeminformation": "latest",
+    "wa-sticker-formatter": "latest"
   }
 }
