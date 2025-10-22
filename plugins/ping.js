@@ -2,6 +2,7 @@ import os from "os";
 import { execSync } from "child_process";
 import fs from "fs";
 import { performance } from "perf_hooks";
+import v8 from "v8";
 
 export default async function ({ m, reply }) {
     const startTime = performance.now();
@@ -213,9 +214,9 @@ export default async function ({ m, reply }) {
         }
 
         // V8 Engine Info - DETAIL
-        const v8 = process.versions;
-        const v8HeapStats = require("v8").getHeapStatistics();
-        const v8HeapSpaceStats = require("v8").getHeapSpaceStatistics();
+        const v8Versions = process.versions;
+        const v8HeapStats = v8.getHeapStatistics();
+        const v8HeapSpaceStats = v8.getHeapSpaceStatistics();
 
         // Calculate response time
         const endTime = performance.now();
@@ -385,8 +386,8 @@ export default async function ({ m, reply }) {
         msg5 += "┗━━━━━━━━━━━━━━━━━━\n\n";
 
         msg5 += "┏━━━ *VERSIONS* ━━━\n";
-        Object.keys(v8).forEach(key => {
-            msg5 += `┃ • ${key}: ${v8[key]}\n`;
+        Object.keys(v8Versions).forEach(key => {
+            msg5 += `┃ • ${key}: ${v8Versions[key]}\n`;
         });
         msg5 += "┗━━━━━━━━━━━━━━━━━━\n\n";
 
