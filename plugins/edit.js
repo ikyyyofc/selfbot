@@ -20,17 +20,13 @@ export default async function ({ sock, m, args, text, fileBuffer }) {
             );
         }
 
-        await m.reply("⏳ Mengupload gambar...");
-
         const imageUrl = await upload(fileBuffer);
         if (!imageUrl) {
             return await m.reply("❌ Gagal mengupload gambar");
         }
 
-        await m.reply("🎨 Memproses edit gambar...");
-
         const response = await axios.get(
-            "https://wudysoft.xyz/api/ai/nano-banana/v20",
+            "https://wudysoft.xyz/api/ai/nano-banana/v15",
             {
                 params: {
                     prompt: text,
@@ -42,12 +38,11 @@ export default async function ({ sock, m, args, text, fileBuffer }) {
 
         const data = response.data;
 
-        if (!data.ok || !data.images || data.images.length === 0) {
+        if (data.code !== 0 || !data.data || !data.data.url) {
             return await m.reply("❌ Gagal mengedit gambar");
         }
 
-        const resultUrl = data.images[0].url;
-        const description = data.description || "Hasil edit gambar";
+        const resultUrl = data.data.url;
 
         await sock.sendMessage(
             m.chat,
@@ -56,8 +51,7 @@ export default async function ({ sock, m, args, text, fileBuffer }) {
                 caption:
                     `✨ *Edit Gambar AI*\n\n` +
                     `📝 Prompt: ${text}\n` +
-                    `💬 ${description}\n` +
-                    `🆔 Request ID: ${data.requestId}`
+                    `✅ Berhasil diedit`
             },
             { quoted: m }
         );
