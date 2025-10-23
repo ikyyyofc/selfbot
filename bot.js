@@ -1,16 +1,8 @@
 import "./config.js";
 import colors from "@colors/colors/safe.js";
-import { fileURLToPath } from "url";
-import { dirname } from "path";
 import BotState from "./lib/BotState.js";
 import PluginManager from "./lib/PluginManager.js";
 import ConnectionManager from "./lib/ConnectionManager.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-// Export __dirname for use in other modules
-export { __dirname };
 
 // ===== MAIN =====
 const main = async () => {
