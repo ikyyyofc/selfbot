@@ -35,14 +35,8 @@ async function veo3(prompt, { image = null } = {}) {
     try {
         if (!prompt) throw new Error("Prompt is required");
 
-        const { data: cf } = await axios.post(
-            "https://cf.nekolabs.my.id/action",
-            {
-                mode: "turnstile-min",
-                siteKey: "0x4AAAAAAANuFg_hYO9YJZqo",
-                url: "https://aivideogenerator.me/features/g-ai-video-generator"
-            }
-        );
+      
+        const cf_token = await cf.turnstileMin("https://aivideogenerator.me/features/g-ai-video-generator", "0x4AAAAAAANuFg_hYO9YJZqo")
 
         const num = Math.floor(Math.random() * 100) + 1700;
         const uid = crypto
@@ -75,7 +69,7 @@ async function veo3(prompt, { image = null } = {}) {
             {
                 headers: {
                     uniqueid: uid,
-                    verify: cf.token
+                    verify: cf_token
                 }
             }
         );
@@ -86,7 +80,7 @@ async function veo3(prompt, { image = null } = {}) {
                 {
                     headers: {
                         uniqueid: uid,
-                        verify: cf.token
+                        verify: cf_token
                     }
                 }
             );
