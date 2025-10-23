@@ -26,7 +26,7 @@ export default async function ({ sock, m }) {
         const hasWiki = data.has_wiki ? "Yes" : "No";
         const hasPages = data.has_pages ? "Yes" : "No";
 
-        const message = `╭━━━『 *REPOSITORY INFO* 』━━━╮
+        const message = `╭━━━『 *REPO INFO* 』━━━╮
 │
 │ 📦 *Name:* ${data.name}
 │ 👤 *Owner:* ${data.owner.login}
