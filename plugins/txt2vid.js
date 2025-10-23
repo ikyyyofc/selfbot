@@ -73,8 +73,10 @@ async function veo3(prompt, { image = null } = {}) {
                 }
             }
         );
+        
+        return task
 
-        while (true) {
+       /* while (true) {
             const { data } = await axios.get(
                 `https://aiarticle.erweima.ai/api/v1/secondary-page/api/${task.data.recordId}`,
                 {
@@ -90,7 +92,7 @@ async function veo3(prompt, { image = null } = {}) {
             if (data.data.state === "success")
                 return JSON.parse(data.data.completeData);
             await new Promise(res => setTimeout(res, 1000));
-        }
+        }*/
     } catch (error) {
         throw new Error(error.message);
     }
