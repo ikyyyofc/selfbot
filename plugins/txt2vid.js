@@ -1,14 +1,19 @@
 import axios from "axios";
 import crypto from "crypto";
+import upload from "../lib/upload.js";
+import { shannz: cf } from "bycf";
 
-export default async function ({ sock, m, from, args, text, reply }) {
+export default async function ({ sock, m, from, args, text, reply, fileBuffer }) {
   try {
     if (!text) return reply("⚠️ Masukkan prompt untuk membuat video.\n\nContoh:\n.txt2vid seorang wanita sedang duduk di pantai");
+    
+    let q = m.quoted ? m.quoted : m;
+    let img = null
+    if (q.type == "imageMessage") img = await upload(fileBuffer)
+    
+    let proses = await veo3(text, {image:img})
 
-    await sock.sendMessage(from, {
-      video: { url: videoUrl },
-      caption: `🎬 *Video AI Berhasil Dibuat!*\n\nPrompt: ${prompt}\nRasio: ${ratio}`,
-    });
+    reply(proses)
   } catch (err) {
     console.error(err);
     reply("❌ Terjadi kesalahan saat membuat video: " + err.message);
