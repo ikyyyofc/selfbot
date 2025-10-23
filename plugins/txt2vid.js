@@ -5,53 +5,6 @@ export default async function ({ sock, from, args, text, reply }) {
   try {
     if (!text) return reply("⚠️ Masukkan prompt untuk membuat video.\n\nContoh:\n.txt2vid seorang wanita sedang duduk di pantai");
 
-    const ratio = text.includes("--landscape")
-      ? "landscape"
-      : "portrait";
-    const prompt = text.replace("--landscape", "").trim();
-
-    reply("⏳ Sedang membuat video AI, mohon tunggu sebentar...");
-
-    const api = axios.create({
-      baseURL: "https://api.bylo.ai/aimodels/api/v1/ai",
-      headers: {
-        accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        "content-type": "application/json; charset=UTF-8",
-        "user-agent":
-          "Mozilla/5.0 (Linux; Android 15; SM-F958 Build/AP3A.240905.015) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.86 Mobile Safari/537.36",
-        referer: "https://bylo.ai/features/sora-2",
-        origin: "https://bylo.ai",
-        uniqueId: crypto.randomUUID().replace(/-/g, ""),
-      },
-    });
-
-    const { data: task } = await api.post("/video/create", {
-      prompt,
-      channel: "SORA2",
-      pageId: 536,
-      source: "bylo.ai",
-      watermarkFlag: true,
-      privateFlag: true,
-      isTemp: true,
-      vipFlag: true,
-      model: "sora_video2",
-      videoType: "text-to-video",
-      aspectRatio: ratio,
-    });
-
-    let videoUrl;
-    while (true) {
-      const { data } = await api.get(`/${task.data}?channel=SORA2'`);
-      if (data?.data?.state > 0) {
-        const result = JSON.parse(data.data.completeData);
-        videoUrl = result?.data?.result_urls?.[0];
-        break;
-      }
-      await new Promise((res) => setTimeout(res, 2000));
-    }
-
-    if (!videoUrl) return reply("❌ Gagal membuat video, coba lagi nanti.");
-
     await sock.sendMessage(from, {
       video: { url: videoUrl },
       caption: `🎬 *Video AI Berhasil Dibuat!*\n\nPrompt: ${prompt}\nRasio: ${ratio}`,
@@ -60,4 +13,60 @@ export default async function ({ sock, from, args, text, reply }) {
     console.error(err);
     reply("❌ Terjadi kesalahan saat membuat video: " + err.message);
   }
+}
+
+async function veo3(prompt, { image = null } = {}) {
+    try {
+        if (!prompt) throw new Error('Prompt is required');
+        
+        const { data: cf } = await axios.post('https://cf.nekolabs.my.id/action', {
+            mode: 'turnstile-min',
+            siteKey: '0x4AAAAAAANuFg_hYO9YJZqo',
+            url: 'https://aivideogenerator.me/features/g-ai-video-generator'
+        });
+        
+        const num = Math.floor(Math.random() * 100) + 1700;
+        const uid = crypto.createHash('md5').update(Date.now().toString()).digest('hex');
+        const { data: task } = await axios.post('https://aiarticle.erweima.ai/api/v1/secondary-page/api/create', {
+            prompt: prompt,
+            imgUrls: image ? [image] : [],
+            quality: '720p',
+            duration: 8,
+            autoSoundFlag: false,
+            soundPrompt: '',
+            autoSpeechFlag: false,
+            speechPrompt: '',
+            speakerId: 'Auto',
+            aspectRatio: '16:9',
+            secondaryPageId: num,
+            channel: 'VEO3',
+            source: 'aivideogenerator.me',
+            type: 'features',
+            watermarkFlag: true,
+            privateFlag: true,
+            isTemp: true,
+            vipFlag: true,
+            model: 'veo-3-fast'
+        }, {
+            headers: {
+                uniqueid: uid,
+                verify: cf.token
+            }
+        });
+        
+        while (true) {
+            const { data } = await axios.get(`https://aiarticle.erweima.ai/api/v1/secondary-page/api/${task.data.recordId}`, {
+                headers: {
+                    uniqueid: uid,
+                    verify: cf.token
+                }
+            });
+            
+            if (data.data.state === 'fail') return JSON.parse(data.data.completeData);
+            if (data.data.state === 'success') return JSON.parse(data.data.completeData);
+            await new Promise(res => setTimeout(res, 1000));
+        }
+    } catch (error) {
+        throw new Error(error.message);
+    }
 }
