@@ -4,5 +4,7 @@ export default {
     PAIRING_CODE: "IKYYSELF",
     PREFIX: [".", "!", "/"],
     BOT_NAME: "IKYY",
-    OWNER_NAME: "IKYYOFC"
+    OWNER_NAME: "IKYYOFC",
+    SESSION_CLEANUP_INTERVAL: 1,
+    SESSION_MAX_SIZE_MB: 5
 };
