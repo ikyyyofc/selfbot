@@ -1,7 +1,7 @@
 import axios from "axios";
 import crypto from "crypto";
 
-export default async function ({ sock, from, args, text, reply }) {
+export default async function ({ sock, m, from, args, text, reply }) {
   try {
     if (!text) return reply("⚠️ Masukkan prompt untuk membuat video.\n\nContoh:\n.txt2vid seorang wanita sedang duduk di pantai");
 
