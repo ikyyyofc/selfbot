@@ -5,6 +5,6 @@ export default {
     PREFIX: [".", "!", "/"],
     BOT_NAME: "IKYY",
     OWNER_NAME: "IKYYOFC",
-    SESSION_CLEANUP_INTERVAL: 1,
-    SESSION_MAX_SIZE_MB: 5
+    SESSION_CLEANUP_INTERVAL: 1, // jam
+    SESSION_MAX_SIZE_MB: 5 // size folder
 };
