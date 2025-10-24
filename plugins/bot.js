@@ -12,7 +12,7 @@ async function read(file) {
 export default async function ({ m, text, fileBuffer, reply }) {
     if (!text) {
         return reply(
-            "Silakan berikan pertanyaan Anda setelah perintah. Contoh: .claude Apa kabar?"
+            "Silakan berikan pertanyaan Anda setelah perintah. Contoh: .bot Apa kabar?"
         );
     }
 
