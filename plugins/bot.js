@@ -12,7 +12,7 @@ async function read(file) {
 export default async function ({ sock, m, text, fileBuffer, reply }) {
   let q = m.quoted ? m.quoted : m;
     
-    if (!text && !q.text) {
+    if (!text && !m.quoted.text) {
         return reply(
             "Silakan berikan pertanyaan Anda setelah perintah. Contoh: .bot buatin plugin buat stiker?"
         );
