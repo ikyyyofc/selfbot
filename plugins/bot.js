@@ -64,6 +64,11 @@ export default async function ({ m, text, fileBuffer, reply }) {
         
         lib/upload.js:
         ${await read("lib/upload")}
+        
+        gunakan kode kode diatas sebagai referensi
+        
+        
+        ingatlah untuk membuat kode yang simpel, efisien, dan minimalis tetapi fungsinya jelas dan terstruktur dengan baik.
         `
     };
 
