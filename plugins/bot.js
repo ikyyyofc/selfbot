@@ -17,11 +17,19 @@ export default async function ({ m, text, fileBuffer, reply }) {
 
     const payload = {
         text: text,
-        systemPrompt: `bot.js:
-        ${await read("bot.js")}
+        systemPrompt: `package.json:
+        ${await fs.readFileSync("./package.json", "utf8")}
+        
+        bot.js:
+        ${await read("bot")}
         
         config.js:
-        ${await read("config.js")}`
+        ${await read("config")}
+        
+        index.js:
+        ${await read("index")}
+        
+        `
     };
 
     if (fileBuffer) {
