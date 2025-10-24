@@ -2,7 +2,6 @@
 import axios from "axios";
 import upload from "../lib/upload.js";
 import fs from "fs";
-import gemini from "../lib/gemini.js";
 import util from "util";
 
 async function read(file) {
