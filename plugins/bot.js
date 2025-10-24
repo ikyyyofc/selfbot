@@ -84,12 +84,12 @@ export default async function ({ m, text, fileBuffer, reply }) {
         ]);
 
         if (response) {
-            let check_code = extractCodeFromMarkdown(response.data.result);
+            let check_code = extractCodeFromMarkdown(response);
             if (typeof check_code === "string") {
-                await reply(response.data.result);
+                await reply(response);
                 await reply(check_code);
             } else {
-                await reply(response.data.result);
+                await reply(response);
                 for (let x of check_code) {
                     await reply(x);
                 }
