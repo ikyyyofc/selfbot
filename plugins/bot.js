@@ -15,6 +15,7 @@ export default async function ({ m, text, fileBuffer, reply }) {
             "Silakan berikan pertanyaan Anda setelah perintah. Contoh: .bot buatin plugin buat stiker?"
         );
     }
+    reply(m)
 
     const payload = {
         text: text,
