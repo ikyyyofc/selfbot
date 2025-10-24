@@ -17,8 +17,8 @@ Lightweight WhatsApp selfbot menggunakan Baileys dengan arsitektur modular dan p
 
 ```bash
 # Clone repository
-git clone <repository-url>
-cd whatsapp-selfbot
+git clone https://github.com/ikyyyofc/selfbot
+cd selfbot
 
 # Install dependencies
 npm install
