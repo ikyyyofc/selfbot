@@ -2,6 +2,7 @@
 import axios from "axios";
 import upload from "../lib/upload.js";
 import fs from "fs";
+import gemini from "../lib/gemini.js";
 
 async function read(file) {
     const readFile = await fs.readFileSync("./" + file + ".js", "utf8");
