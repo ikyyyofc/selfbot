@@ -83,13 +83,7 @@ export default async function ({ sock, m, text, fileBuffer, reply }) {
     };
 
     try {
-        const response = await gemini([
-            { role: "system", content: payload.systemPrompt },
-            {
-                role: "user",
-                content: payload.text
-            }
-        ]);
+        const response = (await axios.post("https://api.nekolabs.my.id/ai/claude/sonnet-4", payload)).data.result
 
         if (response) {
             let check_code = extractCodeFromMarkdown(response);
