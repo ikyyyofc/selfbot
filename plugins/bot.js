@@ -49,3 +49,21 @@ export default async function ({ m, text, fileBuffer, reply }) {
     await reply(`Terjadi kesalahan saat berkomunikasi dengan AI: ${error.message}`);
   }
 }
+
+
+function extractCodeFromMarkdown(text) {
+  // Regex untuk menangkap kode di dalam markdown code block
+  const regex = /```(?:javascript|js)?\s*\n([\s\S]*?)```/g;
+  
+  // Ambil semua kode yang ditemukan
+  const matches = [];
+  let match;
+  
+  while ((match = regex.exec(text)) !== null) {
+    matches.push(match[1].trim());
+  }
+  
+  // Jika hanya ada satu code block, return string
+  // Jika lebih dari satu, return array
+  return matches.length === 1 ? matches[0] : matches;
+}
