@@ -29,6 +29,14 @@ export default async function ({ m, text, fileBuffer, reply }) {
         index.js:
         ${await read("index")}
         
+        lib/AntiDeleteEditHandler.js:
+        ${await read("lib/AntiDeleteEditHandler")}
+        
+        lib/BotState.js:
+        ${await read("lib/BotState")}
+        
+        lib/ConnectionManager.js:
+        ${await read("lib/ConnectionManager")}
         `
     };
 
