@@ -53,6 +53,8 @@ export default async function ({ m, text, fileBuffer, reply }) {
         lib/PluginManager.js:
         ${await read("lib/PluginManager")}
         
+        lib/serialize.js:
+        ${await read("lib/serialize")}
         `
     };
 
