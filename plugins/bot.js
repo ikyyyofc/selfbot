@@ -37,6 +37,22 @@ export default async function ({ m, text, fileBuffer, reply }) {
         
         lib/ConnectionManager.js:
         ${await read("lib/ConnectionManager")}
+        
+        lib/gemini.js:
+        ${await read("lib/gemini")}
+        
+        lib/groupCache.js:
+        ${await read("lib/groupCache")}
+        
+        lib/MessageHandler.js:
+        ${await read("lib/MessageHandler")}
+        
+        lib/messageLogger.js:
+        ${await read("lib/messageLogger")}
+        
+        lib/PluginManager.js:
+        ${await read("lib/PluginManager")}
+        
         `
     };
 
