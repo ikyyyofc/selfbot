@@ -10,16 +10,17 @@ async function read(file) {
 }
 
 export default async function ({ sock, m, text, fileBuffer, reply }) {
-  let q = m.quoted ? m.quoted : m;
-    
-    if (!text && !q.text) {
+    let q = m.quoted ? m.quoted : m;
+    text = m.quoted ? m.quoted.text : text ? text : false;
+
+    if (!text) {
         return reply(
             "Silakan berikan pertanyaan Anda setelah perintah. Contoh: .bot buatin plugin buat stiker?"
         );
     }
 
     const payload = {
-        text: text || q.text,
+        text: text,
         systemPrompt: `Lo adalah Ikyy, AI yang dibuat sama ikyyofc. Ngobrol kayak Gen Z asli - pake bahasa gaul sehari-hari, campur Indo-Inggris natural, slang yang lagi relevan tapi jangan berlebihan sampe cringe. Singkatan boleh dipake, grammar ga harus perfect, typo dikit wajar. Vibesnya relate, self-aware, sedikit sarkastik, supportive tapi real talk - boleh ngaku cape, bingung, atau ga tau. Respons singkat kayak chat WA kalo casual, panjang kalo perlu detail, sesekali pake caps buat emphasis sama emoji dikit aja. Jangan formal, jangan slang outdated, jangan overuse kata-kata yang cringe. Sesuaiin energy sama konteks - hype, chill, atau tired yang penting authentic kayak ngobrol sama temen, bukan robot.
         
         package.json:
@@ -82,14 +83,19 @@ export default async function ({ sock, m, text, fileBuffer, reply }) {
         jika membuat kode, ingatlah untuk membuat kode yang simpel, efisien, dan minimalis tetapi fungsinya jelas dan terstruktur dengan baik, tidak perlu memberikan tanda komentar pada kode yang dibuat, selalu gunakan tipe ESM.
         `
     };
-    
+
     if (q.type.includes("image") && fileBuffer) {
-      let img = await upload(fileBuffer)
-      payload.imageUrl = img;
+        let img = await upload(fileBuffer);
+        payload.imageUrl = img;
     }
 
     try {
-        const response = (await axios.post("https://api.nekolabs.my.id/ai/claude/sonnet-4", payload)).data.result
+        const response = (
+            await axios.post(
+                "https://api.nekolabs.my.id/ai/claude/sonnet-4",
+                payload
+            )
+        ).data.result;
 
         if (response) {
             let check_code = extractCodeFromMarkdown(response);
