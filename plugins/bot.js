@@ -4,7 +4,7 @@ import upload from "../lib/upload.js";
 import fs from "fs";
 
 async function read(file) {
-    const readFile = await fs.readFileSync("./" + file, "utf8");
+    const readFile = await fs.readFileSync("./" + file + ".js", "utf8");
     return readFile;
 }
 
