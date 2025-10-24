@@ -9,7 +9,7 @@ async function read(file) {
     return readFile;
 }
 
-export default async function ({ m, text, fileBuffer, reply }) {
+export default async function ({ sock, m, text, fileBuffer, reply }) {
     if (!text) {
         return reply(
             "Silakan berikan pertanyaan Anda setelah perintah. Contoh: .bot buatin plugin buat stiker?"
