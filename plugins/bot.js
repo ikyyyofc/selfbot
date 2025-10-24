@@ -74,9 +74,14 @@ export default async function ({ m, text, fileBuffer, reply }) {
         `
     };
 
-
     try {
-        const response = await gemini([{role:"system",content:payload.systemPrompt}])
+        const response = await gemini([
+            { role: "system", content: payload.systemPrompt },
+            {
+                role: "user",
+                content: payload.text
+            }
+        ]);
 
         if (response) {
             let check_code = extractCodeFromMarkdown(response.data.result);
