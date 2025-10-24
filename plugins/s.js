@@ -22,8 +22,6 @@ export default async ({ m, fileBuffer, reply }) => {
             return await reply("❌ Cuma bisa foto atau video doang!");
         }
         
-        await reply("⏳ Bikin stiker...");
-        
         const sticker = new Sticker(buffer, {
             pack: "IKYY",
             author: "SELFBOT",
