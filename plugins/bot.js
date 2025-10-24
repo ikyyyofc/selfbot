@@ -70,7 +70,7 @@ export default async function ({ sock, m, text, fileBuffer, reply }) {
         
         gunakan file-file diatas sebagai referensi
         
-        message object saat ini:
+        message object (m) saat ini:
         ${util.inspect(m, {
             depth: null,
             maxArrayLength: null,
