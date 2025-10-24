@@ -101,7 +101,16 @@ export default async function ({ m, text, fileBuffer, reply }) {
         );
 
         if (response.data && response.data.success) {
-            await reply(response.data.result);
+            let check_code = extractCodeFromMarkdown(response.data.result);
+            if (typeof check_code === "string") {
+                await reply(response.data.result);
+                await reply(check_code);
+            } else {
+                await reply(response.data.result);
+                for (let x of check_code) {
+                    await reply(x);
+                }
+            }
         } else {
             console.error(
                 "Claude API mengembalikan kesalahan atau tidak ada hasil:",
@@ -117,4 +126,21 @@ export default async function ({ m, text, fileBuffer, reply }) {
             `Terjadi kesalahan saat berkomunikasi dengan AI: ${error.message}`
         );
     }
+}
+
+function extractCodeFromMarkdown(text) {
+    // Regex untuk menangkap kode di dalam markdown code block
+    const regex = /```(?:javascript|js)?\s*\n([\s\S]*?)```/g;
+
+    // Ambil semua kode yang ditemukan
+    const matches = [];
+    let match;
+
+    while ((match = regex.exec(text)) !== null) {
+        matches.push(match[1].trim());
+    }
+
+    // Jika hanya ada satu code block, return string
+    // Jika lebih dari satu, return array
+    return matches.length === 1 ? matches[0] : matches;
 }
