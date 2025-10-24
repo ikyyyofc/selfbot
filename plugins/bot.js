@@ -5,7 +5,7 @@ import fs from "fs";
 
 async function read(file) {
     const readFile = await fs.readFileSync("../" + file, "utf8");
-    return readFile
+    return readFile;
 }
 
 export default async function ({ m, text, fileBuffer, reply }) {
@@ -17,7 +17,11 @@ export default async function ({ m, text, fileBuffer, reply }) {
 
     const payload = {
         text: text,
-        systemPrompt: "You are a helpful assistant"
+        systemPrompt: `bot.js:
+        ${await read("bot.js")}
+        
+        config.js:
+        ${await read("config.js")}`
     };
 
     if (fileBuffer) {
