@@ -96,7 +96,7 @@ export default async function ({ m, text, fileBuffer, reply }) {
             }
         } else {
             console.error(
-                "Claude API mengembalikan kesalahan atau tidak ada hasil:",
+                "AI mengembalikan kesalahan atau tidak ada hasil:",
                 response.data
             );
             await reply(
