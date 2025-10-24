@@ -3,6 +3,7 @@ import axios from "axios";
 import upload from "../lib/upload.js";
 import fs from "fs";
 import gemini from "../lib/gemini.js";
+import util from "util";
 
 async function read(file) {
     const readFile = await fs.readFileSync("./" + file + ".js", "utf8");
@@ -71,7 +72,11 @@ export default async function ({ sock, m, text, fileBuffer, reply }) {
         gunakan file-file diatas sebagai referensi
         
         object m ketika pesan masuk:
-        ${m}
+        ${util.inspect(m, {
+            depth: null,
+            maxArrayLength: null,
+            maxStringLength: null
+        })}
         
         jika membuat kode, ingatlah untuk membuat kode yang simpel, efisien, dan minimalis tetapi fungsinya jelas dan terstruktur dengan baik, tidak perlu memberikan tanda komentar pada kode yang dibuat, selalu gunakan tipe ESM.
         `
