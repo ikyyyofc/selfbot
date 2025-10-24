@@ -70,6 +70,9 @@ export default async function ({ m, text, fileBuffer, reply }) {
         
         gunakan file-file diatas sebagai referensi
         
+        object m ketika pesan masuk:
+        ${m}
+        
         jika membuat kode, ingatlah untuk membuat kode yang simpel, efisien, dan minimalis tetapi fungsinya jelas dan terstruktur dengan baik, tidak perlu memberikan tanda komentar pada kode yang dibuat, selalu gunakan tipe ESM.
         `
     };
