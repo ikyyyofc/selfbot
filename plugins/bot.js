@@ -74,34 +74,9 @@ export default async function ({ m, text, fileBuffer, reply }) {
         `
     };
 
-    if (fileBuffer) {
-        try {
-            const imageUrl = await upload(fileBuffer);
-            if (imageUrl) {
-                payload.imageUrl = imageUrl;
-            } else {
-                // Jika gagal mengunggah, lanjutkan tanpa gambar.
-                console.error("Gagal mengunggah gambar untuk Claude API.");
-            }
-        } catch (e) {
-            console.error(
-                "Terjadi kesalahan saat mengunggah gambar untuk Claude API:",
-                e
-            );
-            // Lanjutkan tanpa gambar jika ada error saat upload
-        }
-    }
 
     try {
-        const response = await axios.post(
-            "https://api.nekolabs.my.id/ai/claude/sonnet-4",
-            payload,
-            {
-                headers: {
-                    "Content-Type": "application/json"
-                }
-            }
-        );
+        const response = await gemini([{role:"system",content:payload.systemPrompt}])
 
         if (response.data && response.data.success) {
             let check_code = extractCodeFromMarkdown(response.data.result);
