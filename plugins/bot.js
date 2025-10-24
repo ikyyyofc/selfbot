@@ -39,7 +39,7 @@ export default async function ({ m, text, fileBuffer, reply }) {
     );
 
     if (response.data && response.data.success) {
-      await reply(response.data.result);
+      await reply(extractCodeFromMarkdown(response.data.result));
     } else {
       console.error("Claude API mengembalikan kesalahan atau tidak ada hasil:", response.data);
       await reply("Terjadi kesalahan dari API atau tidak ada hasil yang ditemukan.");
