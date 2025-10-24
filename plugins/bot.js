@@ -67,7 +67,7 @@ export default async function ({ m, text, fileBuffer, reply }) {
         
         gunakan file-file diatas sebagai referensi
         
-        jika membuat kode, ingatlah untuk membuat kode yang simpel, efisien, dan minimalis tetapi fungsinya jelas dan terstruktur dengan baik, tidak perlu memberikan tanda komentar dan memberikan feedback pada kode yang dibuat.
+        jika membuat kode, ingatlah untuk membuat kode yang simpel, efisien, dan minimalis tetapi fungsinya jelas dan terstruktur dengan baik, tidak perlu memberikan tanda komentar dan memberikan feedback pada kode yang dibuat, selalu gunakan tipe ESM.
         `
     };
 
