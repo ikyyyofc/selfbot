@@ -10,7 +10,9 @@ async function read(file) {
 }
 
 export default async function ({ sock, m, text, fileBuffer, reply }) {
-    if (!text && !m.quoted.text) {
+  let q = m.quoted ? m.quoted : m;
+    
+    if (!text && !q.text) {
         return reply(
             "Silakan berikan pertanyaan Anda setelah perintah. Contoh: .bot buatin plugin buat stiker?"
         );
@@ -80,9 +82,6 @@ export default async function ({ sock, m, text, fileBuffer, reply }) {
         jika membuat kode, ingatlah untuk membuat kode yang simpel, efisien, dan minimalis tetapi fungsinya jelas dan terstruktur dengan baik, tidak perlu memberikan tanda komentar pada kode yang dibuat, selalu gunakan tipe ESM.
         `
     };
-    
-    let q = m.quoted ? m.quoted : m;
-    
     
     if (q.type.includes("image") && fileBuffer) {
       let img = await upload(fileBuffer)
