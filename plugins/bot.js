@@ -10,7 +10,7 @@ async function read(file) {
 }
 
 export default async function ({ sock, m, text, fileBuffer, reply }) {
-  let q = q ? q : m;
+  let q = m.quoted ? m.quoted : m;
     
     if (!text && !q.text) {
         return reply(
