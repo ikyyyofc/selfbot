@@ -55,6 +55,15 @@ export default async function ({ m, text, fileBuffer, reply }) {
         
         lib/serialize.js:
         ${await read("lib/serialize")}
+        
+        lib/SessionCleaner.js:
+        ${await read("lib/SessionCleaner")}
+        
+        lib/socket.js:
+        ${await read("lib/socket")}
+        
+        lib/upload.js:
+        ${await read("lib/upload")}
         `
     };
 
