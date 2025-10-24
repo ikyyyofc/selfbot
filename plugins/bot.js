@@ -15,7 +15,6 @@ export default async function ({ sock, m, text, fileBuffer, reply }) {
             "Silakan berikan pertanyaan Anda setelah perintah. Contoh: .bot buatin plugin buat stiker?"
         );
     }
-    sock.sendMessage(m.chat, {text:m})
 
     const payload = {
         text: text,
