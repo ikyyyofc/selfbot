@@ -113,7 +113,7 @@ export default async function ({ sock, m, text, fileBuffer, reply }) {
     try {
         const response = (
             await axios.post(
-                "https://api.nekolabs.web.id/ai/gpt/4o-search",
+                "https://api.nekolabs.web.id/ai/gpt/4o",
                 payload
             )
         ).data.result;
