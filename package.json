@@ -19,7 +19,6 @@
     "bycf": "latest",
     "cheerio": "latest",
     "file-type": "latest",
-    "fluent-ffmpeg": "latest",
     "node-cache": "latest",
     "wa-sticker-formatter": "latest"
   }
