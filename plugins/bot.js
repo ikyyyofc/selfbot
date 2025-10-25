@@ -112,7 +112,7 @@ export default async function ({ sock, m, text, fileBuffer, reply }) {
     try {
         const response = (
             await axios.post(
-                "https://api.nekolabs.my.id/ai/claude/sonnet-4",
+                "https://api.nekolabs.web.id/ai/claude/sonnet-4",
                 payload
             )
         ).data.result;
