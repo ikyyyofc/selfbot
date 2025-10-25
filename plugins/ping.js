@@ -1,15 +1,52 @@
 import os from 'os';
 import fs from 'fs';
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
-export default async ({ reply }) => {
-    const startTime = process.hrtime.bigint();
+const execAsync = promisify(exec);
+
+export default async ({ m, reply }) => {
+    const startTime = Date.now();
     
     try {
-        const responseTime = Number(process.hrtime.bigint() - startTime) / 1000000;
+        const pingResult = await Promise.race([
+            execAsync('ping -c 1 8.8.8.8'),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+        ]);
         
-        const uptime = process.uptime();
-        const sysUptime = os.uptime();
+        const diskInfo = await execAsync('df -h /').catch(() => ({ stdout: 'N/A' }));
+        const memInfo = await execAsync('free -h').catch(() => ({ stdout: 'N/A' }));
+        const cpuInfo = await execAsync('lscpu').catch(() => ({ stdout: 'N/A' }));
+        const uptimeInfo = await execAsync('uptime -p').catch(() => ({ stdout: 'N/A' }));
+        const networkInfo = await execAsync('ip route | grep default').catch(() => ({ stdout: 'N/A' }));
+        const processInfo = await execAsync('ps aux --sort=-%cpu | head -10').catch(() => ({ stdout: 'N/A' }));
+        const kernelInfo = await execAsync('uname -a').catch(() => ({ stdout: 'N/A' }));
+        const thermalInfo = await execAsync('sensors').catch(() => ({ stdout: 'Sensor tidak tersedia' }));
+        const ioInfo = await execAsync('iostat -x 1 1').catch(() => ({ stdout: 'N/A' }));
+        const networkStats = await execAsync('cat /proc/net/dev').catch(() => ({ stdout: 'N/A' }));
+        
+        const endTime = Date.now();
+        const responseTime = endTime - startTime;
+        
+        const platform = os.platform();
+        const architecture = os.arch();
+        const hostname = os.hostname();
+        const release = os.release();
+        const type = os.type();
+        const uptime = os.uptime();
+        const totalMem = os.totalmem();
+        const freeMem = os.freemem();
+        const usedMem = totalMem - freeMem;
+        const cpus = os.cpus();
+        const loadAvg = os.loadavg();
+        const networkInterfaces = os.networkInterfaces();
+        
+        const formatBytes = (bytes) => {
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            if (bytes === 0) return '0 Bytes';
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+        };
         
         const formatUptime = (seconds) => {
             const days = Math.floor(seconds / 86400);
@@ -19,200 +56,200 @@ export default async ({ reply }) => {
             return `${days}d ${hours}h ${minutes}m ${secs}s`;
         };
         
-        const formatBytes = (bytes) => {
-            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-            if (bytes === 0) return '0 B';
-            const i = Math.floor(Math.log(bytes) / Math.log(1024));
-            return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+        const getPingLatency = (pingOutput) => {
+            const match = pingOutput.match(/time=([0-9.]+)\s*ms/);
+            return match ? parseFloat(match[1]) : 'N/A';
         };
         
-        const formatPercentage = (value) => (value * 100).toFixed(1) + '%';
-        
-        const getCpuUsage = () => {
-            const cpus = os.cpus();
-            let totalIdle = 0;
-            let totalTick = 0;
-            
-            cpus.forEach(cpu => {
-                for (let type in cpu.times) {
-                    totalTick += cpu.times[type];
-                }
-                totalIdle += cpu.times.idle;
-            });
-            
-            return 1 - totalIdle / totalTick;
+        const getMemoryUsagePercent = () => {
+            return ((usedMem / totalMem) * 100).toFixed(2);
         };
         
-        const getStorageInfo = () => {
+        const getCpuUsage = async () => {
             try {
-                const stats = fs.statSync('.');
-                const free = execSync('df -h . | tail -1 | awk \'{print $4}\'', { encoding: 'utf8' }).trim();
-                const used = execSync('df -h . | tail -1 | awk \'{print $3}\'', { encoding: 'utf8' }).trim();
-                const total = execSync('df -h . | tail -1 | awk \'{print $2}\'', { encoding: 'utf8' }).trim();
-                const usagePercent = execSync('df -h . | tail -1 | awk \'{print $5}\'', { encoding: 'utf8' }).trim();
-                
-                return {
-                    total,
-                    used,
-                    free,
-                    usagePercent
-                };
+                const { stdout } = await execAsync("top -bn1 | grep 'Cpu(s)' | awk '{print $2}' | cut -d'%' -f1");
+                return stdout.trim() || 'N/A';
             } catch {
-                return {
-                    total: 'N/A',
-                    used: 'N/A',
-                    free: 'N/A',
-                    usagePercent: 'N/A'
-                };
+                return 'N/A';
             }
         };
         
-        const getNetworkInfo = () => {
+        const getSwapInfo = async () => {
             try {
-                const interfaces = os.networkInterfaces();
-                const active = [];
-                
-                for (const [name, nets] of Object.entries(interfaces)) {
-                    if (name !== 'lo') {
-                        nets.forEach(net => {
-                            if (!net.internal && net.family === 'IPv4') {
-                                active.push({
-                                    interface: name,
-                                    ip: net.address,
-                                    netmask: net.netmask,
-                                    mac: net.mac
-                                });
-                            }
-                        });
+                const { stdout } = await execAsync('free -h | grep Swap');
+                return stdout.trim() || 'Tidak ada swap';
+            } catch {
+                return 'N/A';
+            }
+        };
+        
+        const getDiskUsage = (diskOutput) => {
+            const lines = diskOutput.split('\n');
+            const rootLine = lines.find(line => line.includes('/') && line.includes('%'));
+            return rootLine ? rootLine.split(/\s+/) : ['N/A'];
+        };
+        
+        const getNetworkInterfaces = () => {
+            let interfaceInfo = '';
+            Object.keys(networkInterfaces).forEach(interface => {
+                const addresses = networkInterfaces[interface];
+                interfaceInfo += `\n   🔌 ${interface}:\n`;
+                addresses.forEach(addr => {
+                    if (addr.family === 'IPv4') {
+                        interfaceInfo += `      IPv4: ${addr.address}/${addr.netmask}\n`;
+                        interfaceInfo += `      MAC: ${addr.mac}\n`;
+                        interfaceInfo += `      Internal: ${addr.internal ? 'Ya' : 'Tidak'}\n`;
+                    }
+                });
+            });
+            return interfaceInfo;
+        };
+        
+        const getTopProcesses = (processOutput) => {
+            const lines = processOutput.split('\n').slice(1, 6);
+            let processInfo = '';
+            lines.forEach((line, index) => {
+                if (line.trim()) {
+                    const parts = line.split(/\s+/);
+                    if (parts.length >= 11) {
+                        processInfo += `   ${index + 1}. ${parts[10]} (CPU: ${parts[2]}%, MEM: ${parts[3]}%)\n`;
                     }
                 }
-                
-                return active;
-            } catch {
-                return [];
+            });
+            return processInfo || 'N/A';
+        };
+        
+        const cpuUsage = await getCpuUsage();
+        const swapInfo = await getSwapInfo();
+        const diskUsage = getDiskUsage(diskInfo.stdout);
+        const pingLatency = getPingLatency(pingResult.stdout);
+        
+        let response = `🤖 *SISTEM MONITORING LENGKAP*\n\n`;
+        
+        response += `⚡ *PERFORMA & RESPONS*\n`;
+        response += `├─ Response Time: ${responseTime}ms\n`;
+        response += `├─ Ping Latency: ${pingLatency}ms\n`;
+        response += `├─ Load Average: ${loadAvg[0].toFixed(2)}, ${loadAvg[1].toFixed(2)}, ${loadAvg[2].toFixed(2)}\n`;
+        response += `└─ CPU Usage: ${cpuUsage}%\n\n`;
+        
+        response += `💻 *SISTEM OPERASI*\n`;
+        response += `├─ Platform: ${platform}\n`;
+        response += `├─ Type: ${type}\n`;
+        response += `├─ Architecture: ${architecture}\n`;
+        response += `├─ Release: ${release}\n`;
+        response += `├─ Hostname: ${hostname}\n`;
+        response += `├─ Kernel: ${kernelInfo.stdout.split('\n')[0] || 'N/A'}\n`;
+        response += `└─ Uptime: ${formatUptime(uptime)}\n\n`;
+        
+        response += `🧠 *MEMORI & STORAGE*\n`;
+        response += `├─ Total RAM: ${formatBytes(totalMem)}\n`;
+        response += `├─ Used RAM: ${formatBytes(usedMem)} (${getMemoryUsagePercent()}%)\n`;
+        response += `├─ Free RAM: ${formatBytes(freeMem)}\n`;
+        response += `├─ Swap: ${swapInfo}\n`;
+        response += `├─ Disk Usage: ${diskUsage[4] || 'N/A'} used of ${diskUsage[1] || 'N/A'}\n`;
+        response += `└─ Disk Available: ${diskUsage[3] || 'N/A'}\n\n`;
+        
+        response += `⚙️ *PROSESOR DETAIL*\n`;
+        response += `├─ Model: ${cpus[0]?.model || 'N/A'}\n`;
+        response += `├─ Cores: ${cpus.length}\n`;
+        response += `├─ Speed: ${cpus[0]?.speed || 'N/A'} MHz\n`;
+        response += `└─ Architecture: ${architecture}\n\n`;
+        
+        response += `🌡️ *THERMAL & SENSOR*\n`;
+        if (thermalInfo.stdout.includes('Sensor tidak tersedia')) {
+            response += `└─ Sensor thermal tidak tersedia\n\n`;
+        } else {
+            const tempLines = thermalInfo.stdout.split('\n').filter(line => 
+                line.includes('°C') && !line.includes('N/A')
+            ).slice(0, 3);
+            tempLines.forEach(line => {
+                response += `├─ ${line.trim()}\n`;
+            });
+            response += `\n`;
+        }
+        
+        response += `🌐 *JARINGAN & KONEKTIVITAS*\n`;
+        response += `├─ Gateway: ${networkInfo.stdout.split(' ')[2] || 'N/A'}\n`;
+        response += `├─ Interface Aktif: ${Object.keys(networkInterfaces).filter(iface => 
+            networkInterfaces[iface].some(addr => !addr.internal && addr.family === 'IPv4')
+        ).join(', ') || 'N/A'}\n`;
+        response += getNetworkInterfaces();
+        response += `\n`;
+        
+        response += `📊 *STATISTIK JARINGAN*\n`;
+        const netLines = networkStats.stdout.split('\n').slice(2, 5);
+        netLines.forEach(line => {
+            if (line.trim() && !line.includes('lo:')) {
+                const parts = line.trim().split(/\s+/);
+                if (parts.length >= 10) {
+                    const iface = parts[0].replace(':', '');
+                    const rxBytes = formatBytes(parseInt(parts[1]) || 0);
+                    const txBytes = formatBytes(parseInt(parts[9]) || 0);
+                    response += `├─ ${iface}: RX ${rxBytes}, TX ${txBytes}\n`;
+                }
             }
+        });
+        response += `\n`;
+        
+        response += `🔄 *I/O & DISK PERFORMANCE*\n`;
+        const ioLines = ioInfo.stdout.split('\n').filter(line => 
+            line.includes('sd') || line.includes('nvme') || line.includes('vd')
+        ).slice(0, 3);
+        ioLines.forEach(line => {
+            if (line.trim()) {
+                const parts = line.trim().split(/\s+/);
+                if (parts.length >= 10) {
+                    response += `├─ ${parts[0]}: Read ${parts[5]}KB/s, Write ${parts[6]}KB/s, Util ${parts[9]}%\n`;
+                }
+            }
+        });
+        if (ioLines.length === 0) {
+            response += `└─ Data I/O tidak tersedia\n`;
+        }
+        response += `\n`;
+        
+        response += `📈 *TOP PROCESSES (CPU)*\n`;
+        response += getTopProcesses(processInfo.stdout);
+        response += `\n`;
+        
+        response += `🔧 *SISTEM TUNING*\n`;
+        try {
+            const { stdout: vmstat } = await execAsync('cat /proc/vmstat | grep -E "nr_dirty|nr_writeback"');
+            const { stdout: schedstat } = await execAsync('cat /proc/schedstat | head -1');
+            response += `├─ VM Stats: ${vmstat.replace(/\n/g, ', ')}\n`;
+            response += `└─ Scheduler: ${schedstat.trim().split(' ').slice(0, 3).join(' ')}\n\n`;
+        } catch {
+            response += `└─ VM Stats tidak tersedia\n\n`;
+        }
+        
+        response += `⚡ *KINERJA REAL-TIME*\n`;
+        const memPercent = getMemoryUsagePercent();
+        const diskPercent = diskUsage[4] ? diskUsage[4].replace('%', '') : '0';
+        
+        const getStatus = (value, thresholds) => {
+            if (value < thresholds[0]) return '🟢 Optimal';
+            if (value < thresholds[1]) return '🟡 Normal';
+            return '🔴 Tinggi';
         };
         
-        const getLoadAverage = () => {
-            const loads = os.loadavg();
-            return {
-                '1min': loads[0].toFixed(2),
-                '5min': loads[1].toFixed(2),
-                '15min': loads[2].toFixed(2)
-            };
-        };
+        response += `├─ CPU: ${getStatus(parseFloat(cpuUsage) || 0, [50, 80])}\n`;
+        response += `├─ Memory: ${getStatus(parseFloat(memPercent), [70, 90])}\n`;
+        response += `├─ Disk: ${getStatus(parseFloat(diskPercent), [80, 95])}\n`;
+        response += `├─ Network: ${getStatus(pingLatency !== 'N/A' ? parseFloat(pingLatency) : 0, [100, 300])}\n`;
+        response += `└─ Overall: ${responseTime < 1000 ? '🟢 Excellent' : responseTime < 3000 ? '🟡 Good' : '🔴 Slow'}\n\n`;
         
-        const memInfo = process.memoryUsage();
-        const totalMem = os.totalmem();
-        const freeMem = os.freemem();
-        const usedMem = totalMem - freeMem;
-        const cpuInfo = os.cpus()[0];
-        const storageInfo = getStorageInfo();
-        const networkInfo = getNetworkInfo();
-        const loadAvg = getLoadAverage();
-        const cpuUsage = getCpuUsage();
+        response += `📋 *RINGKASAN TEKNIS*\n`;
+        response += `├─ Node.js: ${process.version}\n`;
+        response += `├─ Process ID: ${process.pid}\n`;
+        response += `├─ Process Uptime: ${formatUptime(process.uptime())}\n`;
+        response += `├─ Memory Usage: ${formatBytes(process.memoryUsage().rss)}\n`;
+        response += `└─ Working Directory: ${process.cwd()}\n\n`;
         
-        const systemInfo = `🖥️ *SYSTEM SPECIFICATIONS & PERFORMANCE*
-
-⚡ *RESPONSE TIME*
-├ Bot Response: ${responseTime.toFixed(2)}ms
-├ System Latency: ${process.hrtime.bigint() ? 'Active' : 'Unknown'}
-└ API Status: ✅ Online
-
-🔧 *HARDWARE SPECIFICATIONS*
-├ Architecture: ${os.arch()} (${process.arch})
-├ Platform: ${os.platform()} ${os.release()}
-├ Hostname: ${os.hostname()}
-├ Endianness: ${os.endianness()}
-└ CPU Cores: ${os.cpus().length} cores
-
-🧠 *PROCESSOR DETAILS*
-├ Model: ${cpuInfo.model}
-├ Speed: ${cpuInfo.speed} MHz
-├ Current Usage: ${formatPercentage(cpuUsage)}
-├ Load Average:
-│  ├ 1 min: ${loadAvg['1min']}
-│  ├ 5 min: ${loadAvg['5min']}
-│  └ 15 min: ${loadAvg['15min']}
-└ Architecture: ${process.arch}
-
-💾 *MEMORY INFORMATION*
-├ Total RAM: ${formatBytes(totalMem)}
-├ Used RAM: ${formatBytes(usedMem)} (${formatPercentage(usedMem/totalMem)})
-├ Free RAM: ${formatBytes(freeMem)} (${formatPercentage(freeMem/totalMem)})
-├ Process Memory:
-│  ├ RSS: ${formatBytes(memInfo.rss)}
-│  ├ Heap Total: ${formatBytes(memInfo.heapTotal)}
-│  ├ Heap Used: ${formatBytes(memInfo.heapUsed)}
-│  ├ External: ${formatBytes(memInfo.external)}
-│  └ Array Buffers: ${formatBytes(memInfo.arrayBuffers || 0)}
-└ Memory Usage: ${formatPercentage(memInfo.heapUsed/memInfo.heapTotal)}
-
-💿 *STORAGE INFORMATION*
-├ Total Space: ${storageInfo.total}
-├ Used Space: ${storageInfo.used}
-├ Free Space: ${storageInfo.free}
-├ Usage: ${storageInfo.usagePercent}
-└ File System: ${process.platform === 'linux' ? 'ext4/xfs' : 'Unknown'}
-
-🌐 *NETWORK CONFIGURATION*
-${networkInfo.length > 0 ? networkInfo.map((net, i) => 
-`├ Interface ${i + 1}: ${net.interface}
-│  ├ IP Address: ${net.ip}
-│  ├ Subnet Mask: ${net.netmask}
-│  └ MAC Address: ${net.mac}`).join('\n') : '├ No active interfaces detected'}
-└ Hostname Resolution: ${os.hostname()}
-
-⏱️ *UPTIME STATISTICS*
-├ Process Uptime: ${formatUptime(uptime)}
-├ System Uptime: ${formatUptime(sysUptime)}
-├ Node.js Version: ${process.version}
-├ Process ID: ${process.pid}
-├ Parent PID: ${process.ppid || 'N/A'}
-└ Working Directory: ${process.cwd()}
-
-🔐 *SECURITY & ENVIRONMENT*
-├ User ID: ${process.getuid ? process.getuid() : 'N/A'}
-├ Group ID: ${process.getgid ? process.getgid() : 'N/A'}
-├ Process Title: ${process.title}
-├ Environment: ${process.env.NODE_ENV || 'development'}
-└ Execution Path: ${process.execPath}
-
-🏷️ *PROCESS DETAILS*
-├ Arguments: ${process.argv.slice(2).join(' ') || 'None'}
-├ Features: ${process.features ? Object.keys(process.features).join(', ') : 'Standard'}
-├ Module Paths: ${process.config?.variables?.node_module_version || 'Unknown'}
-└ Binary Version: ${process.versions.node}
-
-📊 *RUNTIME VERSIONS*
-├ Node.js: ${process.versions.node}
-├ V8 Engine: ${process.versions.v8}
-├ UV Library: ${process.versions.uv}
-├ Zlib: ${process.versions.zlib}
-├ OpenSSL: ${process.versions.openssl}
-├ ICU: ${process.versions.icu || 'Not available'}
-├ Unicode: ${process.versions.unicode || 'Unknown'}
-└ Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}
-
-📈 *PERFORMANCE METRICS*
-├ CPU Model: ${cpuInfo.model}
-├ CPU Speed: ${cpuInfo.speed} MHz
-├ CPU Usage: ${formatPercentage(cpuUsage)}
-├ Memory Efficiency: ${formatPercentage(1 - (memInfo.heapUsed/memInfo.heapTotal))}
-├ System Load: ${loadAvg['1min']} (1min avg)
-├ Response Time: ${responseTime.toFixed(2)}ms
-└ Timestamp: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}
-
-🔄 *SYSTEM HEALTH*
-├ Status: ${cpuUsage < 0.8 && (usedMem/totalMem) < 0.9 ? '🟢 Healthy' : '🟡 Warning'}
-├ CPU Health: ${cpuUsage < 0.8 ? '✅ Normal' : '⚠️ High Usage'}
-├ Memory Health: ${(usedMem/totalMem) < 0.9 ? '✅ Normal' : '⚠️ High Usage'}
-├ Storage Health: ${!storageInfo.usagePercent.includes('9') ? '✅ Normal' : '⚠️ Low Space'}
-└ Network Health: ${networkInfo.length > 0 ? '✅ Connected' : '⚠️ Limited'}`;
-
-        await reply(systemInfo);
+        response += `⏱️ *Scan completed in ${responseTime}ms*`;
+        
+        await reply(response);
         
     } catch (error) {
-        await reply(`❌ Error getting system info: ${error.message}`);
+        await reply(`❌ Error: ${error.message}\nResponse time: ${Date.now() - startTime}ms`);
     }
 };
