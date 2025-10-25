@@ -1,64 +1,68 @@
 import axios from "axios";
 
-export default async function ({ sock, m }) {
+export default async function ({ reply }) {
+    const repoOwner = "ikyyyofc";
+    const repoName = "selfbot";
+    const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}`;
+    const repoUrl = `https://github.com/${repoOwner}/${repoName}`;
+
     try {
-        const owner = "ikyyyofc";
-        const repo = "selfbot";
+        const { data } = await axios.get(apiUrl);
 
-        const { data } = await axios.get(
-            `https://api.github.com/repos/${owner}/${repo}`
-        );
+        const manualDesc = `
+Source code ini dibuat pake Node.js dengan library utama @whiskeysockets/baileys. Didesain buat jadi self-bot yang ringan, modular, dan gampang di-custom.
 
-        const stars = data.stargazers_count || 0;
-        const forks = data.forks_count || 0;
-        const watchers = data.watchers_count || 0;
-        const issues = data.open_issues_count || 0;
-        const size = (data.size / 1024).toFixed(2);
-        const language = data.language || "Unknown";
-        const license = data.license?.name || "No License";
-        const created = new Date(data.created_at).toLocaleDateString("id-ID");
-        const updated = new Date(data.updated_at).toLocaleDateString("id-ID");
-        const description = data.description || "No description available";
-        const homepage = data.homepage || "-";
-        const topics = data.topics?.join(", ") || "-";
-        const defaultBranch = data.default_branch || "main";
-        const isPrivate = data.private ? "Yes" : "No";
-        const hasWiki = data.has_wiki ? "Yes" : "No";
-        const hasPages = data.has_pages ? "Yes" : "No";
+*Fitur Keren:*
+- Modular (sistem plugin)
+- Anti-Delete & Anti-Edit
+- Group Metadata Caching (biar bot cepet)
+- Session Cleaner (otomatis biar ga bengkak)
+- Integrasi Gemini AI
+- Modern (ESM, async/await)
 
-        const message = `╭━━━『 *REPO INFO* 』━━━╮
-│
-│ 📦 *Name:* ${data.name}
-│ 👤 *Owner:* ${data.owner.login}
-│ 📝 *Description:* ${description}
-│
-│ ⭐ *Stars:* ${stars}
-│ 🍴 *Forks:* ${forks}
-│ 👀 *Watchers:* ${watchers}
-│ 🐛 *Open Issues:* ${issues}
-│
-│ 💾 *Size:* ${size} MB
-│ 🔤 *Language:* ${language}
-│ 📜 *License:* ${license}
-│ 🌿 *Default Branch:* ${defaultBranch}
-│
-│ 🔒 *Private:* ${isPrivate}
-│ 📚 *Wiki:* ${hasWiki}
-│ 📄 *Pages:* ${hasPages}
-│
-│ 🏷️ *Topics:* ${topics}
-│ 🌐 *Homepage:* ${homepage}
-│
-│ 📅 *Created:* ${created}
-│ 🔄 *Last Updated:* ${updated}
-│
-│ 🔗 *URL:* ${data.html_url}
-│ 📥 *Clone:* ${data.clone_url}
-│
-╰━━━━━━━━━━━━━━━━━━━━━╯`;
+Cocok buat yang suka ngoprek atau mau bikin bot pribadi yang gak ribet.
+        `;
 
-        await m.reply(message);
+        const lastUpdate = new Date(data.pushed_at).toLocaleString("id-ID", {
+            timeZone: "Asia/Jakarta",
+            dateStyle: "medium",
+            timeStyle: "short"
+        });
+
+        const message = `
+🤖 *${data.full_name}* 🤖
+
+${data.description || "Ga ada deskripsi dari sananya."}
+
+⭐ *Stars:* ${data.stargazers_count}
+🍴 *Forks:* ${data.forks_count}
+👀 *Watchers:* ${data.watchers_count}
+⚠️ *Open Issues:* ${data.open_issues_count}
+📄 *License:* ${data.license ? data.license.name : "Not specified"}
+⏰ *Last Update:* ${lastUpdate} WIB
+
+🔗 *URL:*
+${data.html_url}
+
+---
+*📝 Catatan Tambahan dari Ikyy:*
+${manualDesc.trim()}
+        `.trim();
+
+        await reply(message);
     } catch (error) {
-        await m.reply(`❌ Error: ${error.message}`);
+        console.error("Gagal fetch info repo:", error.message);
+        const fallbackMessage = `
+Waduh, sorry, gagal ngambil data dari API GitHub. 😭 Kayaknya lagi ada masalah.
+
+Tapi tenang, ini info manualnya:
+
+*Repository:* ikyyyofc/selfbot
+*URL:* ${repoUrl}
+
+Ini adalah source code buat self-bot WhatsApp yang gue pake sekarang. Dibangun pake Node.js dan Baileys, fokusnya biar enteng dan gampang dioprek. Kalo mau liat-liat, langsung aja ke link di atas ya!
+        `.trim();
+
+        await reply(fallbackMessage);
     }
 }
