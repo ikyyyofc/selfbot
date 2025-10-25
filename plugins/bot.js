@@ -2,6 +2,7 @@
 import axios from "axios";
 import upload from "../lib/upload.js";
 import util from "util";
+import gmn from "../lib/gemini.js";
 
 async function displayFilesInFolder(folderPath, options = {}) {
     const fs = await import("fs/promises");
