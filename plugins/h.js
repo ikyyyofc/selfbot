@@ -1,96 +1,63 @@
-// plugins/hidetag.js
-export default async function ({ sock, from, args, text, m, isGroup, reply, fileBuffer }) {
-  try {
-    if (!isGroup) return await reply('❌ Perintah ini hanya bisa dipakai di grup.');
+export default async (context) => {
+    const { sock, m, text, groupCache } = context;
 
-    // Ambil metadata grup untuk daftar peserta
-    const metadata = await sock.groupMetadata(from);
-    const participants = (metadata?.participants || []).map(p => p.id);
-
-    if (!participants.length) return await reply('❌ Tidak menemukan peserta grup.');
-
-    // Cek apakah ada pesan yang dikutip (quoted)
-    const quoted =
-      m?.message?.extendedTextMessage?.contextInfo?.quotedMessage || null;
-
-    // Pesan yang ingin dikirim (jika user menuliskan teks setelah perintah)
-    const bodyText = text?.trim() || " ";
-
-    // Fungsi bantu untuk mengirim pesan dengan mentions
-    const sendWithMentions = async (msg) => {
-      await sock.sendMessage(from, { ...msg, mentions: participants }, { quoted: m });
-    };
-
-    // Jika ada quoted message, coba kirim ulang jenis media yang sesuai
-    if (quoted) {
-      // IMAGE
-      if (quoted.imageMessage) {
-        return await sendWithMentions({ image: fileBuffer || quoted.imageMessage, caption: bodyText });
-      }
-
-      // VIDEO
-      if (quoted.videoMessage) {
-        return await sendWithMentions({ video: fileBuffer || quoted.videoMessage, caption: bodyText });
-      }
-
-      // STICKER
-      if (quoted.stickerMessage) {
-        return await sendWithMentions({ sticker: fileBuffer || quoted.stickerMessage });
-      }
-
-      // AUDIO
-      if (quoted.audioMessage) {
-        return await sendWithMentions({ audio: fileBuffer || quoted.audioMessage, mimetype: 'audio/mp4' });
-      }
-
-      // DOCUMENT
-      if (quoted.documentMessage) {
-        const doc = quoted.documentMessage;
-        return await sendWithMentions({
-          document: fileBuffer || doc,
-          fileName: doc.fileName || 'file',
-          mimetype: doc.mimetype || 'application/octet-stream',
-          caption: bodyText
-        });
-      }
-
-      // Jika quoted cuma teks, kirim teks dengan mention
-      const quotedText =
-        quoted?.conversation || quoted?.extendedTextMessage?.text || bodyText;
-      return await sendWithMentions({ text: quotedText });
+    if (!m.isGroup) {
+        return m.reply("Fitur ini cuma buat di grup, bukan PC.");
     }
 
-    // Jika tidak ada quoted, kirim teks biasa dengan mention
-    if (!fileBuffer) {
-      return await sendWithMentions({ text: bodyText });
-    }
+    try {
+        const metadata = await groupCache.fetch(sock, m.chat, true);
+        const participants = metadata.participants.map(p => p.id);
 
-    // Jika ada fileBuffer (media) di message saat ini, kirim sesuai tipe pesan saat ini
-    // coba deteksi tipe lewat isi m.message
-    const currentMsg = m?.message || {};
-    if (currentMsg.imageMessage) {
-      return await sendWithMentions({ image: fileBuffer, caption: bodyText });
-    }
-    if (currentMsg.videoMessage) {
-      return await sendWithMentions({ video: fileBuffer, caption: bodyText });
-    }
-    if (currentMsg.stickerMessage) {
-      return await sendWithMentions({ sticker: fileBuffer });
-    }
-    if (currentMsg.documentMessage) {
-      const doc = currentMsg.documentMessage;
-      return await sendWithMentions({
-        document: fileBuffer,
-        fileName: doc.fileName || 'file',
-        mimetype: doc.mimetype || 'application/octet-stream',
-        caption: bodyText
-      });
-    }
+        const source = m.quoted || m;
+        const caption = text.trim() || source.text || "";
 
-    // Fallback: kirim teks dengan mention
-    await sendWithMentions({ text: bodyText });
-  } catch (e) {
-    console.error('hidetag plugin error:', e);
-    await reply('❌ Terjadi kesalahan: ' + (e.message || e.toString()));
-  }
-}
+        if (source.isMedia) {
+            const buffer = await source.download();
+            if (!buffer) {
+                return m.reply("Gagal download media, coba lagi nanti.");
+            }
+
+            const type = source.type;
+            let message = {};
+
+            if (['imageMessage', 'videoMessage', 'documentMessage'].includes(type)) {
+                if (type === 'imageMessage') {
+                    message.image = buffer;
+                } else if (type === 'videoMessage') {
+                    message.video = buffer;
+                } else {
+                    message.document = buffer;
+                    message.mimetype = source.msg.mimetype;
+                    message.fileName = source.msg.fileName;
+                }
+                message.caption = caption;
+                message.mentions = participants;
+
+                await sock.sendMessage(m.chat, message);
+
+            } else {
+                // For media without captions like sticker/audio
+                let mediaMessage = {};
+                if (type === 'stickerMessage') {
+                    mediaMessage.sticker = buffer;
+                } else if (type === 'audioMessage') {
+                    mediaMessage.audio = buffer;
+                    mediaMessage.mimetype = 'audio/mp4';
+                }
+
+                await sock.sendMessage(m.chat, mediaMessage);
+                await sock.sendMessage(m.chat, { text: caption, mentions: participants });
+            }
+        } else {
+            // Handle text-only hidetag
+            if (!caption) {
+                return m.reply("Kasih teks atau reply pesan yang mau di-hidetag dong.");
+            }
+            await sock.sendMessage(m.chat, { text: caption, mentions: participants });
+        }
+    } catch (e) {
+        console.error("Error di plugin hidetag:", e);
+        m.reply("Waduh, ada error. Coba cek log deh.");
+    }
+};
