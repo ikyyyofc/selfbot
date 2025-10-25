@@ -161,7 +161,3 @@ function extractCodeFromMarkdown(text) {
     // Jika lebih dari satu, return array
     return matches.length === 1 ? matches[0] : matches;
 }
-
-
-
-perbaiki kode ini
