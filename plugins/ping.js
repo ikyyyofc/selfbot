@@ -1,80 +1,204 @@
 import os from "os";
 import fs from "fs";
-import { exec } from "child_process";
-import { promisify } from "util";
-
-const execAsync = promisify(exec);
+import { execSync } from "child_process";
 
 export default async ({ m, reply }) => {
-    const startTime = Date.now();
-
+    const startTime = process.hrtime.bigint();
+    
     try {
-        const pingResult = await Promise.race([
-            execAsync("ping -c 1 8.8.8.8"),
-            new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("Timeout")), 5000)
-            )
-        ]);
-
-        const diskInfo = await execAsync("df -h /").catch(() => ({
-            stdout: "N/A"
-        }));
-        const memInfo = await execAsync("free -h").catch(() => ({
-            stdout: "N/A"
-        }));
-        const cpuInfo = await execAsync("lscpu").catch(() => ({
-            stdout: "N/A"
-        }));
-        const uptimeInfo = await execAsync("uptime -p").catch(() => ({
-            stdout: "N/A"
-        }));
-        const networkInfo = await execAsync("ip route | grep default").catch(
-            () => ({ stdout: "N/A" })
-        );
-        const processInfo = await execAsync(
-            "ps aux --sort=-%cpu | head -10"
-        ).catch(() => ({ stdout: "N/A" }));
-        const kernelInfo = await execAsync("uname -a").catch(() => ({
-            stdout: "N/A"
-        }));
-        const thermalInfo = await execAsync("sensors").catch(() => ({
-            stdout: "Sensor tidak tersedia"
-        }));
-        const ioInfo = await execAsync("iostat -x 1 1").catch(() => ({
-            stdout: "N/A"
-        }));
-        const networkStats = await execAsync("cat /proc/net/dev").catch(() => ({
-            stdout: "N/A"
-        }));
-
-        const endTime = Date.now();
-        const responseTime = endTime - startTime;
-
-        const platform = os.platform();
-        const architecture = os.arch();
-        const hostname = os.hostname();
-        const release = os.release();
-        const type = os.type();
-        const uptime = os.uptime();
-        const totalMem = os.totalmem();
-        const freeMem = os.freemem();
-        const usedMem = totalMem - freeMem;
-        const cpus = os.cpus();
-        const loadAvg = os.loadavg();
-        const networkInterfaces = os.networkInterfaces();
-
-        const formatBytes = bytes => {
-            const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
-            if (bytes === 0) return "0 Bytes";
-            const i = Math.floor(Math.log(bytes) / Math.log(1024));
-            return (
-                Math.round((bytes / Math.pow(1024, i)) * 100) / 100 +
-                " " +
-                sizes[i]
-            );
+        const getSystemInfo = () => {
+            try {
+                return {
+                    hostname: os.hostname(),
+                    platform: os.platform(),
+                    arch: os.arch(),
+                    release: os.release(),
+                    version: os.version(),
+                    type: os.type(),
+                    endianness: os.endianness(),
+                    homedir: os.homedir(),
+                    tmpdir: os.tmpdir(),
+                    uptime: os.uptime(),
+                    loadavg: os.loadavg(),
+                    totalmem: os.totalmem(),
+                    freemem: os.freemem(),
+                    cpus: os.cpus(),
+                    networkInterfaces: os.networkInterfaces(),
+                    userInfo: os.userInfo()
+                };
+            } catch (e) {
+                return { error: e.message };
+            }
         };
 
-        const formatUptime = seconds => {
+        const getProcessInfo = () => {
+            try {
+                const usage = process.memoryUsage();
+                const resourceUsage = process.resourceUsage ? process.resourceUsage() : {};
+                
+                return {
+                    pid: process.pid,
+                    ppid: process.ppid,
+                    platform: process.platform,
+                    arch: process.arch,
+                    version: process.version,
+                    versions: process.versions,
+                    execPath: process.execPath,
+                    execArgv: process.execArgv,
+                    argv: process.argv,
+                    env: {
+                        NODE_ENV: process.env.NODE_ENV,
+                        PATH: process.env.PATH?.split(':').length || 0,
+                        HOME: process.env.HOME,
+                        USER: process.env.USER,
+                        SHELL: process.env.SHELL,
+                        TERM: process.env.TERM,
+                        PWD: process.env.PWD
+                    },
+                    cwd: process.cwd(),
+                    uptime: process.uptime(),
+                    memoryUsage: usage,
+                    resourceUsage: resourceUsage,
+                    features: process.features || {},
+                    config: process.config || {}
+                };
+            } catch (e) {
+                return { error: e.message };
+            }
+        };
+
+        const getFileSystemInfo = () => {
+            try {
+                const stats = {};
+                const paths = ['/', '/tmp', '/var', '/home', process.cwd()];
+                
+                paths.forEach(path => {
+                    try {
+                        if (fs.existsSync(path)) {
+                            const stat = fs.statSync(path);
+                            stats[path] = {
+                                size: stat.size,
+                                mode: stat.mode,
+                                uid: stat.uid,
+                                gid: stat.gid,
+                                atime: stat.atime,
+                                mtime: stat.mtime,
+                                ctime: stat.ctime,
+                                birthtime: stat.birthtime,
+                                isDirectory: stat.isDirectory(),
+                                isFile: stat.isFile()
+                            };
+                        }
+                    } catch (e) {
+                        stats[path] = { error: e.message };
+                    }
+                });
+
+                return stats;
+            } catch (e) {
+                return { error: e.message };
+            }
+        };
+
+        const getSystemCommands = () => {
+            const commands = {
+                'uname -a': 'uname -a',
+                'cat /proc/version': 'cat /proc/version',
+                'cat /etc/os-release': 'cat /etc/os-release',
+                'cat /proc/cpuinfo | head -20': 'cat /proc/cpuinfo | head -20',
+                'cat /proc/meminfo': 'cat /proc/meminfo',
+                'df -h': 'df -h',
+                'free -h': 'free -h',
+                'ps aux | head -10': 'ps aux | head -10',
+                'netstat -tuln | head -10': 'netstat -tuln | head -10',
+                'lscpu': 'lscpu',
+                'lsb_release -a': 'lsb_release -a',
+                'whoami': 'whoami',
+                'id': 'id',
+                'env | head -10': 'env | head -10',
+                'cat /proc/loadavg': 'cat /proc/loadavg',
+                'uptime': 'uptime'
+            };
+
+            const results = {};
+            
+            Object.entries(commands).forEach(([name, cmd]) => {
+                try {
+                    results[name] = execSync(cmd, { 
+                        encoding: 'utf8', 
+                        timeout: 5000,
+                        maxBuffer: 1024 * 1024
+                    }).trim();
+                } catch (e) {
+                    results[name] = `Error: ${e.message}`;
+                }
+            });
+
+            return results;
+        };
+
+        const getDockerInfo = () => {
+            try {
+                const dockerVersion = execSync('docker --version', { encoding: 'utf8', timeout: 3000 }).trim();
+                const dockerInfo = execSync('docker info --format "{{json .}}"', { encoding: 'utf8', timeout: 5000 });
+                const containers = execSync('docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"', { encoding: 'utf8', timeout: 3000 }).trim();
+                
+                return {
+                    version: dockerVersion,
+                    info: JSON.parse(dockerInfo),
+                    containers: containers
+                };
+            } catch (e) {
+                return { error: e.message };
+            }
+        };
+
+        const getNetworkInfo = () => {
+            try {
+                const results = {};
+                
+                try {
+                    results.publicIP = execSync('curl -s ifconfig.me || curl -s ipinfo.io/ip', { 
+                        encoding: 'utf8', 
+                        timeout: 5000 
+                    }).trim();
+                } catch (e) {
+                    results.publicIP = `Error: ${e.message}`;
+                }
+
+                try {
+                    results.routing = execSync('ip route | head -5', { 
+                        encoding: 'utf8', 
+                        timeout: 3000 
+                    }).trim();
+                } catch (e) {
+                    results.routing = `Error: ${e.message}`;
+                }
+
+                try {
+                    results.dns = execSync('cat /etc/resolv.conf', { 
+                        encoding: 'utf8', 
+                        timeout: 3000 
+                    }).trim();
+                } catch (e) {
+                    results.dns = `Error: ${e.message}`;
+                }
+
+                return results;
+            } catch (e) {
+                return { error: e.message };
+            }
+        };
+
+        const formatBytes = (bytes) => {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        };
+
+        const formatUptime = (seconds) => {
             const days = Math.floor(seconds / 86400);
             const hours = Math.floor((seconds % 86400) / 3600);
             const minutes = Math.floor((seconds % 3600) / 60);
@@ -82,260 +206,177 @@ export default async ({ m, reply }) => {
             return `${days}d ${hours}h ${minutes}m ${secs}s`;
         };
 
-        const getPingLatency = pingOutput => {
-            const match = pingOutput.match(/time=([0-9.]+)\s*ms/);
-            return match ? parseFloat(match[1]) : "N/A";
-        };
+        await m.react("🔄");
 
-        const getMemoryUsagePercent = () => {
-            return ((usedMem / totalMem) * 100).toFixed(2);
-        };
+        const systemInfo = getSystemInfo();
+        const processInfo = getProcessInfo();
+        const fileSystemInfo = getFileSystemInfo();
+        const systemCommands = getSystemCommands();
+        const dockerInfo = getDockerInfo();
+        const networkInfo = getNetworkInfo();
 
-        const getCpuUsage = async () => {
-            try {
-                const { stdout } = await execAsync(
-                    "top -bn1 | grep 'Cpu(s)' | awk '{print $2}' | cut -d'%' -f1"
-                );
-                return stdout.trim() || "N/A";
-            } catch {
-                return "N/A";
-            }
-        };
+        const endTime = process.hrtime.bigint();
+        const responseTime = Number(endTime - startTime) / 1000000;
 
-        const getSwapInfo = async () => {
-            try {
-                const { stdout } = await execAsync("free -h | grep Swap");
-                return stdout.trim() || "Tidak ada swap";
-            } catch {
-                return "N/A";
-            }
-        };
+        let result = `🚀 *SYSTEM SPECIFICATIONS & PERFORMANCE*\n`;
+        result += `═══════════════════════════════════════\n\n`;
 
-        const getDiskUsage = diskOutput => {
-            const lines = diskOutput.split("\n");
-            const rootLine = lines.find(
-                line => line.includes("/") && line.includes("%")
-            );
-            return rootLine ? rootLine.split(/\s+/) : ["N/A"];
-        };
+        result += `⚡ *RESPONSE TIME*\n`;
+        result += `├─ Response: ${responseTime.toFixed(2)} ms\n`;
+        result += `├─ Process Uptime: ${formatUptime(processInfo.uptime)}\n`;
+        result += `└─ System Uptime: ${formatUptime(systemInfo.uptime)}\n\n`;
 
-        const getNetworkInterfaces = () => {
-            let interfaceInfo = "";
-            Object.keys(networkInterfaces).forEach(interface => {
-                const addresses = networkInterfaces[interface];
-                interfaceInfo += `\n   🔌 ${interface}:\n`;
-                addresses.forEach(addr => {
-                    if (addr.family === "IPv4") {
-                        interfaceInfo += `      IPv4: ${addr.address}/${addr.netmask}\n`;
-                        interfaceInfo += `      MAC: ${addr.mac}\n`;
-                        interfaceInfo += `      Internal: ${
-                            addr.internal ? "Ya" : "Tidak"
-                        }\n`;
-                    }
-                });
+        result += `🖥️ *OPERATING SYSTEM*\n`;
+        result += `├─ Hostname: ${systemInfo.hostname}\n`;
+        result += `├─ Platform: ${systemInfo.platform}\n`;
+        result += `├─ Architecture: ${systemInfo.arch}\n`;
+        result += `├─ OS Type: ${systemInfo.type}\n`;
+        result += `├─ OS Release: ${systemInfo.release}\n`;
+        result += `├─ OS Version: ${systemInfo.version}\n`;
+        result += `├─ Endianness: ${systemInfo.endianness}\n`;
+        result += `├─ Home Directory: ${systemInfo.homedir}\n`;
+        result += `└─ Temp Directory: ${systemInfo.tmpdir}\n\n`;
+
+        result += `💾 *MEMORY & STORAGE*\n`;
+        result += `├─ Total Memory: ${formatBytes(systemInfo.totalmem)}\n`;
+        result += `├─ Free Memory: ${formatBytes(systemInfo.freemem)}\n`;
+        result += `├─ Used Memory: ${formatBytes(systemInfo.totalmem - systemInfo.freemem)}\n`;
+        result += `├─ Memory Usage: ${(((systemInfo.totalmem - systemInfo.freemem) / systemInfo.totalmem) * 100).toFixed(2)}%\n`;
+        result += `├─ Process RSS: ${formatBytes(processInfo.memoryUsage.rss)}\n`;
+        result += `├─ Process Heap Used: ${formatBytes(processInfo.memoryUsage.heapUsed)}\n`;
+        result += `├─ Process Heap Total: ${formatBytes(processInfo.memoryUsage.heapTotal)}\n`;
+        result += `├─ Process External: ${formatBytes(processInfo.memoryUsage.external)}\n`;
+        result += `└─ Process Array Buffers: ${formatBytes(processInfo.memoryUsage.arrayBuffers)}\n\n`;
+
+        result += `🔧 *CPU INFORMATION*\n`;
+        result += `├─ CPU Count: ${systemInfo.cpus.length} cores\n`;
+        result += `├─ CPU Model: ${systemInfo.cpus[0]?.model || 'Unknown'}\n`;
+        result += `├─ CPU Speed: ${systemInfo.cpus[0]?.speed || 'Unknown'} MHz\n`;
+        result += `├─ Load Average: [${systemInfo.loadavg.map(avg => avg.toFixed(2)).join(', ')}]\n`;
+        
+        systemInfo.cpus.forEach((cpu, index) => {
+            const total = Object.values(cpu.times).reduce((acc, time) => acc + time, 0);
+            const idle = cpu.times.idle;
+            const usage = ((total - idle) / total * 100).toFixed(2);
+            result += `├─ Core ${index}: ${usage}% usage\n`;
+        });
+        result += `\n`;
+
+        result += `🌐 *NETWORK INTERFACES*\n`;
+        Object.entries(systemInfo.networkInterfaces).forEach(([name, interfaces]) => {
+            result += `├─ ${name}:\n`;
+            interfaces.forEach((iface, index) => {
+                result += `│  ├─ [${index}] ${iface.family}: ${iface.address}\n`;
+                result += `│  ├─ Netmask: ${iface.netmask}\n`;
+                result += `│  ├─ MAC: ${iface.mac}\n`;
+                result += `│  └─ Internal: ${iface.internal}\n`;
             });
-            return interfaceInfo;
-        };
+        });
+        result += `\n`;
 
-        const getTopProcesses = processOutput => {
-            const lines = processOutput.split("\n").slice(1, 6);
-            let processInfo = "";
-            lines.forEach((line, index) => {
-                if (line.trim()) {
-                    const parts = line.split(/\s+/);
-                    if (parts.length >= 11) {
-                        processInfo += `   ${index + 1}. ${parts[10]} (CPU: ${
-                            parts[2]
-                        }%, MEM: ${parts[3]}%)\n`;
-                    }
-                }
-            });
-            return processInfo || "N/A";
-        };
+        result += `🔒 *USER & PERMISSIONS*\n`;
+        result += `├─ Username: ${systemInfo.userInfo.username}\n`;
+        result += `├─ UID: ${systemInfo.userInfo.uid}\n`;
+        result += `├─ GID: ${systemInfo.userInfo.gid}\n`;
+        result += `├─ Home: ${systemInfo.userInfo.homedir}\n`;
+        result += `└─ Shell: ${systemInfo.userInfo.shell}\n\n`;
 
-        const cpuUsage = await getCpuUsage();
-        const swapInfo = await getSwapInfo();
-        const diskUsage = getDiskUsage(diskInfo.stdout);
-        const pingLatency = getPingLatency(pingResult.stdout);
+        result += `⚙️ *NODE.JS PROCESS*\n`;
+        result += `├─ Process ID: ${processInfo.pid}\n`;
+        result += `├─ Parent PID: ${processInfo.ppid}\n`;
+        result += `├─ Node Version: ${processInfo.version}\n`;
+        result += `├─ V8 Version: ${processInfo.versions.v8}\n`;
+        result += `├─ UV Version: ${processInfo.versions.uv}\n`;
+        result += `├─ Zlib Version: ${processInfo.versions.zlib}\n`;
+        result += `├─ OpenSSL Version: ${processInfo.versions.openssl}\n`;
+        result += `├─ HTTP Parser: ${processInfo.versions.http_parser}\n`;
+        result += `├─ ICU Version: ${processInfo.versions.icu || 'N/A'}\n`;
+        result += `├─ Executable Path: ${processInfo.execPath}\n`;
+        result += `├─ Working Directory: ${processInfo.cwd}\n`;
+        result += `├─ Arguments: ${processInfo.argv.length} args\n`;
+        result += `└─ Environment Variables: ${Object.keys(process.env).length} vars\n\n`;
 
-        let response = `🤖 *SISTEM MONITORING LENGKAP*\n\n`;
-
-        response += `⚡ *PERFORMA & RESPONS*\n`;
-        response += `├─ Response Time: ${responseTime}ms\n`;
-        response += `├─ Ping Latency: ${pingLatency}ms\n`;
-        response += `├─ Load Average: ${loadAvg[0].toFixed(
-            2
-        )}, ${loadAvg[1].toFixed(2)}, ${loadAvg[2].toFixed(2)}\n`;
-        response += `└─ CPU Usage: ${cpuUsage}%\n\n`;
-
-        response += `💻 *SISTEM OPERASI*\n`;
-        response += `├─ Platform: ${platform}\n`;
-        response += `├─ Type: ${type}\n`;
-        response += `├─ Architecture: ${architecture}\n`;
-        response += `├─ Release: ${release}\n`;
-        response += `├─ Hostname: ${hostname}\n`;
-        response += `├─ Kernel: ${kernelInfo.stdout.split("\n")[0] || "N/A"}\n`;
-        response += `└─ Uptime: ${formatUptime(uptime)}\n\n`;
-
-        response += `🧠 *MEMORI & STORAGE*\n`;
-        response += `├─ Total RAM: ${formatBytes(totalMem)}\n`;
-        response += `├─ Used RAM: ${formatBytes(
-            usedMem
-        )} (${getMemoryUsagePercent()}%)\n`;
-        response += `├─ Free RAM: ${formatBytes(freeMem)}\n`;
-        response += `├─ Swap: ${swapInfo}\n`;
-        response += `├─ Disk Usage: ${diskUsage[4] || "N/A"} used of ${
-            diskUsage[1] || "N/A"
-        }\n`;
-        response += `└─ Disk Available: ${diskUsage[3] || "N/A"}\n\n`;
-
-        response += `⚙️ *PROSESOR DETAIL*\n`;
-        response += `├─ Model: ${cpus[0]?.model || "N/A"}\n`;
-        response += `├─ Cores: ${cpus.length}\n`;
-        response += `├─ Speed: ${cpus[0]?.speed || "N/A"} MHz\n`;
-        response += `└─ Architecture: ${architecture}\n\n`;
-
-        response += `🌡️ *THERMAL & SENSOR*\n`;
-        if (thermalInfo.stdout.includes("Sensor tidak tersedia")) {
-            response += `└─ Sensor thermal tidak tersedia\n\n`;
+        result += `📊 *RESOURCE USAGE*\n`;
+        if (processInfo.resourceUsage.userCPUTime) {
+            result += `├─ User CPU Time: ${processInfo.resourceUsage.userCPUTime}\n`;
+            result += `├─ System CPU Time: ${processInfo.resourceUsage.systemCPUTime}\n`;
+            result += `├─ Max RSS: ${formatBytes(processInfo.resourceUsage.maxRSS * 1024)}\n`;
+            result += `├─ Shared Memory: ${formatBytes(processInfo.resourceUsage.sharedMemorySize * 1024)}\n`;
+            result += `├─ Unshared Data: ${formatBytes(processInfo.resourceUsage.unsharedDataSize * 1024)}\n`;
+            result += `├─ Unshared Stack: ${formatBytes(processInfo.resourceUsage.unsharedStackSize * 1024)}\n`;
+            result += `├─ Minor Page Faults: ${processInfo.resourceUsage.minorPageFault}\n`;
+            result += `├─ Major Page Faults: ${processInfo.resourceUsage.majorPageFault}\n`;
+            result += `├─ Swaps: ${processInfo.resourceUsage.swappedOut}\n`;
+            result += `├─ File System Inputs: ${processInfo.resourceUsage.fsRead}\n`;
+            result += `├─ File System Outputs: ${processInfo.resourceUsage.fsWrite}\n`;
+            result += `├─ IPC Messages Sent: ${processInfo.resourceUsage.ipcSent}\n`;
+            result += `├─ IPC Messages Received: ${processInfo.resourceUsage.ipcReceived}\n`;
+            result += `├─ Signals Received: ${processInfo.resourceUsage.signalsCount}\n`;
+            result += `└─ Context Switches: ${processInfo.resourceUsage.voluntaryContextSwitches + processInfo.resourceUsage.involuntaryContextSwitches}\n\n`;
         } else {
-            const tempLines = thermalInfo.stdout
-                .split("\n")
-                .filter(line => line.includes("°C") && !line.includes("N/A"))
-                .slice(0, 3);
-            tempLines.forEach(line => {
-                response += `├─ ${line.trim()}\n`;
+            result += `└─ Resource usage data not available\n\n`;
+        }
+
+        result += `📁 *FILE SYSTEM ANALYSIS*\n`;
+        Object.entries(fileSystemInfo).forEach(([path, info]) => {
+            if (info.error) {
+                result += `├─ ${path}: Error - ${info.error}\n`;
+            } else {
+                result += `├─ ${path}:\n`;
+                result += `│  ├─ Type: ${info.isDirectory ? 'Directory' : 'File'}\n`;
+                result += `│  ├─ Size: ${formatBytes(info.size)}\n`;
+                result += `│  ├─ Mode: ${info.mode.toString(8)}\n`;
+                result += `│  ├─ UID/GID: ${info.uid}/${info.gid}\n`;
+                result += `│  ├─ Access Time: ${info.atime.toISOString()}\n`;
+                result += `│  ├─ Modified Time: ${info.mtime.toISOString()}\n`;
+                result += `│  ├─ Changed Time: ${info.ctime.toISOString()}\n`;
+                result += `│  └─ Birth Time: ${info.birthtime.toISOString()}\n`;
+            }
+        });
+        result += `\n`;
+
+        result += `🌐 *NETWORK CONFIGURATION*\n`;
+        result += `├─ Public IP: ${networkInfo.publicIP}\n`;
+        result += `├─ DNS Configuration:\n${networkInfo.dns.split('\n').map(line => `│  ${line}`).join('\n')}\n`;
+        result += `├─ Routing Table:\n${networkInfo.routing.split('\n').map(line => `│  ${line}`).join('\n')}\n\n`;
+
+        if (!dockerInfo.error) {
+            result += `🐳 *DOCKER INFORMATION*\n`;
+            result += `├─ Version: ${dockerInfo.version}\n`;
+            result += `├─ Server Version: ${dockerInfo.info.ServerVersion}\n`;
+            result += `├─ Storage Driver: ${dockerInfo.info.Driver}\n`;
+            result += `├─ Containers: ${dockerInfo.info.Containers}\n`;
+            result += `├─ Running: ${dockerInfo.info.ContainersRunning}\n`;
+            result += `├─ Paused: ${dockerInfo.info.ContainersPaused}\n`;
+            result += `├─ Stopped: ${dockerInfo.info.ContainersStopped}\n`;
+            result += `├─ Images: ${dockerInfo.info.Images}\n`;
+            result += `├─ CPUs: ${dockerInfo.info.NCPU}\n`;
+            result += `├─ Total Memory: ${formatBytes(dockerInfo.info.MemTotal)}\n`;
+            result += `├─ Docker Root Dir: ${dockerInfo.info.DockerRootDir}\n`;
+            result += `└─ Container List:\n${dockerInfo.containers.split('\n').map(line => `   ${line}`).join('\n')}\n\n`;
+        }
+
+        result += `🔧 *SYSTEM COMMANDS OUTPUT*\n`;
+        Object.entries(systemCommands).forEach(([cmd, output]) => {
+            result += `├─ ${cmd}:\n`;
+            const lines = output.split('\n').slice(0, 5);
+            lines.forEach(line => {
+                result += `│  ${line}\n`;
             });
-            response += `\n`;
-        }
-
-        response += `🌐 *JARINGAN & KONEKTIVITAS*\n`;
-        response += `├─ Gateway: ${
-            networkInfo.stdout.split(" ")[2] || "N/A"
-        }\n`;
-        response += `├─ Interface Aktif: ${
-            Object.keys(networkInterfaces)
-                .filter(iface =>
-                    networkInterfaces[iface].some(
-                        addr => !addr.internal && addr.family === "IPv4"
-                    )
-                )
-                .join(", ") || "N/A"
-        }\n`;
-        response += getNetworkInterfaces();
-        response += `\n`;
-
-        response += `📊 *STATISTIK JARINGAN*\n`;
-        const netLines = networkStats.stdout.split("\n").slice(2, 5);
-        netLines.forEach(line => {
-            if (line.trim() && !line.includes("lo:")) {
-                const parts = line.trim().split(/\s+/);
-                if (parts.length >= 10) {
-                    const iface = parts[0].replace(":", "");
-                    const rxBytes = formatBytes(parseInt(parts[1]) || 0);
-                    const txBytes = formatBytes(parseInt(parts[9]) || 0);
-                    response += `├─ ${iface}: RX ${rxBytes}, TX ${txBytes}\n`;
-                }
+            if (output.split('\n').length > 5) {
+                result += `│  ... (truncated)\n`;
             }
         });
-        response += `\n`;
 
-        response += `🔄 *I/O & DISK PERFORMANCE*\n`;
-        const ioLines = ioInfo.stdout
-            .split("\n")
-            .filter(
-                line =>
-                    line.includes("sd") ||
-                    line.includes("nvme") ||
-                    line.includes("vd")
-            )
-            .slice(0, 3);
-        ioLines.forEach(line => {
-            if (line.trim()) {
-                const parts = line.trim().split(/\s+/);
-                if (parts.length >= 10) {
-                    response += `├─ ${parts[0]}: Read ${parts[5]}KB/s, Write ${parts[6]}KB/s, Util ${parts[9]}%\n`;
-                }
-            }
-        });
-        if (ioLines.length === 0) {
-            response += `└─ Data I/O tidak tersedia\n`;
-        }
-        response += `\n`;
+        result += `\n═══════════════════════════════════════\n`;
+        result += `📊 Generated in ${responseTime.toFixed(2)}ms\n`;
+        result += `🕐 ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}`;
 
-        response += `📈 *TOP PROCESSES (CPU)*\n`;
-        response += getTopProcesses(processInfo.stdout);
-        response += `\n`;
+        await reply(result);
+        await m.react("✅");
 
-        response += `🔧 *SISTEM TUNING*\n`;
-        try {
-            const { stdout: vmstat } = await execAsync(
-                'cat /proc/vmstat | grep -E "nr_dirty|nr_writeback"'
-            );
-            const { stdout: schedstat } = await execAsync(
-                "cat /proc/schedstat | head -1"
-            );
-            response += `├─ VM Stats: ${vmstat.replace(/\n/g, ", ")}\n`;
-            response += `└─ Scheduler: ${schedstat
-                .trim()
-                .split(" ")
-                .slice(0, 3)
-                .join(" ")}\n\n`;
-        } catch {
-            response += `└─ VM Stats tidak tersedia\n\n`;
-        }
-
-        response += `⚡ *KINERJA REAL-TIME*\n`;
-        const memPercent = getMemoryUsagePercent();
-        const diskPercent = diskUsage[4] ? diskUsage[4].replace("%", "") : "0";
-
-        const getStatus = (value, thresholds) => {
-            if (value < thresholds[0]) return "🟢 Optimal";
-            if (value < thresholds[1]) return "🟡 Normal";
-            return "🔴 Tinggi";
-        };
-
-        response += `├─ CPU: ${getStatus(
-            parseFloat(cpuUsage) || 0,
-            [50, 80]
-        )}\n`;
-        response += `├─ Memory: ${getStatus(
-            parseFloat(memPercent),
-            [70, 90]
-        )}\n`;
-        response += `├─ Disk: ${getStatus(
-            parseFloat(diskPercent),
-            [80, 95]
-        )}\n`;
-        response += `├─ Network: ${getStatus(
-            pingLatency !== "N/A" ? parseFloat(pingLatency) : 0,
-            [100, 300]
-        )}\n`;
-        response += `└─ Overall: ${
-            responseTime < 1000
-                ? "🟢 Excellent"
-                : responseTime < 3000
-                ? "🟡 Good"
-                : "🔴 Slow"
-        }\n\n`;
-
-        response += `📋 *RINGKASAN TEKNIS*\n`;
-        response += `├─ Node.js: ${process.version}\n`;
-        response += `├─ Process ID: ${process.pid}\n`;
-        response += `├─ Process Uptime: ${formatUptime(process.uptime())}\n`;
-        response += `├─ Memory Usage: ${formatBytes(
-            process.memoryUsage().rss
-        )}\n`;
-        response += `└─ Working Directory: ${process.cwd()}\n\n`;
-
-        response += `⏱️ *Scan completed in ${responseTime}ms*`;
-
-        await reply(response);
     } catch (error) {
-        await reply(
-            `❌ Error: ${error.message}\nResponse time: ${
-                Date.now() - startTime
-            }ms`
-        );
+        await m.react("❌");
+        await reply(`❌ Error generating system info: ${error.message}`);
     }
 };
