@@ -1,65 +1,59 @@
 import ffmpeg from 'fluent-ffmpeg';
-import fs from 'fs/promises';
-import path from 'path';
+import { Readable } from 'stream';
 
-/**
- * @param {import('../lib/MessageHandler').Context} context
- */
 export default async ({ sock, m, reply }) => {
-    const tempDir = 'tmp';
-    const randomId = Date.now();
-    const webpPath = path.join(tempDir, `${randomId}.webp`);
-    const mp4Path = path.join(tempDir, `${randomId}.mp4`);
-
     try {
-        const quotedMessage = m.quoted?.message;
-        if (!quotedMessage?.stickerMessage) {
-            await reply('Woi, reply stiker geraknya dong.');
-            return;
+        // Cek kalo user udah reply ke stiker atau belum
+        if (!m.quoted) {
+            return await reply('Reply ke stiker gerak yang mau dijadiin video, ya.');
         }
 
-        if (!quotedMessage.stickerMessage.isAnimated) {
-            await reply('Ini stiker biasa, bukan yang gerak. Gabisa.');
-            return;
+        // Pastiin yang di-reply itu stiker gerak
+        const isAnimatedSticker = m.quoted.type === 'stickerMessage' && m.quoted.msg.isAnimated;
+        if (!isAnimatedSticker) {
+            return await reply('Ini bukan stiker gerak, coba yang lain.');
         }
 
+        // Download stikernya
         const stickerBuffer = await m.quoted.download();
         if (!stickerBuffer) {
-            await reply('Gagal download stikernya, coba lagi ntar.');
-            return;
+            throw new Error('Gagal download stikernya, coba lagi nanti.');
         }
 
-        await fs.mkdir(tempDir, { recursive: true });
-        await fs.writeFile(webpPath, stickerBuffer);
+        // Bikin stream dari buffer stiker
+        const inputStream = new Readable();
+        inputStream.push(stickerBuffer);
+        inputStream.push(null);
 
-        await new Promise((resolve, reject) => {
-            ffmpeg(webpPath)
-                .outputOptions([
-                    "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2",
-                    "-pix_fmt", "yuv420p"
-                ])
+        // Proses konversi pake ffmpeg
+        const videoBuffer = await new Promise((resolve, reject) => {
+            const stream = ffmpeg(inputStream)
+                .inputFormat('webp')
+                .outputOptions('-pix_fmt yuv420p') // Biar kompatibel di banyak perangkat
                 .toFormat('mp4')
-                .save(mp4Path)
-                .on('end', resolve)
-                .on('error', reject);
+                .on('error', (err) => {
+                    console.error('FFmpeg Error:', err.message);
+                    reject(new Error('Gagal konversi videonya. Mungkin stikernya corrupt.'));
+                })
+                .pipe();
+
+            const chunks = [];
+            stream.on('data', chunk => chunks.push(chunk));
+            stream.on('end', () => resolve(Buffer.concat(chunks)));
+            stream.on('error', reject);
         });
 
-        const videoBuffer = await fs.readFile(mp4Path);
-
+        // Kirim hasilnya
         await sock.sendMessage(m.chat, {
             video: videoBuffer,
-            caption: 'Nih, jadi video.'
-        }, { quoted: m });
+            mimetype: 'video/mp4',
+            caption: 'Nih, videonya udah jadi! ✨'
+        }, {
+            quoted: m
+        });
 
     } catch (error) {
-        console.error('Error in tovideo plugin:', error);
-        await reply(`Anjir, error: ${error.message}`);
-    } finally {
-        try {
-            await fs.unlink(webpPath);
-            await fs.unlink(mp4Path);
-        } catch (cleanupError) {
-            console.error('Gagal hapus file temporary:', cleanupError.message);
-        }
+        console.error('Error di plugin tovid:', error);
+        await reply(`Waduh, error nih: ${error.message}`);
     }
 };
