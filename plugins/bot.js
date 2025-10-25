@@ -136,7 +136,7 @@ jika membuat kode, ingatlah untuk membuat kode yang simpel, efisien, dan minimal
     } catch (error) {
         console.error("Error saat memanggil Claude API:", error);
         await reply(
-            `Terjadi kesalahan saat berkomunikasi dengan AI: ${error.response}`
+            `Terjadi kesalahan saat berkomunikasi dengan AI: ${error.response.data}`
         );
     }
 }
