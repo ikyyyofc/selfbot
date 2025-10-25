@@ -72,7 +72,7 @@ async function addPrompt() {
   return await displayFilesInFolder("./", {
             skipDirs: ["session", "plugins"],
             excludeExtensions: [".md", ".gitignore", ".gitkeep"],
-            skipFiles: ["package-lock.json", "help"]
+            skipFiles: ["package-lock.json", "help", ".gitkeep"]
         })
 }
 export default async function ({ sock, m, text, fileBuffer, reply }) {
