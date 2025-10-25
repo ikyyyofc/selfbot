@@ -1,68 +1,64 @@
-import axios from "axios";
+import axios from 'axios';
 
-export default async function ({ reply }) {
-    const repoOwner = "ikyyyofc";
-    const repoName = "selfbot";
-    const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}`;
-    const repoUrl = `https://github.com/${repoOwner}/${repoName}`;
+export default async function({
+    m,
+    reply
+}) {
+    const owner = 'ikyyyofc';
+    const repo = 'selfbot';
 
     try {
-        const { data } = await axios.get(apiUrl);
+        const apiUrl = `https://api.github.com/repos/${owner}/${repo}`;
+        const {
+            data
+        } = await axios.get(apiUrl);
+
+        const repoName = data.name;
+        const description = data.description || 'Gaada deskripsi, tapi yang pasti keren.';
+        const url = data.html_url;
+        const stars = data.stargazers_count;
+        const forks = data.forks_count;
+        const language = data.language;
+        const author = data.owner.login;
 
         const manualDesc = `
-Source code ini dibuat pake Node.js dengan library utama @whiskeysockets/baileys. Didesain buat jadi self-bot yang ringan, modular, dan gampang di-custom.
+Source code ini dibuat pake cinta dan kopi ☕. Bot ini ringan, efisien, dan gampang di-custom. Dibuat pake Baileys versi terbaru, jadi support fitur-fitur WhatsApp paling update.
 
 *Fitur Keren:*
-- Modular (sistem plugin)
+-  modular (gampang nambahin plugin)
 - Anti-Delete & Anti-Edit
-- Group Metadata Caching (biar bot cepet)
-- Session Cleaner (otomatis biar ga bengkak)
-- Integrasi Gemini AI
-- Modern (ESM, async/await)
+- Manajemen Sesi Otomatis
+- Support Gemini AI
+- Logging Pesan yang Detail
 
-Cocok buat yang suka ngoprek atau mau bikin bot pribadi yang gak ribet.
-        `;
+Kalau suka sama project ini, jangan lupa kasih bintang ya di GitHub! Biar ownernya makin semangat ngembangin. Thanks!`;
 
-        const lastUpdate = new Date(data.pushed_at).toLocaleString("id-ID", {
-            timeZone: "Asia/Jakarta",
-            dateStyle: "medium",
-            timeStyle: "short"
-        });
+        let response = `🤖 *Source Code Bot* 🤖
 
-        const message = `
-🤖 *${data.full_name}* 🤖
+✨ *Repository:*
+   - *Nama:* ${repoName}
+   - *Author:* @${author}
+   - *URL:* ${url}
 
-${data.description || "Ga ada deskripsi dari sananya."}
+📊 *Statistik:*
+   - ⭐ *Bintang:* ${stars}
+   - 🍴 *Forks:* ${forks}
+   - 💻 *Bahasa:* ${language}
 
-⭐ *Stars:* ${data.stargazers_count}
-🍴 *Forks:* ${data.forks_count}
-👀 *Watchers:* ${data.watchers_count}
-⚠️ *Open Issues:* ${data.open_issues_count}
-📄 *License:* ${data.license ? data.license.name : "Not specified"}
-⏰ *Last Update:* ${lastUpdate} WIB
+📝 *Deskripsi:*
+${description}
+${manualDesc}`;
 
-🔗 *URL:*
-${data.html_url}
+        await reply(response);
 
----
-*📝 Catatan Tambahan dari Ikyy:*
-${manualDesc.trim()}
-        `.trim();
-
-        await reply(message);
     } catch (error) {
-        console.error("Gagal fetch info repo:", error.message);
-        const fallbackMessage = `
-Waduh, sorry, gagal ngambil data dari API GitHub. 😭 Kayaknya lagi ada masalah.
+        console.error("Gagal fetch data dari GitHub:", error.message);
+        const fallbackResponse = `Yah, gagal ngambil data dari GitHub. Coba lagi nanti ya.
 
-Tapi tenang, ini info manualnya:
+Tapi intinya, source code bot ini ada di:
+https://github.com/ikyyyofc/selfbot
 
-*Repository:* ikyyyofc/selfbot
-*URL:* ${repoUrl}
-
-Ini adalah source code buat self-bot WhatsApp yang gue pake sekarang. Dibangun pake Node.js dan Baileys, fokusnya biar enteng dan gampang dioprek. Kalo mau liat-liat, langsung aja ke link di atas ya!
-        `.trim();
-
-        await reply(fallbackMessage);
+Dibuat sama *ikyyofc*, jangan lupa mampir dan kasih bintang! ⭐`;
+        await reply(fallbackResponse);
     }
 }
