@@ -1,10 +1,9 @@
 export default async function ({ sock, text, reply, m }) {
     try {
         if (!text) return reply("judulnya apa anjir");
-        reply("wet...");
         let proses = await (
             await fetch(
-                `https://api.nekolabs.my.id/downloader/youtube/play/v1?q=${text}`
+                `https://api.nekolabs.web.id/downloader/youtube/play/v1?q=${text}`
             )
         ).json();
         if (!proses.success) return reply("gagal jir");
