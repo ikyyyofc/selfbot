@@ -111,7 +111,7 @@ jika membuat kode, ingatlah untuk membuat kode yang simpel, efisien, dan minimal
 
     try {
         const response = await axios.post(
-            "https://api.nekolabs.my.id/ai/claude/sonnet-4",
+            "https://api.nekolabs.web.id/ai/claude/sonnet-4",
             payload
         );
 
