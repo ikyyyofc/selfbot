@@ -105,19 +105,19 @@ export default async function ({ sock, m, text, fileBuffer, reply }) {
         `
     };
 
-    /*if (q.type.includes("image") && fileBuffer) {
+    if (q.type.includes("image") && fileBuffer) {
         let img = await upload(fileBuffer);
         payload.imageUrl = img;
-    }*/
+    }
 
     try {
-        /*const response = (
+        const response = (
             await axios.post(
                 "https://api.nekolabs.web.id/ai/claude/sonnet-4",
                 payload
             )
-        ).data.result;*/
-        const response = await gmn([{role:"system",content:payload.systemPrompt}, {role:"user", content:payload.text}], fileBuffer)
+        ).data.result;
+        /*const response = await gmn([{role:"system",content:payload.systemPrompt}, {role:"user", content:payload.text}], fileBuffer)*/
 
         if (response) {
             let check_code = extractCodeFromMarkdown(response);
