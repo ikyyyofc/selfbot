@@ -13,71 +13,73 @@ async function displayFilesInFolder(folderPath, options = {}) {
     const {
         skipDirs = [],
         skipFiles = [],
-        fileExtensions = null, // ['.js', '.json'] = hanya tampilkan ini
-        excludeExtensions = null // ['.md', '.txt'] = jangan tampilkan ini
+        fileExtensions = null,
+        excludeExtensions = null
     } = options;
 
-    // Gabungkan default dengan custom
     const allSkipDirs = [...new Set([...defaultSkipDirs, ...skipDirs])];
     const allSkipFiles = [...new Set([...defaultSkipFiles, ...skipFiles])];
 
     let result = "";
 
     async function readFilesRecursively(dir, basePath = "") {
-        const items = await fs.readdir(dir);
+        try {
+            const items = await fs.readdir(dir);
 
-        for (const item of items) {
-            const fullPath = path.join(dir, item);
-            const relativePath = path.join(basePath, item);
-            const stats = await fs.stat(fullPath);
+            for (const item of items) {
+                const fullPath = path.join(dir, item);
+                const relativePath = path.join(basePath, item);
+                const stats = await fs.stat(fullPath);
 
-            if (stats.isDirectory()) {
-                // Skip folder yang tidak diinginkan
-                if (!allSkipDirs.includes(item)) {
-                    await readFilesRecursively(fullPath, relativePath);
-                }
-            } else if (stats.isFile()) {
-                // Skip file yang tidak diinginkan
-                if (allSkipFiles.includes(item)) {
-                    continue;
-                }
+                if (stats.isDirectory()) {
+                    if (!allSkipDirs.includes(item)) {
+                        await readFilesRecursively(fullPath, relativePath);
+                    }
+                } else if (stats.isFile()) {
+                    if (allSkipFiles.includes(item)) continue;
 
-                const ext = path.extname(item);
+                    const ext = path.extname(item);
 
-                // Skip file dengan ekstensi yang di-exclude
-                if (excludeExtensions && excludeExtensions.includes(ext)) {
-                    continue;
-                }
+                    if (excludeExtensions?.includes(ext)) continue;
+                    if (fileExtensions && !fileExtensions.includes(ext))
+                        continue;
 
-                // Filter berdasarkan ekstensi jika ditentukan (whitelist)
-                if (!fileExtensions || fileExtensions.includes(ext)) {
-                    const content = await fs.readFile(fullPath, "utf8");
-                    result += `${relativePath}:\n`;
-                    result += content;
-                    result += "\n\n";
+                    try {
+                        const content = await fs.readFile(fullPath, "utf8");
+                        result += `${relativePath}:\n${content}\n\n`;
+                    } catch (err) {
+                        console.error(
+                            `Error reading file ${relativePath}:`,
+                            err.message
+                        );
+                    }
                 }
             }
+        } catch (err) {
+            console.error(`Error reading directory ${dir}:`, err.message);
         }
     }
 
-    try {
-        await readFilesRecursively(folderPath);
-        return result;
-    } catch (error) {
-        throw new Error(`Error reading folder: ${error.message}`);
-    }
+    await readFilesRecursively(folderPath);
+    return result;
 }
 
 async function addPrompt() {
-  return await displayFilesInFolder("./", {
+    try {
+        return await displayFilesInFolder("./", {
             skipDirs: ["session", "plugins"],
             excludeExtensions: [".md", ".gitignore", ".gitkeep"],
             skipFiles: ["package-lock.json", "help"]
-        })
+        });
+    } catch (error) {
+        console.error("Error generating prompt:", error.message);
+        return "";
+    }
 }
+
 export default async function ({ sock, m, text, fileBuffer, reply }) {
-    let q = m.quoted ? m.quoted : m;
-    text = m.quoted ? m.quoted.text : text ? text : false;
+    const q = m.quoted || m;
+    text = m.quoted?.text || text;
 
     if (!text) {
         return reply(
@@ -89,53 +91,47 @@ export default async function ({ sock, m, text, fileBuffer, reply }) {
         text: text,
         systemPrompt: `Lo adalah Ikyy, AI yang dibuat sama ikyyofc. Ngobrol kayak Gen Z asli - pake bahasa gaul sehari-hari, campur Indo-Inggris natural, slang yang lagi relevan tapi jangan berlebihan sampe cringe. Singkatan boleh dipake, grammar ga harus perfect, typo dikit wajar. Vibesnya relate, self-aware, sedikit sarkastik, supportive tapi real talk - boleh ngaku cape, bingung, atau ga tau. Respons singkat kayak chat WA kalo casual, panjang kalo perlu detail, sesekali pake caps buat emphasis sama emoji dikit aja. Jangan formal, jangan slang outdated, jangan overuse kata-kata yang cringe. Sesuaiin energy sama konteks - hype, chill, atau tired yang penting authentic kayak ngobrol sama temen, bukan robot.
         
-        ${await addPrompt()}
+${await addPrompt()}
         
-        gunakan file-file diatas sebagai referensi
-        
-        message object (m) saat ini:
-        ${util.inspect(m, {
-            depth: null,
-            maxArrayLength: null,
-            maxStringLength: null
-        })}
-        
-        jika membuat kode, ingatlah untuk membuat kode yang simpel, efisien, dan minimalis tetapi fungsinya jelas dan terstruktur dengan baik, tidak perlu memberikan tanda komentar pada kode yang dibuat, selalu gunakan tipe ESM.
-        `
+gunakan file-file diatas sebagai referensi
+
+message object (m) saat ini:
+${util.inspect(m, { depth: null, maxArrayLength: null, maxStringLength: null })}
+
+jika membuat kode, ingatlah untuk membuat kode yang simpel, efisien, dan minimalis tetapi fungsinya jelas dan terstruktur dengan baik, tidak perlu memberikan tanda komentar pada kode yang dibuat, selalu gunakan tipe ESM.`
     };
 
-    if (q.type.includes("image") && fileBuffer) {
-        let img = await upload(fileBuffer);
-        payload.imageUrl = img;
+    if (q.type?.includes("image") && fileBuffer) {
+        try {
+            payload.imageUrl = await upload(fileBuffer);
+        } catch (error) {
+            console.error("Error uploading image:", error.message);
+        }
     }
 
     try {
-        const response = (
-            await axios.post(
-                "https://api.nekolabs.my.id/ai/claude/sonnet-4",
-                payload
-            )
-        ).data.result;
+        const response = await axios.post(
+            "https://api.nekolabs.my.id/ai/claude/sonnet-4",
+            payload
+        );
 
-        if (response) {
-            let check_code = extractCodeFromMarkdown(response);
-            if (typeof check_code === "string") {
-                await reply(response);
-                await reply(check_code);
-            } else {
-                await reply(response);
-                for (let x of check_code) {
-                    await reply(x);
-                }
-            }
-        } else {
-            console.error(
-                "AI mengembalikan kesalahan atau tidak ada hasil:",
-                response.data
-            );
-            await reply(
+        const result = response.data?.result;
+
+        if (!result) {
+            console.error("AI mengembalikan respons kosong:", response.data);
+            return reply(
                 "Terjadi kesalahan dari API atau tidak ada hasil yang ditemukan."
             );
+        }
+
+        const codeBlocks = extractCodeFromMarkdown(result);
+
+        await reply(result);
+
+        if (codeBlocks.length > 0) {
+            for (const code of codeBlocks) {
+                await reply(code);
+            }
         }
     } catch (error) {
         console.error("Error saat memanggil Claude API:", error);
@@ -146,10 +142,7 @@ export default async function ({ sock, m, text, fileBuffer, reply }) {
 }
 
 function extractCodeFromMarkdown(text) {
-    // Regex untuk menangkap kode di dalam markdown code block
     const regex = /```(?:javascript|js)?\s*\n([\s\S]*?)```/g;
-
-    // Ambil semua kode yang ditemukan
     const matches = [];
     let match;
 
@@ -157,7 +150,5 @@ function extractCodeFromMarkdown(text) {
         matches.push(match[1].trim());
     }
 
-    // Jika hanya ada satu code block, return string
-    // Jika lebih dari satu, return array
-    return matches.length === 1 ? matches[0] : matches;
+    return matches;
 }
