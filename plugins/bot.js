@@ -105,15 +105,15 @@ export default async function ({ sock, m, text, fileBuffer, reply }) {
         `
     };
 
-    if (q.type.includes("image") && fileBuffer) {
+    /*if (q.type.includes("image") && fileBuffer) {
         let img = await upload(fileBuffer);
         payload.imageUrl = img;
-    }
+    }*/
 
     try {
         const response = (
             await axios.post(
-                "https://api.nekolabs.web.id/ai/claude/sonnet-4",
+                "https://api.nekolabs.web.id/ai/gpt/4o-search",
                 payload
             )
         ).data.result;
