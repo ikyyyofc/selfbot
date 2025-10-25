@@ -111,13 +111,13 @@ export default async function ({ sock, m, text, fileBuffer, reply }) {
     }*/
 
     try {
-        const response = (
+        /*const response = (
             await axios.post(
                 "https://api.nekolabs.web.id/ai/claude/3.7-sonnet",
                 payload
             )
-        ).data.result;
-        /*const response = await gmn([{role:"system",content:payload.systemPrompt}, {role:"user", content:payload.text}], fileBuffer)*/
+        ).data.result;*/
+        const response = await gmn([{role:"system",content:payload.systemPrompt}, {role:"user", content:payload.text}], fileBuffer)
 
         if (response) {
             let check_code = extractCodeFromMarkdown(response);
