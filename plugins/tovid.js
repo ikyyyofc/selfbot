@@ -1,59 +1,68 @@
-import ffmpeg from 'fluent-ffmpeg';
-import { Readable } from 'stream';
+import { exec } from "child_process";
+import { promisify } from "util";
+import fs from "fs";
+import path from "path";
+import { fileTypeFromBuffer } from "file-type";
 
-export default async ({ sock, m, reply }) => {
+const execAsync = promisify(exec);
+
+export default async ({ m, reply, fileBuffer }) => {
     try {
-        // Cek kalo user udah reply ke stiker atau belum
-        if (!m.quoted) {
-            return await reply('Reply ke stiker gerak yang mau dijadiin video, ya.');
+        if (!m.quoted || !m.quoted.isMedia) {
+            return await reply("❌ Reply sticker animasi yang mau diubah jadi video!");
         }
 
-        // Pastiin yang di-reply itu stiker gerak
-        const isAnimatedSticker = m.quoted.type === 'stickerMessage' && m.quoted.msg.isAnimated;
-        if (!isAnimatedSticker) {
-            return await reply('Ini bukan stiker gerak, coba yang lain.');
+        const quotedType = Object.keys(m.quoted.message)[0];
+        if (quotedType !== "stickerMessage") {
+            return await reply("❌ Yang di-reply harus sticker!");
         }
 
-        // Download stikernya
-        const stickerBuffer = await m.quoted.download();
-        if (!stickerBuffer) {
-            throw new Error('Gagal download stikernya, coba lagi nanti.');
+        await reply("🔄 Converting animated sticker to video...");
+
+        const buffer = await m.quoted.download();
+        if (!buffer) {
+            return await reply("❌ Gagal download sticker!");
         }
 
-        // Bikin stream dari buffer stiker
-        const inputStream = new Readable();
-        inputStream.push(stickerBuffer);
-        inputStream.push(null);
+        const type = await fileTypeFromBuffer(buffer);
+        if (!type || type.mime !== "image/webp") {
+            return await reply("❌ Format sticker ga valid!");
+        }
 
-        // Proses konversi pake ffmpeg
-        const videoBuffer = await new Promise((resolve, reject) => {
-            const stream = ffmpeg(inputStream)
-                .inputFormat('webp')
-                .outputOptions('-pix_fmt yuv420p') // Biar kompatibel di banyak perangkat
-                .toFormat('mp4')
-                .on('error', (err) => {
-                    console.error('FFmpeg Error:', err.message);
-                    reject(new Error('Gagal konversi videonya. Mungkin stikernya corrupt.'));
-                })
-                .pipe();
+        const tempDir = "./temp";
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+        }
 
-            const chunks = [];
-            stream.on('data', chunk => chunks.push(chunk));
-            stream.on('end', () => resolve(Buffer.concat(chunks)));
-            stream.on('error', reject);
-        });
+        const inputFile = path.join(tempDir, `sticker_${Date.now()}.webp`);
+        const outputFile = path.join(tempDir, `video_${Date.now()}.mp4`);
 
-        // Kirim hasilnya
-        await sock.sendMessage(m.chat, {
+        fs.writeFileSync(inputFile, buffer);
+
+        try {
+            await execAsync(`ffmpeg -i "${inputFile}" -vcodec libx264 -pix_fmt yuv420p -movflags +faststart "${outputFile}"`);
+        } catch (ffmpegError) {
+            fs.unlinkSync(inputFile);
+            return await reply("❌ Sticker ini ga bisa diconvert! Mungkin bukan animated sticker.");
+        }
+
+        if (!fs.existsSync(outputFile)) {
+            fs.unlinkSync(inputFile);
+            return await reply("❌ Gagal convert sticker!");
+        }
+
+        const videoBuffer = fs.readFileSync(outputFile);
+        
+        await m.reply({
             video: videoBuffer,
-            mimetype: 'video/mp4',
-            caption: 'Nih, videonya udah jadi! ✨'
-        }, {
-            quoted: m
+            caption: "✅ Sticker berhasil diubah jadi video!"
         });
+
+        fs.unlinkSync(inputFile);
+        fs.unlinkSync(outputFile);
 
     } catch (error) {
-        console.error('Error di plugin tovid:', error);
-        await reply(`Waduh, error nih: ${error.message}`);
+        console.error("Error in sticker to video:", error);
+        await reply(`❌ Error: ${error.message}`);
     }
 };
