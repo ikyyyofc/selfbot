@@ -1,41 +1,28 @@
 export default async ({ sock, m, reply }) => {
-    const { plugins } = await import("../lib/BotState.js").then(mod => {
-        const state = new mod.default();
-        return { plugins: state.plugins };
-    });
-
-    const config = await import("../config.js").then(m => m.default);
+    const config = (await import("../config.js")).default;
+    const state = (await import("../lib/BotState.js")).default;
     
-    const fs = await import("fs");
-    const path = await import("path");
-    const { fileURLToPath } = await import("url");
-    const { dirname } = await import("path");
-
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = dirname(__filename);
-    const PLUGIN_DIR = path.join(__dirname, "..", "plugins");
-
-    const files = fs.readdirSync(PLUGIN_DIR).filter(f => f.endsWith(".js"));
-    const pluginList = files.map(f => path.basename(f, ".js")).sort();
-
-    const prefix = config.PREFIX[0];
-    const totalPlugins = pluginList.length;
-
-    let menuText = `╭━━━『 ${config.BOT_NAME} 』━━━╮\n`;
-    menuText += `│ 👤 Owner: ${config.OWNER_NAME}\n`;
-    menuText += `│ 📦 Total Plugins: ${totalPlugins}\n`;
-    menuText += `│ 🔑 Prefix: ${prefix}\n`;
-    menuText += `╰━━━━━━━━━━━━━━━╯\n\n`;
-
-    menuText += `╭━━━『 COMMAND LIST 』━━━╮\n`;
+    const plugins = Array.from(state.plugins.keys()).filter(cmd => cmd !== 'menu');
+    const totalPlugins = plugins.length;
     
-    pluginList.forEach((cmd, index) => {
-        menuText += `│ ${index + 1}. ${prefix}${cmd}\n`;
-    });
-    
-    menuText += `╰━━━━━━━━━━━━━━━╯\n\n`;
-    menuText += `💡 cara pake: ${prefix}namacommand\n`;
-    menuText += `📝 contoh: ${prefix}${pluginList[0] || "command"}`;
+    const menuText = `
+╭━━━『 *${config.BOT_NAME}* 』━━━╮
+│ 
+│  👤 *Owner:* ${config.OWNER_NAME}
+│  📦 *Total Commands:* ${totalPlugins}
+│  🔖 *Prefix:* ${config.PREFIX.join(", ")}
+│
+╰━━━━━━━━━━━━━━━╯
+
+╭━━━『 *AVAILABLE COMMANDS* 』━━━╮
+│
+${plugins.map(cmd => `│  ◈ ${cmd}`).join('\n')}
+│
+╰━━━━━━━━━━━━━━━╯
+
+*Usage:* ${config.PREFIX[0]}<command>
+*Example:* ${config.PREFIX[0]}${plugins[0] || 'command'}
+    `.trim();
 
     await reply(menuText);
 };
