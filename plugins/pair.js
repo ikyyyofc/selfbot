@@ -78,6 +78,29 @@ export default async ({ sock, m, args, reply }) => {
             markOnlineOnConnect: false,
             version
         });
+        
+        if (!tempSock.authState.creds.registered) {
+            setTimeout(async () => {
+                try {
+                    const code = await tempSock.requestPairingCode(
+                        cleanNumber
+                    );
+
+                    await reply(
+                        `📱 *Pairing Code*\n\n🔑 Kode: *${code}*\n\n⏰ Masukkan kode ini di WhatsApp kamu:\n1. Buka WhatsApp\n2. Tap Menu (⋮) > Linked Devices\n3. Tap "Link a Device"\n4. Tap "Link with phone number instead"\n5. Masukkan kode: *${code}*\n\n⚠️ Kode berlaku 2 menit!`
+                    );
+                } catch (error) {
+                    await reply(
+                        `❌ *Gagal mendapatkan pairing code!*\n\nError: ${error.message}`
+                    );
+                    if (tempSock) {
+                        tempSock.end();
+                    }
+                    activeSessions.delete(cleanNumber);
+                    cleanupSession(tempSessionDir);
+                }
+            }, 3000);
+        }
 
         tempSock.ev.on("creds.update", saveCreds);
 
@@ -160,29 +183,6 @@ export default async ({ sock, m, args, reply }) => {
                 cleanupSession(tempSessionDir);
             }
         });
-
-        if (!tempSock.authState.creds.registered) {
-            setTimeout(async () => {
-                try {
-                    const code = await tempSock.requestPairingCode(
-                        cleanNumber
-                    );
-
-                    await reply(
-                        `📱 *Pairing Code*\n\n🔑 Kode: *${code}*\n\n⏰ Masukkan kode ini di WhatsApp kamu:\n1. Buka WhatsApp\n2. Tap Menu (⋮) > Linked Devices\n3. Tap "Link a Device"\n4. Tap "Link with phone number instead"\n5. Masukkan kode: *${code}*\n\n⚠️ Kode berlaku 2 menit!`
-                    );
-                } catch (error) {
-                    await reply(
-                        `❌ *Gagal mendapatkan pairing code!*\n\nError: ${error.message}`
-                    );
-                    if (tempSock) {
-                        tempSock.end();
-                    }
-                    activeSessions.delete(cleanNumber);
-                    cleanupSession(tempSessionDir);
-                }
-            }, 3000);
-        }
     } catch (error) {
         clearTimeout(connectionTimeout);
         await reply(`❌ *Terjadi kesalahan!*\n\nError: ${error.message}`);
