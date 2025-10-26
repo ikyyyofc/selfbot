@@ -81,5 +81,12 @@ export default async function ({ sock, m, text, fileBuffer, reply }) {
             "\n\ngunakan file-file diatas sebagai referensi\n\n" +
             "jika membuat kode, ingatlah untuk membuat kode yang simpel, efisien, dan minimalis tetapi fungsinya jelas dan terstruktur dengan baik, tidak perlu memberikan tanda komentar pada kode yang dibuat, selalu gunakan tipe ESM."
     };
-    reply(payload.systemPrompt);
+    if (payload.systemPrompt.length => 65629) {
+      let sistem_split = payload.systemPrompt.split(65629)
+      for (let x of sistem_split) {
+        await reply(x)
+      }
+    } else {
+      reply(payload.systemPrompt)
+    }
 }
