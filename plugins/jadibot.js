@@ -1,162 +1,205 @@
-export default async ({ sock, m, args, text }) => {
-    const { jidNormalizedUser } = await import("@whiskeysockets/baileys");
-    const config = (await import("../config.js")).default;
-    const fs = await import("fs");
-    const path = await import("path");
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+import makeWASocket, {
+    useMultiFileAuthState,
+    makeCacheableSignalKeyStore,
+    fetchLatestWaWebVersion,
+    Browsers,
+    DisconnectReason
+} from "@whiskeysockets/baileys";
+import Pino from "pino";
+import { Boom } from "@hapi/boom";
 
-    const jadibotDir = path.join("jadibot_sessions");
-    const activeSessions = new Map();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
-    if (!fs.existsSync(jadibotDir)) {
-        fs.mkdirSync(jadibotDir, { recursive: true });
+const activeSessions = new Map();
+
+export default async ({ sock, m, args, reply }) => {
+    const targetNumber = args[0];
+
+    if (!targetNumber) {
+        return await reply(
+            "❌ *Format salah!*\n\n📱 Gunakan: .getsession <nomor>\n\n*Contoh:*\n.getsession 628123456789"
+        );
     }
 
-    const command = args[0]?.toLowerCase();
+    const cleanNumber = targetNumber.replace(/[^0-9]/g, "");
 
-    if (!command || command === "help") {
-        const helpText = `*JADIBOT PANEL*
-
-Available Commands:
-• ${config.PREFIX[0]}jadibot start - Start jadibot session
-• ${config.PREFIX[0]}jadibot stop - Stop jadibot session  
-• ${config.PREFIX[0]}jadibot list - List active sessions
-• ${config.PREFIX[0]}jadibot delete - Delete session data
-
-Status: ${activeSessions.size} active session(s)`;
-        return m.reply(helpText);
+    if (cleanNumber.length < 10 || cleanNumber.length > 15) {
+        return await reply("❌ *Nomor tidak valid!*\n\nPastikan nomor yang dimasukkan benar.");
     }
 
-    if (command === "start") {
-        const userSession = path.join(jadibotDir, m.sender.split("@")[0]);
-        
-        if (activeSessions.has(m.sender)) {
-            return m.reply("❌ Kamu sudah punya sesi aktif!");
-        }
+    if (activeSessions.has(m.sender)) {
+        return await reply(
+            "⚠️ *Kamu sudah memiliki sesi aktif!*\n\nTunggu hingga sesi sebelumnya selesai."
+        );
+    }
 
-        if (fs.existsSync(userSession)) {
-            return m.reply("⚠️ Sesi sudah ada! Ketik `.jadibot delete` untuk hapus session lama");
-        }
+    const tempSessionDir = path.join(
+        __dirname,
+        "..",
+        "temp_sessions",
+        `session_${Date.now()}`
+    );
 
-        try {
-            await m.reply("⏳ Memulai jadibot session...");
+    if (!fs.existsSync(path.dirname(tempSessionDir))) {
+        fs.mkdirSync(path.dirname(tempSessionDir), { recursive: true });
+    }
 
-            const { default: makeWASocket, useMultiFileAuthState, Browsers, makeCacheableSignalKeyStore, fetchLatestWaWebVersion } = await import("@whiskeysockets/baileys");
-            const Pino = (await import("pino")).default;
+    await reply(
+        `🔄 *Memulai koneksi...*\n\n📱 Nomor: ${cleanNumber}\n⏳ Tunggu sebentar...`
+    );
 
-            const { version } = await fetchLatestWaWebVersion();
-            const { state, saveCreds } = await useMultiFileAuthState(userSession);
+    activeSessions.set(m.sender, true);
 
-            const jadibotSock = makeWASocket({
-                auth: {
-                    creds: state.creds,
-                    keys: makeCacheableSignalKeyStore(state.keys, Pino().child({ level: "fatal" }))
-                },
-                browser: Browsers.ubuntu("Chrome"),
-                logger: Pino({ level: "silent" }),
-                version,
-                syncFullHistory: false,
-                markOnlineOnConnect: false
-            });
+    let tempSock = null;
+    let connectionTimeout = null;
 
-            if (!jadibotSock.authState.creds.registered) {
-                const code = await jadibotSock.requestPairingCode(m.sender.split("@")[0]);
-                await m.reply(`✅ *PAIRING CODE*\n\n\`\`\`${code}\`\`\`\n\nMasukkan kode ini di WhatsApp kamu untuk jadi bot`);
+    try {
+        const { version } = await fetchLatestWaWebVersion();
+        const { state, saveCreds } = await useMultiFileAuthState(
+            tempSessionDir
+        );
+
+        tempSock = makeWASocket({
+            auth: {
+                creds: state.creds,
+                keys: makeCacheableSignalKeyStore(
+                    state.keys,
+                    Pino().child({ level: "fatal" })
+                )
+            },
+            browser: Browsers.ubuntu("Chrome"),
+            logger: Pino({ level: "silent" }),
+            syncFullHistory: false,
+            markOnlineOnConnect: false,
+            version
+        });
+
+        tempSock.ev.on("creds.update", saveCreds);
+
+        connectionTimeout = setTimeout(async () => {
+            if (tempSock) {
+                tempSock.end();
+            }
+            activeSessions.delete(m.sender);
+            cleanupSession(tempSessionDir);
+            await reply("⏰ *Waktu koneksi habis!*\n\nSilakan coba lagi.");
+        }, 120000);
+
+        tempSock.ev.on("connection.update", async update => {
+            const { connection, lastDisconnect } = update;
+
+            if (connection === "open") {
+                clearTimeout(connectionTimeout);
+
+                await reply(
+                    `✅ *Koneksi berhasil!*\n\n⏳ Mengirim file session dalam 5 detik...`
+                );
+
+                setTimeout(async () => {
+                    try {
+                        const credsPath = path.join(
+                            tempSessionDir,
+                            "creds.json"
+                        );
+
+                        if (!fs.existsSync(credsPath)) {
+                            throw new Error("File creds.json tidak ditemukan");
+                        }
+
+                        const targetJid = `${cleanNumber}@s.whatsapp.net`;
+
+                        await sock.sendMessage(targetJid, {
+                            document: fs.readFileSync(credsPath),
+                            fileName: "creds.json",
+                            mimetype: "application/json",
+                            caption: `✅ *Session Bot WhatsApp*\n\n📱 Nomor: ${cleanNumber}\n⏰ ${new Date().toLocaleString(
+                                "id-ID",
+                                { timeZone: "Asia/Jakarta" }
+                            )}\n\n⚠️ *JANGAN SHARE FILE INI KE SIAPAPUN!*`
+                        });
+
+                        await reply(
+                            `✅ *Session berhasil dikirim!*\n\n📱 Dikirim ke: ${cleanNumber}\n📄 File: creds.json\n\n⚠️ Jangan share file tersebut ke siapapun!`
+                        );
+
+                        tempSock.end();
+                        activeSessions.delete(m.sender);
+                        cleanupSession(tempSessionDir);
+                    } catch (error) {
+                        await reply(
+                            `❌ *Gagal mengirim session!*\n\nError: ${error.message}`
+                        );
+                        tempSock.end();
+                        activeSessions.delete(m.sender);
+                        cleanupSession(tempSessionDir);
+                    }
+                }, 5000);
             }
 
-            jadibotSock.ev.on("creds.update", saveCreds);
+            if (connection === "close") {
+                clearTimeout(connectionTimeout);
+                const statusCode = new Boom(lastDisconnect?.error)?.output
+                    ?.statusCode;
 
-            jadibotSock.ev.on("connection.update", async (update) => {
-                const { connection, lastDisconnect } = update;
-
-                if (connection === "open") {
-                    activeSessions.set(m.sender, jadibotSock);
-                    await sock.sendMessage(m.chat, { 
-                        text: `✅ Jadibot berhasil tersambung!\n\nNomor: ${jadibotSock.user.name}\nStatus: Online` 
-                    });
+                if (
+                    statusCode !== 401 &&
+                    statusCode !== 403 &&
+                    statusCode !== 515
+                ) {
+                    await reply(
+                        "❌ *Koneksi terputus!*\n\nSilakan coba lagi."
+                    );
                 }
 
-                if (connection === "close") {
-                    const { Boom } = await import("@hapi/boom");
-                    const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
+                activeSessions.delete(m.sender);
+                cleanupSession(tempSessionDir);
+            }
+        });
 
-                    if (statusCode === 401 || statusCode === 403) {
-                        fs.rmSync(userSession, { recursive: true, force: true });
-                        await sock.sendMessage(m.chat, { text: "❌ Session invalid, silakan start ulang" });
+        if (!tempSock.authState.creds.registered) {
+            setTimeout(async () => {
+                try {
+                    const code = await tempSock.requestPairingCode(
+                        cleanNumber
+                    );
+
+                    await reply(
+                        `📱 *Pairing Code*\n\n🔑 Kode: *${code}*\n\n⏰ Masukkan kode ini di WhatsApp kamu:\n1. Buka WhatsApp\n2. Tap Menu (⋮) > Linked Devices\n3. Tap "Link a Device"\n4. Tap "Link with phone number instead"\n5. Masukkan kode: *${code}*\n\n⚠️ Kode berlaku 2 menit!`
+                    );
+                } catch (error) {
+                    await reply(
+                        `❌ *Gagal mendapatkan pairing code!*\n\nError: ${error.message}`
+                    );
+                    if (tempSock) {
+                        tempSock.end();
                     }
-
                     activeSessions.delete(m.sender);
+                    cleanupSession(tempSessionDir);
                 }
-            });
-
-            jadibotSock.ev.on("messages.upsert", async ({ messages }) => {
-                const msg = messages[0];
-                if (!msg.message || msg.key.fromMe) return;
-
-                const serialize = (await import("../lib/serialize.js")).default;
-                const serialized = await serialize(msg, jadibotSock);
-
-                if (serialized.text?.startsWith(config.PREFIX[0])) {
-                    await sock.sendMessage(m.chat, { 
-                        text: `📨 Pesan dari jadibot:\n\nDari: ${serialized.pushName}\nPesan: ${serialized.text}` 
-                    });
-                }
-            });
-
-        } catch (error) {
-            await m.reply(`❌ Error: ${error.message}`);
+            }, 3000);
         }
-    }
-
-    if (command === "stop") {
-        const session = activeSessions.get(m.sender);
-        
-        if (!session) {
-            return m.reply("❌ Tidak ada sesi aktif");
+    } catch (error) {
+        clearTimeout(connectionTimeout);
+        await reply(`❌ *Terjadi kesalahan!*\n\nError: ${error.message}`);
+        if (tempSock) {
+            tempSock.end();
         }
-
-        try {
-            await session.logout();
-            activeSessions.delete(m.sender);
-            await m.reply("✅ Jadibot session dihentikan");
-        } catch (error) {
-            await m.reply(`❌ Error: ${error.message}`);
-        }
-    }
-
-    if (command === "list") {
-        if (activeSessions.size === 0) {
-            return m.reply("📊 Tidak ada sesi aktif");
-        }
-
-        let list = "*ACTIVE JADIBOT SESSIONS*\n\n";
-        let index = 1;
-
-        for (const [user, session] of activeSessions) {
-            const number = user.split("@")[0];
-            const name = session.user?.name || "Unknown";
-            list += `${index}. @${number}\n   Name: ${name}\n   Status: Online\n\n`;
-            index++;
-        }
-
-        await m.reply(list);
-    }
-
-    if (command === "delete") {
-        const userSession = path.join(jadibotDir, m.sender.split("@")[0]);
-
-        if (activeSessions.has(m.sender)) {
-            return m.reply("⚠️ Stop session dulu dengan `.jadibot stop`");
-        }
-
-        if (!fs.existsSync(userSession)) {
-            return m.reply("❌ Tidak ada session data");
-        }
-
-        try {
-            fs.rmSync(userSession, { recursive: true, force: true });
-            await m.reply("✅ Session data berhasil dihapus");
-        } catch (error) {
-            await m.reply(`❌ Error: ${error.message}`);
-        }
+        activeSessions.delete(m.sender);
+        cleanupSession(tempSessionDir);
     }
 };
+
+function cleanupSession(sessionDir) {
+    try {
+        if (fs.existsSync(sessionDir)) {
+            fs.rmSync(sessionDir, { recursive: true, force: true });
+        }
+    } catch (error) {
+        console.error("Failed to cleanup session:", error.message);
+    }
+}
