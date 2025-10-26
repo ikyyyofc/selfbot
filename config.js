@@ -1,4 +1,21 @@
 // config.js
+import { format } from 'util';
+
+const jsonFormat = obj => {
+    try {
+        let print =
+            obj &&
+            (obj.constructor.name === "Object" ||
+                obj.constructor.name === "Array")
+                ? format(JSON.stringify(obj, null, 2))
+                : format(obj);
+        return print;
+    } catch {
+        return format(obj);
+    }
+};
+
+global.jsonFormat = jsonFormat;
 export default {
     SESSION: "session",
     PAIRING_CODE: "IKYYSELF",
