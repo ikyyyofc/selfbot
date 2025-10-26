@@ -1,44 +1,46 @@
-import path from "path";
-import { fileURLToPath } from "url";
-import fs from "fs";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-export default async ({ sock, m, reply }) => {
+export default async ({ sock, m, groupCache }) => {
     const config = (await import("../config.js")).default;
-    
-    const PLUGIN_DIR = path.join(__dirname, "..", "plugins");
-    const files = fs.readdirSync(PLUGIN_DIR).filter(f => f.endsWith(".js"));
-    const commands = files.map(f => path.basename(f, ".js")).sort();
-    
+    const { readdirSync } = await import("fs");
+    const { join, dirname } = await import("path");
+    const { fileURLToPath } = await import("url");
+
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const pluginDir = join(__dirname);
+
+    const plugins = readdirSync(pluginDir)
+        .filter(f => f.endsWith(".js") && f !== "menu.js")
+        .map(f => f.replace(".js", ""));
+
+    const totalPlugins = plugins.length;
     const prefix = config.PREFIX[0];
-    
-    const uptime = process.uptime();
-    const hours = Math.floor(uptime / 3600);
-    const minutes = Math.floor((uptime % 3600) / 60);
-    const seconds = Math.floor(uptime % 60);
-    
-    const menu = `╭━━━━『 *${config.BOT_NAME}* 』━━━━╮
 
-*👤 Owner:* ${config.OWNER_NAME}
-*⏱️ Runtime:* ${hours}h ${minutes}m ${seconds}s
-*📦 Plugins:* ${commands.length} loaded
+    let menuText = `╭━━━━━━━━━━━━━━━━
+│ 🤖 *${config.BOT_NAME}*
+│ 👤 *Owner:* ${config.OWNER_NAME}
+│ 📦 *Plugins:* ${totalPlugins}
+│ 🔖 *Prefix:* ${config.PREFIX.join(", ")}
+╰━━━━━━━━━━━━━━━━
 
-╰━━━━━━━━━━━━━━━━━━━╯
+`;
 
-┏━━━『 *COMMANDS* 』━━━┓
-${commands.map(cmd => `┃ ${prefix}${cmd}`).join('\n')}
-┗━━━━━━━━━━━━━━━━━━━┛
+    if (m.isGroup) {
+        const metadata = await groupCache.fetch(sock, m.chat);
+        menuText += `╭━━━ *Group Info*
+│ 👥 ${metadata.subject}
+│ 👤 ${metadata.participants.length} members
+╰━━━━━━━━━━━━━━━━
 
-┏━━━『 *SPECIAL CMDS* 』━━━┓
-┃ > code (eval)
-┃ => code (eval return)  
-┃ $ command (exec)
-┗━━━━━━━━━━━━━━━━━━━┛
+`;
+    }
 
-*Usage:* ${prefix}<command> [args]
-*Example:* ${prefix}sticker (reply media)`;
+    menuText += `╭━━━ *Commands*\n`;
+    plugins.forEach((cmd, i) => {
+        menuText += `│ ${i + 1}. ${prefix}${cmd}\n`;
+    });
+    menuText += `╰━━━━━━━━━━━━━━━━
 
-    await reply(menu);
+_ketik ${prefix}namacommand untuk menggunakan_`;
+
+    await m.reply(menuText);
 };
