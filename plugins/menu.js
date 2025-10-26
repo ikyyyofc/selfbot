@@ -1,8 +1,17 @@
+import path from "path";
+import { fileURLToPath } from "url";
+import fs from "fs";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 export default async ({ sock, m, reply }) => {
     const config = (await import("../config.js")).default;
-    const state = (await import("../lib/BotState.js")).default;
     
-    const commands = Array.from(state.plugins.keys()).sort();
+    const PLUGIN_DIR = path.join(__dirname, "..", "plugins");
+    const files = fs.readdirSync(PLUGIN_DIR).filter(f => f.endsWith(".js"));
+    const commands = files.map(f => path.basename(f, ".js")).sort();
+    
     const prefix = config.PREFIX[0];
     
     const uptime = process.uptime();
