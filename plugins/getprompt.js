@@ -47,10 +47,10 @@ async function displayFilesInFolder(folderPath, options = {}) {
 
                 if (!fileExtensions || fileExtensions.includes(ext)) {
                     const content = await fs.readFile(fullPath, "utf8");
-                    result += "—".repeat(20) + "\n"
+                    result += "—".repeat(100) + "\n"
                     result += `${relativePath}:\n`;
                     result += content;
-                    result += "\n"+"—".repeat(20) + "\n\n";
+                    result += "\n"+"—".repeat(100) + "\n\n";
                 }
             }
         }
