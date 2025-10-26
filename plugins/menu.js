@@ -1,18 +1,26 @@
-export default async ({ sock, m, reply }) => {
-    const plugins = Array.from(m.sock.user.state.plugins.keys());
-    
-    let menu = `╭─── *MENU BOT* ───╮\n\n`;
-    menu += `Hai ${m.pushName}! 👋\n`;
-    menu += `Total ada ${plugins.length} command yang bisa dipake\n\n`;
-    
-    menu += `*📌 Available Commands:*\n\n`;
-    
-    plugins.forEach(cmd => {
-        menu += `◦ .${cmd}\n`;
-    });
-    
-    menu += `\n╰───────────────╯\n\n`;
-    menu += `_Ketik .help <command> buat info detail_`;
-    
-    await reply(menu);
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+export default async ({ reply }) => {
+    try {
+        const files = fs.readdirSync(__dirname).filter(file => file.endsWith('.js'));
+        
+        let menuText = "❏  *MENU*\n\n";
+
+        const commands = files.map(file => {
+            const commandName = path.basename(file, '.js');
+            return `› .${commandName}`;
+        });
+        
+        menuText += commands.join('\n');
+        
+        await reply(menuText);
+
+    } catch (error) {
+        console.error("Error building menu:", error);
+        await reply("Duh, sorry. Gagal nampilin menu, ada error nih.");
+    }
 };
