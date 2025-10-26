@@ -228,7 +228,7 @@ async function addPrompt() {
 }
 export default async function ({ sock, m, text, fileBuffer, reply }) {
     let q = m.quoted ? m.quoted : m;
-    text = m.quoted ? m.quoted.text : text ? text : false;
+    text = text ? text : m.quoted ? m.quoted.text : false
 
     if (!text) {
         return reply(
