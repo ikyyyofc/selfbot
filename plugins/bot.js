@@ -300,10 +300,10 @@ export default async function ({ sock, m, text, fileBuffer, reply }) {
             "\n\njika membuat kode, ingatlah untuk membuat kode yang simpel, efisien, dan minimalis tetapi fungsinya jelas dan terstruktur dengan baik, tidak perlu memberikan tanda komentar pada kode yang dibuat, selalu gunakan tipe ESM."
     };
 
-    /*if (q.type.includes("image") && fileBuffer) {
+    if (q.type.includes("image") && fileBuffer) {
         let img = await upload(fileBuffer);
         payload.imageUrl = img;
-    }*/
+    }
 
     try {
         const response = (
