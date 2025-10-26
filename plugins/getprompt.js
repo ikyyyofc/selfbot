@@ -10,11 +10,10 @@ async function displayFilesInFolder(folderPath, options = {}) {
     const {
         skipDirs = [],
         skipFiles = [],
-        fileExtensions = null, // ['.js', '.json'] = hanya tampilkan ini
-        excludeExtensions = null // ['.md', '.txt'] = jangan tampilkan ini
+        fileExtensions = null,
+        excludeExtensions = null
     } = options;
 
-    // Gabungkan default dengan custom
     const allSkipDirs = [...new Set([...defaultSkipDirs, ...skipDirs])];
     const allSkipFiles = [...new Set([...defaultSkipFiles, ...skipFiles])];
 
@@ -29,24 +28,20 @@ async function displayFilesInFolder(folderPath, options = {}) {
             const stats = await fs.stat(fullPath);
 
             if (stats.isDirectory()) {
-                // Skip folder yang tidak diinginkan
                 if (!allSkipDirs.includes(item)) {
                     await readFilesRecursively(fullPath, relativePath);
                 }
             } else if (stats.isFile()) {
-                // Skip file yang tidak diinginkan
                 if (allSkipFiles.includes(item)) {
                     continue;
                 }
 
                 const ext = path.extname(item);
 
-                // Skip file dengan ekstensi yang di-exclude
                 if (excludeExtensions && excludeExtensions.includes(ext)) {
                     continue;
                 }
 
-                // Filter berdasarkan ekstensi jika ditentukan (whitelist)
                 if (!fileExtensions || fileExtensions.includes(ext)) {
                     const content = await fs.readFile(fullPath, "utf8");
                     result += `${relativePath}:\n`;
@@ -72,6 +67,7 @@ async function addPrompt() {
         skipFiles: ["package-lock.json", "help", ".gitkeep", ".gitignore"]
     });
 }
+
 export default async function ({ sock, m, text, fileBuffer, reply }) {
     const payload = {
         text: text,
@@ -81,12 +77,13 @@ export default async function ({ sock, m, text, fileBuffer, reply }) {
             "\n\ngunakan file-file diatas sebagai referensi\n\n" +
             "jika membuat kode, ingatlah untuk membuat kode yang simpel, efisien, dan minimalis tetapi fungsinya jelas dan terstruktur dengan baik, tidak perlu memberikan tanda komentar pada kode yang dibuat, selalu gunakan tipe ESM."
     };
-    if (payload.systemPrompt.length => 65629) {
-      let sistem_split = payload.systemPrompt.split(65629)
-      for (let x of sistem_split) {
-        await reply(x)
-      }
+    
+    if (payload.systemPrompt.length >= 65629) {
+        const chunkSize = 65629;
+        for (let i = 0; i < payload.systemPrompt.length; i += chunkSize) {
+            await reply(payload.systemPrompt.slice(i, i + chunkSize));
+        }
     } else {
-      reply(payload.systemPrompt)
+        await reply(payload.systemPrompt);
     }
 }
