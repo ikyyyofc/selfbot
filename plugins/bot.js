@@ -255,10 +255,10 @@ export default async function ({ sock, m, text, fileBuffer, reply }) {
         `
     };
 
-    if (q.type.includes("image") && fileBuffer) {
+    /*if (q.type.includes("image") && fileBuffer) {
         let img = await upload(fileBuffer);
         payload.imageUrl = img;
-    }
+    }*/
 
     try {
         /*const response = (
