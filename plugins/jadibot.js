@@ -32,7 +32,7 @@ export default async ({ sock, m, args, reply }) => {
         return await reply("❌ *Nomor tidak valid!*\n\nPastikan nomor yang dimasukkan benar.");
     }
 
-    if (activeSessions.has(m.sender)) {
+    if (activeSessions.has(cleanNumber)) {
         return await reply(
             "⚠️ *Kamu sudah memiliki sesi aktif!*\n\nTunggu hingga sesi sebelumnya selesai."
         );
@@ -53,7 +53,7 @@ export default async ({ sock, m, args, reply }) => {
         `🔄 *Memulai koneksi...*\n\n📱 Nomor: ${cleanNumber}\n⏳ Tunggu sebentar...`
     );
 
-    activeSessions.set(m.sender, true);
+    activeSessions.set(cleanNumber, true);
 
     let tempSock = null;
     let connectionTimeout = null;
@@ -85,7 +85,7 @@ export default async ({ sock, m, args, reply }) => {
             if (tempSock) {
                 tempSock.end();
             }
-            activeSessions.delete(m.sender);
+            activeSessions.delete(cleanNumber);
             cleanupSession(tempSessionDir);
             await reply("⏰ *Waktu koneksi habis!*\n\nSilakan coba lagi.");
         }, 120000);
@@ -128,14 +128,14 @@ export default async ({ sock, m, args, reply }) => {
                         );
 
                         tempSock.end();
-                        activeSessions.delete(m.sender);
+                        activeSessions.delete(cleanNumber);
                         cleanupSession(tempSessionDir);
                     } catch (error) {
                         await reply(
                             `❌ *Gagal mengirim session!*\n\nError: ${error.message}`
                         );
                         tempSock.end();
-                        activeSessions.delete(m.sender);
+                        activeSessions.delete(cleanNumber);
                         cleanupSession(tempSessionDir);
                     }
                 }, 5000);
@@ -156,7 +156,7 @@ export default async ({ sock, m, args, reply }) => {
                     );
                 }
 
-                activeSessions.delete(m.sender);
+                activeSessions.delete(cleanNumber);
                 cleanupSession(tempSessionDir);
             }
         });
@@ -178,7 +178,7 @@ export default async ({ sock, m, args, reply }) => {
                     if (tempSock) {
                         tempSock.end();
                     }
-                    activeSessions.delete(m.sender);
+                    activeSessions.delete(cleanNumber);
                     cleanupSession(tempSessionDir);
                 }
             }, 3000);
@@ -189,7 +189,7 @@ export default async ({ sock, m, args, reply }) => {
         if (tempSock) {
             tempSock.end();
         }
-        activeSessions.delete(m.sender);
+        activeSessions.delete(cleanNumber);
         cleanupSession(tempSessionDir);
     }
 };
