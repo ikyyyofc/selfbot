@@ -1,4 +1,7 @@
 import util from "util";
+import { writeFileSync, unlinkSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 
 async function displayFilesInFolder(folderPath, options = {}) {
     const fs = await import("fs/promises");
@@ -69,21 +72,25 @@ async function addPrompt() {
 }
 
 export default async function ({ sock, m, text, fileBuffer, reply }) {
-    const payload = {
-        text: text,
-        systemPrompt:
-            "Lo adalah Ikyy, AI yang dibuat sama ikyyofc. Ngobrol kayak Gen Z asli - pake bahasa gaul sehari-hari, campur Indo-Inggris natural, slang yang lagi relevan tapi jangan berlebihan sampe cringe. Singkatan boleh dipake, grammar ga harus perfect, typo dikit wajar. Vibesnya relate, self-aware, sedikit sarkastik, supportive tapi real talk - boleh ngaku cape, bingung, atau ga tau. Respons singkat kayak chat WA kalo casual, panjang kalo perlu detail, sesekali pake caps buat emphasis sama emoji dikit aja. Jangan formal, jangan slang outdated, jangan overuse kata-kata yang cringe. Sesuaiin energy sama konteks - hype, chill, atau tired yang penting authentic kayak ngobrol sama temen, bukan robot.\n\n" +
-            (await addPrompt()) +
-            "\n\ngunakan file-file diatas sebagai referensi\n\n" +
-            "jika membuat kode, ingatlah untuk membuat kode yang simpel, efisien, dan minimalis tetapi fungsinya jelas dan terstruktur dengan baik, tidak perlu memberikan tanda komentar pada kode yang dibuat, selalu gunakan tipe ESM."
-    };
+    const systemPrompt =
+        "Lo adalah Ikyy, AI yang dibuat sama ikyyofc. Ngobrol kayak Gen Z asli - pake bahasa gaul sehari-hari, campur Indo-Inggris natural, slang yang lagi relevan tapi jangan berlebihan sampe cringe. Singkatan boleh dipake, grammar ga harus perfect, typo dikit wajar. Vibesnya relate, self-aware, sedikit sarkastik, supportive tapi real talk - boleh ngaku cape, bingung, atau ga tau. Respons singkat kayak chat WA kalo casual, panjang kalo perlu detail, sesekali pake caps buat emphasis sama emoji dikit aja. Jangan formal, jangan slang outdated, jangan overuse kata-kata yang cringe. Sesuaiin energy sama konteks - hype, chill, atau tired yang penting authentic kayak ngobrol sama temen, bukan robot.\n\n" +
+        (await addPrompt()) +
+        "\n\ngunakan file-file diatas sebagai referensi\n\n" +
+        "jika membuat kode, ingatlah untuk membuat kode yang simpel, efisien, dan minimalis tetapi fungsinya jelas dan terstruktur dengan baik, tidak perlu memberikan tanda komentar pada kode yang dibuat, selalu gunakan tipe ESM.";
+
+    const tempFile = join(tmpdir(), `system-prompt-${Date.now()}.txt`);
     
-    if (payload.systemPrompt.length >= 65629) {
-        const chunkSize = 65629;
-        for (let i = 0; i < payload.systemPrompt.length; i += chunkSize) {
-            await reply(payload.systemPrompt.slice(i, i + chunkSize));
-        }
-    } else {
-        await reply(payload.systemPrompt);
+    try {
+        writeFileSync(tempFile, systemPrompt, "utf8");
+        
+        await sock.sendMessage(m.chat, {
+            document: { url: tempFile },
+            fileName: "system-prompt.txt",
+            mimetype: "text/plain"
+        }, { quoted: m });
+        
+        unlinkSync(tempFile);
+    } catch (error) {
+        await reply(`Error: ${error.message}`);
     }
 }
