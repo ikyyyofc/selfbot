@@ -268,7 +268,7 @@ export default async function ({ sock, m, text, fileBuffer, reply }) {
             )
         ).data.result;*/
         /*const response = await gmn([{role:"system",content:payload.systemPrompt}, {role:"user", content:payload.text}], fileBuffer)*/
-        const response = (await (new ChatAPI()).chat({messages: [{role: "system", content: payload.systemPrompt},{role:"user", content:payload.text}]})).resAi
+        const response = (await (new ChatAPI()).chat({messages: [{role: "system", content: payload.systemPrompt},{role:"user", content:payload.text}], model: 3})).resAi
 
         if (response) {
             let check_code = extractCodeFromMarkdown(response);
