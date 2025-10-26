@@ -1,26 +1,35 @@
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
+export default async ({ sock, m, reply }) => {
+    const config = (await import("../config.js")).default;
+    const state = (await import("../lib/BotState.js")).default;
+    
+    const commands = Array.from(state.plugins.keys()).sort();
+    const prefix = config.PREFIX[0];
+    
+    const uptime = process.uptime();
+    const hours = Math.floor(uptime / 3600);
+    const minutes = Math.floor((uptime % 3600) / 60);
+    const seconds = Math.floor(uptime % 60);
+    
+    const menu = `╭━━━━『 *${config.BOT_NAME}* 』━━━━╮
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+*👤 Owner:* ${config.OWNER_NAME}
+*⏱️ Runtime:* ${hours}h ${minutes}m ${seconds}s
+*📦 Plugins:* ${commands.length} loaded
 
-export default async ({ reply }) => {
-    try {
-        const files = fs.readdirSync(__dirname).filter(file => file.endsWith('.js'));
-        
-        let menuText = "❏  *MENU*\n\n";
+╰━━━━━━━━━━━━━━━━━━━╯
 
-        const commands = files.map(file => {
-            const commandName = path.basename(file, '.js');
-            return `› .${commandName}`;
-        });
-        
-        menuText += commands.join('\n');
-        
-        await reply(menuText);
+┏━━━『 *COMMANDS* 』━━━┓
+${commands.map(cmd => `┃ ${prefix}${cmd}`).join('\n')}
+┗━━━━━━━━━━━━━━━━━━━┛
 
-    } catch (error) {
-        console.error("Error building menu:", error);
-        await reply("Duh, sorry. Gagal nampilin menu, ada error nih.");
-    }
+┏━━━『 *SPECIAL CMDS* 』━━━┓
+┃ > code (eval)
+┃ => code (eval return)  
+┃ $ command (exec)
+┗━━━━━━━━━━━━━━━━━━━┛
+
+*Usage:* ${prefix}<command> [args]
+*Example:* ${prefix}sticker (reply media)`;
+
+    await reply(menu);
 };
