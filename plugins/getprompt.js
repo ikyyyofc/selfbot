@@ -47,10 +47,11 @@ async function displayFilesInFolder(folderPath, options = {}) {
 
                 if (!fileExtensions || fileExtensions.includes(ext)) {
                     const content = await fs.readFile(fullPath, "utf8");
-                    result += "—".repeat(100) + "\n"
+                    result += "—".repeat(100) + "\n";
                     result += `${relativePath}:\n`;
+                    result += "—".repeat(relativePath.length + 5) + "\n"
                     result += content;
-                    result += "\n"+"—".repeat(100) + "\n\n";
+                    result += "\n" + "—".repeat(100) + "\n\n";
                 }
             }
         }
@@ -80,16 +81,20 @@ export default async function ({ sock, m, text, fileBuffer, reply }) {
         "jika membuat kode, ingatlah untuk membuat kode yang simpel, efisien, dan minimalis tetapi fungsinya jelas dan terstruktur dengan baik, tidak perlu memberikan tanda komentar pada kode yang dibuat, selalu gunakan tipe ESM.";
 
     const tempFile = join(tmpdir(), `system-prompt-${Date.now()}.txt`);
-    
+
     try {
         writeFileSync(tempFile, systemPrompt, "utf8");
-        
-        await sock.sendMessage(m.chat, {
-            document: { url: tempFile },
-            fileName: "system-prompt.txt",
-            mimetype: "text/plain"
-        }, { quoted: m });
-        
+
+        await sock.sendMessage(
+            m.chat,
+            {
+                document: { url: tempFile },
+                fileName: "system-prompt.txt",
+                mimetype: "text/plain"
+            },
+            { quoted: m }
+        );
+
         unlinkSync(tempFile);
     } catch (error) {
         await reply(`Error: ${error.message}`);
