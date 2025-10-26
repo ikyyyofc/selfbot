@@ -255,19 +255,19 @@ export default async function ({ sock, m, text, fileBuffer, reply }) {
         `
     };
 
-    /*if (q.type.includes("image") && fileBuffer) {
+    if (q.type.includes("image") && fileBuffer) {
         let img = await upload(fileBuffer);
         payload.imageUrl = img;
-    }*/
+    }
 
     try {
-        /*const response = (
+        const response = (
             await axios.post(
                 "https://api.nekolabs.web.id/ai/claude/3.7-sonnet",
                 payload
             )
-        ).data.result;*/
-        const response = await gmn([{role:"system",content:payload.systemPrompt}, {role:"user", content:payload.text}], fileBuffer)
+        ).data.result;
+        /*const response = await gmn([{role:"system",content:payload.systemPrompt}, {role:"user", content:payload.text}], fileBuffer)*/
         /*const response = (await (new ChatAPI()).chat({messages: [{role: "system", content: payload.systemPrompt},{role:"user", content:payload.text}]})).resAi*/
 
         if (response) {
