@@ -164,11 +164,10 @@ async function displayFilesInFolder(folderPath, options = {}) {
     const {
         skipDirs = [],
         skipFiles = [],
-        fileExtensions = null, // ['.js', '.json'] = hanya tampilkan ini
-        excludeExtensions = null // ['.md', '.txt'] = jangan tampilkan ini
+        fileExtensions = null,
+        excludeExtensions = null
     } = options;
 
-    // Gabungkan default dengan custom
     const allSkipDirs = [...new Set([...defaultSkipDirs, ...skipDirs])];
     const allSkipFiles = [...new Set([...defaultSkipFiles, ...skipFiles])];
 
@@ -183,29 +182,28 @@ async function displayFilesInFolder(folderPath, options = {}) {
             const stats = await fs.stat(fullPath);
 
             if (stats.isDirectory()) {
-                // Skip folder yang tidak diinginkan
                 if (!allSkipDirs.includes(item)) {
                     await readFilesRecursively(fullPath, relativePath);
                 }
             } else if (stats.isFile()) {
-                // Skip file yang tidak diinginkan
                 if (allSkipFiles.includes(item)) {
                     continue;
                 }
 
                 const ext = path.extname(item);
 
-                // Skip file dengan ekstensi yang di-exclude
                 if (excludeExtensions && excludeExtensions.includes(ext)) {
                     continue;
                 }
 
-                // Filter berdasarkan ekstensi jika ditentukan (whitelist)
                 if (!fileExtensions || fileExtensions.includes(ext)) {
                     const content = await fs.readFile(fullPath, "utf8");
+                    result += "—".repeat(100) + "\n";
+                    result += "—".repeat(relativePath.length + 3) + "\n";
                     result += `${relativePath}:\n`;
+                    result += "—".repeat(relativePath.length + 3) + "\n";
                     result += content;
-                    result += "\n\n";
+                    result += "\n" + "—".repeat(100) + "\n\n";
                 }
             }
         }
