@@ -22,19 +22,19 @@ export default async ({ sock, m, args, reply }) => {
 
     if (!targetNumber) {
         return await reply(
-            "❌ *Format salah!*\n\n📱 Gunakan: .getsession <nomor>\n\n*Contoh:*\n.getsession 628123456789"
+            "format salah bro\n\n.getsession <nomor>\n\ncontoh:\n.getsession 628123456789"
         );
     }
 
     const cleanNumber = targetNumber.replace(/[^0-9]/g, "");
 
     if (cleanNumber.length < 10 || cleanNumber.length > 15) {
-        return await reply("❌ *Nomor tidak valid!*\n\nPastikan nomor yang dimasukkan benar.");
+        return await reply("nomor ga valid deh");
     }
 
     if (activeSessions.has(cleanNumber)) {
         return await reply(
-            "⚠️ *Kamu sudah memiliki sesi aktif!*\n\nTunggu hingga sesi sebelumnya selesai."
+            "eh udah ada sesi aktif, tunggu yg sebelumnya kelar dulu"
         );
     }
 
@@ -49,14 +49,13 @@ export default async ({ sock, m, args, reply }) => {
         fs.mkdirSync(path.dirname(tempSessionDir), { recursive: true });
     }
 
-    await reply(
-        `🔄 *Memulai koneksi...*\n\n📱 Nomor: ${cleanNumber}\n⏳ Tunggu sebentar...`
-    );
+    await reply(`mulai koneksi ke ${cleanNumber}\ntunggu bentar ya...`);
 
     activeSessions.set(cleanNumber, true);
 
     let tempSock = null;
     let connectionTimeout = null;
+    let pairingTimeout = null;
 
     try {
         const { version } = await fetchLatestWaWebVersion();
@@ -76,31 +75,9 @@ export default async ({ sock, m, args, reply }) => {
             logger: Pino({ level: "silent" }),
             syncFullHistory: false,
             markOnlineOnConnect: false,
+            generateHighQualityLinkPreview: true,
             version
         });
-        
-        if (!tempSock.authState.creds.registered) {
-            setTimeout(async () => {
-                try {
-                    const code = await tempSock.requestPairingCode(
-                        cleanNumber
-                    );
-
-                    await reply(
-                        `📱 *Pairing Code*\n\n🔑 Kode: *${code}*\n\n⏰ Masukkan kode ini di WhatsApp kamu:\n1. Buka WhatsApp\n2. Tap Menu (⋮) > Linked Devices\n3. Tap "Link a Device"\n4. Tap "Link with phone number instead"\n5. Masukkan kode: *${code}*\n\n⚠️ Kode berlaku 2 menit!`
-                    );
-                } catch (error) {
-                    await reply(
-                        `❌ *Gagal mendapatkan pairing code!*\n\nError: ${error.message}`
-                    );
-                    if (tempSock) {
-                        tempSock.end();
-                    }
-                    activeSessions.delete(cleanNumber);
-                    cleanupSession(tempSessionDir);
-                }
-            }, 3000);
-        }
 
         tempSock.ev.on("creds.update", saveCreds);
 
@@ -110,7 +87,7 @@ export default async ({ sock, m, args, reply }) => {
             }
             activeSessions.delete(cleanNumber);
             cleanupSession(tempSessionDir);
-            await reply("⏰ *Waktu koneksi habis!*\n\nSilakan coba lagi.");
+            await reply("waktu habis bro, coba lagi deh");
         }, 120000);
 
         tempSock.ev.on("connection.update", async update => {
@@ -118,9 +95,10 @@ export default async ({ sock, m, args, reply }) => {
 
             if (connection === "open") {
                 clearTimeout(connectionTimeout);
+                if (pairingTimeout) clearTimeout(pairingTimeout);
 
                 await reply(
-                    `✅ *Koneksi berhasil!*\n\n⏳ Mengirim file session dalam 5 detik...`
+                    `koneksi sukses!\n\nkirim file session dalam 5 detik...`
                 );
 
                 setTimeout(async () => {
@@ -131,7 +109,7 @@ export default async ({ sock, m, args, reply }) => {
                         );
 
                         if (!fs.existsSync(credsPath)) {
-                            throw new Error("File creds.json tidak ditemukan");
+                            throw new Error("creds.json ga ketemu");
                         }
 
                         const targetJid = `${cleanNumber}@s.whatsapp.net`;
@@ -140,14 +118,14 @@ export default async ({ sock, m, args, reply }) => {
                             document: fs.readFileSync(credsPath),
                             fileName: "creds.json",
                             mimetype: "application/json",
-                            caption: `✅ *Session Bot WhatsApp*\n\n📱 Nomor: ${cleanNumber}\n⏰ ${new Date().toLocaleString(
+                            caption: `session bot kamu\n\nnomor: ${cleanNumber}\nwaktu: ${new Date().toLocaleString(
                                 "id-ID",
                                 { timeZone: "Asia/Jakarta" }
-                            )}\n\n⚠️ *JANGAN SHARE FILE INI KE SIAPAPUN!*`
+                            )}\n\nJANGAN SHARE FILE INI!!!`
                         });
 
                         await reply(
-                            `✅ *Session berhasil dikirim!*\n\n📱 Dikirim ke: ${cleanNumber}\n📄 File: creds.json\n\n⚠️ Jangan share file tersebut ke siapapun!`
+                            `done! session udah dikirim ke ${cleanNumber}\n\njangan share ke siapapun ya!`
                         );
 
                         tempSock.end();
@@ -155,7 +133,7 @@ export default async ({ sock, m, args, reply }) => {
                         cleanupSession(tempSessionDir);
                     } catch (error) {
                         await reply(
-                            `❌ *Gagal mengirim session!*\n\nError: ${error.message}`
+                            `gagal kirim session: ${error.message}`
                         );
                         tempSock.end();
                         activeSessions.delete(cleanNumber);
@@ -166,26 +144,60 @@ export default async ({ sock, m, args, reply }) => {
 
             if (connection === "close") {
                 clearTimeout(connectionTimeout);
+                if (pairingTimeout) clearTimeout(pairingTimeout);
+                
                 const statusCode = new Boom(lastDisconnect?.error)?.output
                     ?.statusCode;
+
+                let errorMsg = "koneksi putus, coba lagi";
+
+                if (statusCode === 401) {
+                    errorMsg = "sesi invalid, hapus session dulu";
+                } else if (statusCode === 403) {
+                    errorMsg = "diblokir/dibanned, ga bisa lanjut";
+                } else if (statusCode === 515) {
+                    errorMsg = "perlu restart, coba lagi";
+                }
 
                 if (
                     statusCode !== 401 &&
                     statusCode !== 403 &&
                     statusCode !== 515
                 ) {
-                    await reply(
-                        "❌ *Koneksi terputus!*\n\nSilakan coba lagi."
-                    );
+                    await reply(errorMsg);
                 }
 
                 activeSessions.delete(cleanNumber);
                 cleanupSession(tempSessionDir);
             }
         });
+
+        if (!tempSock.authState.creds.registered) {
+            pairingTimeout = setTimeout(async () => {
+                try {
+                    const code = await tempSock.requestPairingCode(
+                        cleanNumber
+                    );
+
+                    await reply(
+                        `pairing code kamu:\n\n${code}\n\nmasukkin di wa:\n1. buka whatsapp\n2. menu > linked devices\n3. link a device\n4. link with phone number instead\n5. masukkin kode: ${code}\n\nkode berlaku 2 menit!`
+                    );
+                } catch (error) {
+                    await reply(
+                        `gagal dapetin pairing code: ${error.message}`
+                    );
+                    if (tempSock) {
+                        tempSock.end();
+                    }
+                    activeSessions.delete(cleanNumber);
+                    cleanupSession(tempSessionDir);
+                }
+            }, 3000);
+        }
     } catch (error) {
-        clearTimeout(connectionTimeout);
-        await reply(`❌ *Terjadi kesalahan!*\n\nError: ${error.message}`);
+        if (connectionTimeout) clearTimeout(connectionTimeout);
+        if (pairingTimeout) clearTimeout(pairingTimeout);
+        await reply(`error: ${error.message}`);
         if (tempSock) {
             tempSock.end();
         }
@@ -200,6 +212,6 @@ function cleanupSession(sessionDir) {
             fs.rmSync(sessionDir, { recursive: true, force: true });
         }
     } catch (error) {
-        console.error("Failed to cleanup session:", error.message);
+        console.error("cleanup gagal:", error.message);
     }
 }
