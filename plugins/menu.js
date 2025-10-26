@@ -1,38 +1,38 @@
+// plugins/menu.js
+
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { dirname } from "path";
+import config from "../config.js";
 
+// Helper buat dapetin __dirname di ES Module
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const __dirname = path.dirname(__filename);
 
-export default async function ({ sock, m, args }) {
+export default async ({ reply, m }) => {
     try {
-        const pluginDir = path.join(__dirname, "../plugins");
-        const files = fs
-            .readdirSync(pluginDir)
-            .filter(f => f.endsWith(".js") && f !== "menu.js");
+        const pluginsDir = __dirname;
+        const commandFiles = fs.readdirSync(pluginsDir).filter(file => file.endsWith('.js'));
 
-        const config = await import("../config.js").then(mod => mod.default);
-        const prefix = config.PREFIX?.[0] || ".";
+        const prefix = config.PREFIX[0] || ".";
+        const botName = config.BOT_NAME || "IKYY";
+        const ownerName = config.OWNER_NAME || "IKYYOFC";
 
-        let menu = `╭━━━『 *MENU BOT* 』━━━╮\n`;
-        menu += `│ 👤 *User:* ${m.pushName}\n`;
-        menu += `│ 📱 *Number:* ${m.sender.split("@")[0]}\n`;
-        menu += `│ 🤖 *Total Plugins:* ${files.length}\n`;
-        menu += `╰━━━━━━━━━━━━━━━━╯\n\n`;
+        let menuText = `Hai *${m.pushName}*! 👋\n\nNih daftar command yang ada di *${botName}*:\n\n╭─「 *MENU* 」\n`;
 
-        menu += `╭━━━『 *COMMAND LIST* 』━━━╮\n`;
-        files.forEach(file => {
-            const cmd = path.basename(file, ".js");
-            menu += `│ ◦ ${prefix}${cmd}\n`;
+        const commands = commandFiles.map(file => {
+            const command = path.basename(file, '.js');
+            return `│ › ${prefix}${command}`;
         });
-        menu += `╰━━━━━━━━━━━━━━━━╯\n\n`;
 
-        menu += `_Gunakan ${prefix}<command> untuk menggunakan fitur_`;
+        menuText += commands.join('\n');
+        menuText += `\n╰───「 *${ownerName}* 」`;
+        
+        // Fungsi reply dari bot lu udah otomatis ada thumbnail dll, jadi tinggal kirim teksnya aja
+        await reply(menuText);
 
-        await m.reply(menu);
     } catch (error) {
-        await m.reply(`❌ Error: ${error.message}`);
+        console.error("Error di plugin menu:", error);
+        await reply("Duh, menunya lagi ngambek nih. Coba lagi ntar ya.");
     }
-}
+};
