@@ -49,7 +49,7 @@ async function displayFilesInFolder(folderPath, options = {}) {
                     const content = await fs.readFile(fullPath, "utf8");
                     result += "—".repeat(100) + "\n";
                     result += `${relativePath}:\n`;
-                    result += "—".repeat(relativePath.length + 5) + "\n"
+                    result += "—".repeat(relativePath.length + 3) + "\n";
                     result += content;
                     result += "\n" + "—".repeat(100) + "\n\n";
                 }
