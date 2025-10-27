@@ -1,315 +1,439 @@
-# 🤖 WhatsApp Selfbot
+```markdown
+# WhatsApp Self-Bot
 
-Lightweight WhatsApp selfbot menggunakan Baileys dengan arsitektur modular dan plugin system.
+A lightweight, efficient WhatsApp self-bot built with Baileys. Features smart caching, anti-delete/edit detection, automatic session management, and modular plugin system.
 
-## ✨ Features
+## Features
 
-- 🔌 **Plugin System** - Modular plugin architecture untuk extensibility
-- 🗑️ **Anti-Delete & Anti-Edit** - Deteksi dan backup pesan yang dihapus/diedit
-- 💾 **Message Store** - Persistent message storage dengan auto-save
-- 👥 **Group Cache** - Intelligent caching untuk group metadata
-- 🧹 **Session Cleaner** - Automatic session cleanup untuk menghemat storage
-- 📊 **Detailed Logging** - Comprehensive message logging dengan colors
-- 🔐 **Pairing Code** - QR-less authentication
-- ⚡ **Eval & Exec** - Built-in code evaluation dan shell execution
+- 🚀 **Lightweight & Fast** - Optimized for performance with minimal dependencies
+- 🔌 **Plugin System** - Easy-to-use modular plugin architecture
+- 💾 **Smart Caching** - Group metadata caching to reduce API calls
+- 🗑️ **Anti-Delete/Edit** - Detects and logs deleted/edited messages
+- 🧹 **Auto Session Cleanup** - Automatic session folder management
+- 📝 **Message Store** - Persistent message storage with edit history
+- ⚡ **Code Execution** - Built-in eval and exec commands
+- 🔐 **Pairing Code** - Easy authentication via pairing code
+- 📊 **Detailed Logging** - Comprehensive message and system logging
 
-## 📦 Installation
+## Prerequisites
 
+- Node.js 18.x or higher
+- npm or yarn package manager
+
+## Installation
+
+1. Clone the repository:
 ```bash
-# Clone repository
-git clone https://github.com/ikyyyofc/selfbot
+git clone https://github.com/ikyyyofc/selfbot.git
 cd selfbot
-
-# Install dependencies
-npm install
-
-# Start bot
-npm start
 ```
 
-## 🔧 Configuration
+2. Install dependencies:
+```bash
+npm install
+```
 
-Edit `config.js` untuk mengkonfigurasi bot:
-
+3. Configure the bot (optional):
+Edit `config.js` to customize settings:
 ```javascript
 export default {
-    SESSION: "session",                  // Session folder name
-    PAIRING_CODE: "IKYYSELF",           // Pairing code prefix
-    PREFIX: [".", "!", "/"],            // Command prefixes
-    BOT_NAME: "IKYY",                   // Bot name
-    OWNER_NAME: "IKYYOFC",              // Owner name
-    SESSION_CLEANUP_INTERVAL: 1,        // Cleanup interval (hours)
-    SESSION_MAX_SIZE_MB: 3              // Max session size (MB)
+    SESSION: "session",           // Session directory
+    PAIRING_CODE: "IKYYSELF",    // Pairing code prefix
+    PREFIX: [".", "!", "/"],      // Command prefixes
+    BOT_NAME: "IKYY",            // Bot name
+    OWNER_NAME: "IKYYOFC",       // Owner name
+    SESSION_CLEANUP_INTERVAL: 1,  // Cleanup interval (hours)
+    SESSION_MAX_SIZE_MB: 3       // Max session size (MB)
 };
 ```
 
-## 🚀 Usage
-
-### First Time Setup
-
-1. Jalankan bot dengan `npm start`
-2. Masukkan nomor WhatsApp (format: 628xxx)
-3. Dapatkan pairing code
-4. Masukkan code di WhatsApp (Linked Devices)
-5. Bot siap digunakan!
-
-### Command System
-
-Bot hanya merespon pesan dari diri sendiri (self mode):
-- **Private chat**: Semua pesan dari diri sendiri diproses
-- **Group chat**: Hanya pesan dari diri sendiri yang diproses
-
-### Built-in Commands
-
-#### Eval (Code Execution)
-```javascript
-// Execute code
-> console.log("Hello World")
-
-// Execute with return
-=> 2 + 2
-```
-
-Available variables dalam eval:
-- `sock` - WhatsApp socket instance
-- `m` - Current message object
-- `plugins` - Plugin map
-- `config` - Bot configuration
-- `fs`, `path`, `util`, `colors` - Node.js modules
-- `loadPlugins()` - Reload all plugins
-- `messageStore` - Message store instance
-
-#### Exec (Shell Commands)
+4. Start the bot:
 ```bash
-$ ls -la
-$ npm install package-name
-$ git pull
+npm start
 ```
 
-## 🔌 Creating Plugins
+5. Enter your WhatsApp number when prompted:
+```
+📱 Enter WhatsApp number (example: 628123456789): 
+```
 
-Buat file baru di folder `plugins/` dengan format ESM:
+6. Scan the pairing code in WhatsApp:
+- Open WhatsApp > Settings > Linked Devices
+- Link a Device > Enter code manually
+- Enter the displayed pairing code
+
+## Project Structure
+
+```
+.
+├── bot.js                      # Main bot initialization
+├── index.js                    # Process manager
+├── config.js                   # Configuration
+├── lib/
+│   ├── AntiDeleteEditHandler.js  # Anti-delete/edit logic
+│   ├── BotState.js               # State management
+│   ├── ConnectionManager.js      # Connection handling
+│   ├── MessageHandler.js         # Message processing
+│   ├── PluginManager.js          # Plugin system
+│   ├── SessionCleaner.js         # Session management
+│   ├── groupCache.js             # Group metadata cache
+│   ├── messageLogger.js          # Message logging
+│   ├── serialize.js              # Message serialization
+│   ├── socket.js                 # Socket extensions
+│   ├── gemini.js                 # AI integration
+│   └── upload.js                 # File upload utility
+├── plugins/                    # Plugin directory
+│   ├── ping.js
+│   ├── sticker.js
+│   └── ...
+└── session/                    # Session data (auto-created)
+```
+
+## Built-in Commands
+
+### Code Execution
+
+**Eval (JavaScript):**
+```
+> console.log("Hello World")
+```
+
+**Eval with Return:**
+```
+=> 1 + 1
+```
+
+**Shell Execution:**
+```
+$ ls -la
+```
+
+### Plugin Commands
+
+Commands use configured prefixes (default: `.`, `!`, `/`)
+
+**Ping:**
+```
+.ping
+```
+
+**Create Sticker:**
+```
+.sticker
+# Reply to image/video/gif
+```
+
+## Creating Plugins
+
+Create a new file in `plugins/` directory:
 
 ```javascript
-export default async function ({ sock, m, args, text, reply, fileBuffer }) {
-    // Plugin logic here
-    await reply("Hello from plugin!");
-}
+// plugins/hello.js
+export default async ({ sock, m, args, text, reply }) => {
+    const name = text || "World";
+    await reply(`Hello, ${name}!`);
+};
 ```
 
-### Plugin Context
+Usage:
+```
+.hello John
+```
 
-Setiap plugin menerima context object:
+### Plugin Context API
+
+Available parameters in plugin functions:
 
 ```javascript
 {
     sock,           // WhatsApp socket
-    chat,           // Chat ID
-    from,           // Alias for chat
-    args,           // Command arguments (array)
-    text,           // Full text after command
     m,              // Serialized message object
-    fileBuffer,     // Media buffer (if any)
-    isGroup,        // Is group chat
+    chat,           // Chat ID
+    from,           // From ID
+    args,           // Command arguments array
+    text,           // Full text after command
+    fileBuffer,     // Media buffer (if message contains media)
+    isGroup,        // Boolean: is group chat
     sender,         // Sender JID
-    groupCache,     // Group cache instance
-    reply           // Reply function
+    groupCache,     // Group cache utility
+    reply           // Quick reply function
 }
 ```
 
-### Example Plugin: Ping
+### Message Object (m)
 
 ```javascript
-// plugins/ping.js
-export default async function ({ reply }) {
-    const start = Date.now();
-    await reply(`Pong! ${Date.now() - start}ms`);
+{
+    key: {
+        remoteJid,      // Chat ID
+        fromMe,         // Boolean
+        id,             // Message ID
+        participant     // Participant JID (group only)
+    },
+    message,            // Raw message object
+    messageTimestamp,   // Unix timestamp
+    pushName,           // Sender name
+    text,               // Message text
+    sender,             // Sender JID
+    isGroup,            // Boolean
+    isStatus,           // Boolean
+    isChannel,          // Boolean
+    quoted,             // Quoted message object
+    isMedia,            // Boolean
+    type,               // Message type
+    mentions,           // Array of mentioned JIDs
+    
+    // Methods
+    reply(text),        // Reply to message
+    react(emoji),       // React to message
+    download()          // Download media
 }
 ```
 
-Usage: `.ping`
+### Socket Extensions
 
-### Example Plugin: Sticker
+Custom socket methods:
 
 ```javascript
-// plugins/sticker.js
-export default async function ({ sock, m, fileBuffer, reply }) {
-    if (!fileBuffer) {
-        return await reply("Reply/kirim gambar dengan caption .sticker");
-    }
+// Get group metadata (cached)
+await sock.getGroupMetadata(jid);
 
-    await sock.sendMessage(m.chat, {
-        sticker: fileBuffer
-    });
-}
+// Get group participants (cached)
+await sock.getGroupParticipants(jid);
+
+// Get participant JID by participant ID
+await sock.getJidParticipants(jid, participantId);
+
+// Get group admins (cached)
+await sock.getGroupAdmins(jid);
+
+// Check if user is admin (cached)
+await sock.isGroupAdmin(jid, userJid);
+
+// Add participants
+await sock.groupAdd(jid, [participant1, participant2]);
+
+// Remove participants
+await sock.groupRemove(jid, [participant1, participant2]);
+
+// Promote to admin
+await sock.groupPromote(jid, [participant1]);
+
+// Demote from admin
+await sock.groupDemote(jid, [participant1]);
+
+// Update group subject
+await sock.updateGroupSubject(jid, "New Subject");
+
+// Update group description
+await sock.updateGroupDescription(jid, "New Description");
+
+// Leave group
+await sock.leaveGroup(jid);
+
+// Update group settings (admins only / all participants)
+await sock.updateGroupSettings(jid, true); // true = admins only
 ```
 
-Usage: `.sticker` (reply to image/video)
+## Advanced Features
 
+### Anti-Delete/Edit Detection
 
+Automatically detects and logs:
+- Deleted messages (text, media, stickers)
+- Edited messages with history
+- Works in private chats only
+- Resends deleted media
 
-## 🛡️ Session Cleaner
+### Session Cleaner
 
-Session cleaner secara otomatis membersihkan file-file temporary di folder session untuk menghemat storage.
+Automatic session management:
+- Runs every configured interval
+- Deletes non-essential files
+- Protects important files (creds.json, keys, message store)
+- Configurable size limit
+- Manual cleanup available
 
-### Protected Files (Tidak Dihapus)
-
-- `creds.json` - Account credentials
-- `app-state-sync-key-*.json` - Encryption keys
-- `message_store.json` - Message store
-
-### Konfigurasi
-
+View stats:
 ```javascript
-SESSION_CLEANUP_INTERVAL: 1,    // Cleanup setiap 1 jam
-SESSION_MAX_SIZE_MB: 3          // Cleanup jika > 3MB
+> sessionCleaner.logStats()
 ```
 
-### Manual Cleanup
-
+Manual cleanup:
 ```javascript
-// Via eval
-> sessionCleaner.manualCleanup()
+> await sessionCleaner.manualCleanup()
 ```
 
-## 🗑️ Anti-Delete & Anti-Edit
+### Group Cache
 
-Bot otomatis mendeteksi pesan yang dihapus atau diedit di private chat:
+Smart caching system:
+- Reduces API calls to WhatsApp servers
+- Auto-updates on participant changes
+- Configurable TTL (default: 10 minutes)
+- Cache statistics tracking
 
-### Features
-- ✅ Deteksi pesan dihapus
-- ✅ Deteksi pesan diedit
-- ✅ Simpan history edit
-- ✅ Resend media yang dihapus
-- ✅ Timestamp lengkap
-
-**Note**: Hanya bekerja untuk private chat (non-group)
-
-## 👥 Group Cache
-
-Intelligent caching system untuk group metadata:
-
+View cache stats:
 ```javascript
-// Via socket extensions
-await sock.getGroupMetadata(jid)
-await sock.getGroupParticipants(jid)
-await sock.getGroupAdmins(jid)
-await sock.isGroupAdmin(jid, userJid)
-
-// Via groupCache
-groupCache.get(jid)
-groupCache.getAdmins(jid)
-groupCache.isAdmin(jid, userJid)
-```
-
-### Cache Statistics
-
-```javascript
-// Via eval
 > groupCache.logStats()
 ```
 
-## 🔧 Socket Extensions
+### Message Store
 
-Bot menambahkan helper functions pada socket:
+Persistent message storage:
+- Stores last 1000 messages
+- Tracks edit history
+- Auto-saves every 10 messages
+- Saved to `session/message_store.json`
 
-```javascript
-// Group operations
-await sock.getGroupMetadata(jid)
-await sock.getGroupParticipants(jid)
-await sock.getGroupAdmins(jid)
-await sock.isGroupAdmin(jid, userJid)
-await sock.groupAdd(jid, [participant])
-await sock.groupRemove(jid, [participant])
-await sock.groupPromote(jid, [participant])
-await sock.groupDemote(jid, [participant])
-await sock.updateGroupSubject(jid, subject)
-await sock.updateGroupDescription(jid, desc)
-await sock.updateGroupSettings(jid, adminsOnly)
-await sock.leaveGroup(jid)
+## Configuration Options
 
-// Participant helpers
-await sock.getJidParticipants(jid, id)
-await sock.getLidParticipants(jid, id)
-```
-
-## 📝 Message Serialization
-
-Setiap message diserialisasi dengan properties tambahan:
+### config.js
 
 ```javascript
-m.isGroup       // Is group chat
-m.isStatus      // Is WhatsApp status
-m.isChannel     // Is channel message
-m.chat          // Chat ID
-m.from          // Alias for chat
-m.sender        // Sender JID
-m.fromMe        // Is from self
-m.text          // Message text
-m.quoted        // Quoted message (if any)
-m.mentions      // Mentioned users
-m.isMedia       // Is media message
-m.download()    // Download media
-m.reply(text)   // Reply to message
-m.react(emoji)  // React to message
+{
+    SESSION: "session",              // Session directory name
+    PAIRING_CODE: "IKYYSELF",       // Pairing code prefix
+    PREFIX: [".", "!", "/"],         // Command prefixes (array)
+    BOT_NAME: "IKYY",               // Bot display name
+    OWNER_NAME: "IKYYOFC",          // Owner display name
+    SESSION_CLEANUP_INTERVAL: 1,     // Hours between cleanups
+    SESSION_MAX_SIZE_MB: 3          // Max cleanable size (MB)
+}
 ```
 
-## 🎨 Utilities
+### Session Cleaner Settings
+
+Modify in `lib/SessionCleaner.js`:
+
+```javascript
+this.config = {
+    intervalHours: 6,               // Cleanup interval
+    maxSizeMB: 500,                 // Max cleanable size
+    protectedFiles: [               // Files to protect
+        "creds.json",
+        "app-state-sync-key-*.json",
+        "message_store.json"
+    ]
+};
+```
+
+### Cache Settings
+
+Modify in `lib/groupCache.js`:
+
+```javascript
+this.cache = new NodeCache({
+    stdTTL: 600,        // 10 minutes TTL
+    checkperiod: 120,   // Check every 2 minutes
+    useClones: false    // Better performance
+});
+```
+
+## Utilities
 
 ### File Upload
+
 ```javascript
 import upload from "./lib/upload.js";
 
 const url = await upload(buffer);
 ```
 
-## 🔒 Security Notes
+### Gemini AI
 
-- Bot berjalan dalam mode **SELFBOT** (hanya merespon diri sendiri)
-- Eval & Exec commands sangat powerful - gunakan dengan hati-hati
-- Jangan share `session/` folder ke orang lain
-- Protected files tidak akan terhapus oleh session cleaner
+```javascript
+import chat from "./lib/gemini.js";
 
-## 📊 Logging
+const response = await chat([
+    { role: "user", content: "Hello!" }
+], fileBuffer);
+```
 
-Bot menggunakan colored logging untuk visibility:
+## Troubleshooting
 
-- 🤖 Cyan: System messages
-- ✅ Green: Success operations
-- ❌ Red: Errors
-- ⚠️ Yellow: Warnings
-- 📨 Incoming messages dengan detail lengkap
+### Connection Issues
 
-## 🚨 Troubleshooting
+1. Delete session folder and reconnect:
+```bash
+rm -rf session/
+npm start
+```
 
-### Bot tidak merespon
-- Pastikan command dimulai dengan prefix yang benar
-- Pastikan pesan dikirim dari akun sendiri (self mode)
-- Check console untuk error messages
+2. Check Node.js version:
+```bash
+node --version  # Should be 18.x or higher
+```
 
-### Session error
-- Hapus folder `session/` dan login ulang
-- Pastikan koneksi internet stabil
+### Plugin Not Working
 
-### Plugin tidak load
-- Check syntax error di plugin file
-- Reload plugins: `> loadPlugins()`
-- Restart bot
+1. Check plugin file name matches command
+2. Verify plugin exports default function
+3. Check console for error messages
+4. Reload plugins:
+```javascript
+> await loadPlugins()
+```
 
-## 📜 License
+### High Memory Usage
 
-ISC License
+1. Reduce message store limit in `lib/BotState.js`
+2. Lower cache TTL in `lib/groupCache.js`
+3. Reduce session max size in `config.js`
 
-## 👤 Author
+### Session Errors
 
-**IKYYOFC**
+1. Check session folder permissions
+2. Verify credentials are not corrupted
+3. Try manual cleanup:
+```javascript
+> await sessionCleaner.manualCleanup()
+```
 
-## 🙏 Credits
+## Performance Tips
 
-- [Baileys](https://github.com/WhiskeySockets/Baileys) - WhatsApp Web API
-- [@colors/colors](https://github.com/DABH/colors.js) - Terminal colors
-- [node-cache](https://github.com/node-cache/node-cache) - Caching solution
+1. **Use Cache**: Always use cached methods for group data
+2. **Limit Media**: Don't store large media files unnecessarily
+3. **Clean Sessions**: Run cleanup regularly
+4. **Optimize Plugins**: Keep plugins lightweight and async
+5. **Monitor Logs**: Watch for performance warnings
+
+## Security Notes
+
+- ⚠️ Never share your `session/` folder
+- ⚠️ Keep `creds.json` secure
+- ⚠️ Don't run untrusted plugins
+- ⚠️ Be careful with eval/exec commands
+- ⚠️ Don't expose your pairing code
+
+## Contributing
+
+1. Fork the repository
+2. Create feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit changes (`git commit -m 'Add AmazingFeature'`)
+4. Push to branch (`git push origin feature/AmazingFeature`)
+5. Open Pull Request
+
+## License
+
+This project is licensed under the ISC License.
+
+## Credits
+
+- Built with [Baileys](https://github.com/WhiskeySockets/Baileys)
+- Developed by [IKYYOFC](https://github.com/ikyyyofc)
+
+## Disclaimer
+
+This bot is for educational purposes only. Use at your own risk. The developers are not responsible for any misuse or violations of WhatsApp's Terms of Service.
+
+## Support
+
+For issues and questions:
+- Open an issue on GitHub
+- Check existing issues first
+- Provide detailed information (logs, error messages, steps to reproduce)
 
 ---
 
-Made with ❤️ by IKYYOFC
+**Made with ❤️ by IKYYOFC**
+```
