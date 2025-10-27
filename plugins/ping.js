@@ -14,7 +14,7 @@ const formatBytes = (bytes, decimals = 2) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
 };
 
-const formatUptime = (seconds) => {
+const formatUptime = seconds => {
     const days = Math.floor(seconds / 86400);
     const hours = Math.floor((seconds % 86400) / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -23,19 +23,19 @@ const formatUptime = (seconds) => {
 };
 
 const getCPUUsage = () => {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
         const startUsage = process.cpuUsage();
         const startTime = performance.now();
-        
+
         setTimeout(() => {
             const endUsage = process.cpuUsage(startUsage);
             const endTime = performance.now();
             const elapsedTime = endTime - startTime;
-            
+
             const userPercent = (endUsage.user / 1000 / elapsedTime) * 100;
             const systemPercent = (endUsage.system / 1000 / elapsedTime) * 100;
             const totalPercent = userPercent + systemPercent;
-            
+
             resolve({
                 user: userPercent.toFixed(2),
                 system: systemPercent.toFixed(2),
@@ -52,18 +52,17 @@ const getNetworkStats = async () => {
             const lines = stdout.split("\n");
             let totalRx = 0;
             let totalTx = 0;
-            
+
             for (let i = 2; i < lines.length; i++) {
                 const line = lines[i].trim();
                 if (!line) continue;
                 const parts = line.split(/\s+/);
                 if (parts[0].includes(":")) {
-                    const stats = parts[0].split(":");
                     totalRx += parseInt(parts[1]) || 0;
                     totalTx += parseInt(parts[9]) || 0;
                 }
             }
-            
+
             return {
                 received: formatBytes(totalRx),
                 transmitted: formatBytes(totalTx),
@@ -88,7 +87,9 @@ const getDiskUsage = async () => {
                 usedPercent: parts[4]
             };
         } else if (process.platform === "win32") {
-            const { stdout } = await execPromise("wmic logicaldisk get size,freespace,caption");
+            const { stdout } = await execPromise(
+                "wmic logicaldisk get size,freespace,caption"
+            );
             return { info: stdout.trim() };
         }
         return null;
@@ -106,24 +107,40 @@ const getLoadAverage = () => {
     };
 };
 
+const getUserInfo = () => {
+    try {
+        const userInfo = os.userInfo();
+        return {
+            username: userInfo.username || "unknown",
+            homedir: userInfo.homedir || os.homedir()
+        };
+    } catch (e) {
+        return {
+            username: process.env.USER || process.env.USERNAME || "unknown",
+            homedir: os.homedir()
+        };
+    }
+};
+
 export default async ({ m, sock }) => {
     const startTime = performance.now();
-    
+
     const cpuUsage = await getCPUUsage();
     const networkStats = await getNetworkStats();
     const diskUsage = await getDiskUsage();
     const loadAvg = getLoadAverage();
-    
+    const userInfo = getUserInfo();
+
     const totalMem = os.totalmem();
     const freeMem = os.freemem();
     const usedMem = totalMem - freeMem;
     const memPercent = ((usedMem / totalMem) * 100).toFixed(2);
-    
+
     const cpus = os.cpus();
     const cpuModel = cpus[0].model;
     const cpuCores = cpus.length;
     const cpuSpeed = cpus[0].speed;
-    
+
     let cpuTimes = {
         user: 0,
         nice: 0,
@@ -131,7 +148,7 @@ export default async ({ m, sock }) => {
         idle: 0,
         irq: 0
     };
-    
+
     cpus.forEach(cpu => {
         cpuTimes.user += cpu.times.user;
         cpuTimes.nice += cpu.times.nice;
@@ -139,8 +156,13 @@ export default async ({ m, sock }) => {
         cpuTimes.idle += cpu.times.idle;
         cpuTimes.irq += cpu.times.irq;
     });
-    
-    const total = cpuTimes.user + cpuTimes.nice + cpuTimes.sys + cpuTimes.idle + cpuTimes.irq;
+
+    const total =
+        cpuTimes.user +
+        cpuTimes.nice +
+        cpuTimes.sys +
+        cpuTimes.idle +
+        cpuTimes.irq;
     const cpuTimePercent = {
         user: ((cpuTimes.user / total) * 100).toFixed(2),
         nice: ((cpuTimes.nice / total) * 100).toFixed(2),
@@ -148,41 +170,44 @@ export default async ({ m, sock }) => {
         idle: ((cpuTimes.idle / total) * 100).toFixed(2),
         irq: ((cpuTimes.irq / total) * 100).toFixed(2)
     };
-    
+
     const networkInterfaces = os.networkInterfaces();
     let networkInfo = "";
     Object.keys(networkInterfaces).forEach(iface => {
         networkInterfaces[iface].forEach(addr => {
             if (!addr.internal) {
-                networkInfo += `\n   ${iface}: ${addr.address} (${addr.family})`;
+                networkInfo += `\n ${iface}: ${addr.address} (${addr.family})`;
             }
         });
     });
-    
+
     const processMemUsage = process.memoryUsage();
-    const heapUsedPercent = ((processMemUsage.heapUsed / processMemUsage.heapTotal) * 100).toFixed(2);
-    
+    const heapUsedPercent = (
+        (processMemUsage.heapUsed / processMemUsage.heapTotal) *
+        100
+    ).toFixed(2);
+
     const endTime = performance.now();
     const responseTime = (endTime - startTime).toFixed(2);
-    
+
     let msg = `╔════════════════════════════════\n`;
     msg += `║ ⚡ BOT SYSTEM DIAGNOSTICS\n`;
     msg += `╠════════════════════════════════\n`;
     msg += `║\n`;
     msg += `║ 🎯 RESPONSE TIME\n`;
-    msg += `║    ${responseTime} ms\n`;
+    msg += `║ ${responseTime} ms\n`;
     msg += `║\n`;
     msg += `╠════════════════════════════════\n`;
     msg += `║ 💻 SYSTEM INFORMATION\n`;
     msg += `╠════════════════════════════════\n`;
     msg += `║\n`;
-    msg += `║ 🖥️  Platform: ${os.platform()}\n`;
+    msg += `║ 🖥️ Platform: ${os.platform()}\n`;
     msg += `║ 📦 Architecture: ${os.arch()}\n`;
-    msg += `║ 🏷️  OS Type: ${os.type()}\n`;
+    msg += `║ 🏷️ OS Type: ${os.type()}\n`;
     msg += `║ 📝 OS Release: ${os.release()}\n`;
     msg += `║ 🏠 Hostname: ${os.hostname()}\n`;
-    msg += `║ 👤 User: ${os.userInfo().username}\n`;
-    msg += `║ 🏡 Home Dir: ${os.homedir()}\n`;
+    msg += `║ 👤 User: ${userInfo.username}\n`;
+    msg += `║ 🏡 Home Dir: ${userInfo.homedir}\n`;
     msg += `║ 📁 Temp Dir: ${os.tmpdir()}\n`;
     msg += `║ ⏰ Uptime: ${formatUptime(os.uptime())}\n`;
     msg += `║ 🔢 Endianness: ${os.endianness()}\n`;
@@ -196,21 +221,21 @@ export default async ({ m, sock }) => {
     msg += `║ ⚡ Speed: ${cpuSpeed} MHz\n`;
     msg += `║\n`;
     msg += `║ 📊 CPU USAGE (PROCESS)\n`;
-    msg += `║    User: ${cpuUsage.user}%\n`;
-    msg += `║    System: ${cpuUsage.system}%\n`;
-    msg += `║    Total: ${cpuUsage.total}%\n`;
+    msg += `║ User: ${cpuUsage.user}%\n`;
+    msg += `║ System: ${cpuUsage.system}%\n`;
+    msg += `║ Total: ${cpuUsage.total}%\n`;
     msg += `║\n`;
-    msg += `║ ⏱️  CPU TIME DISTRIBUTION\n`;
-    msg += `║    User: ${cpuTimePercent.user}%\n`;
-    msg += `║    Nice: ${cpuTimePercent.nice}%\n`;
-    msg += `║    System: ${cpuTimePercent.sys}%\n`;
-    msg += `║    Idle: ${cpuTimePercent.idle}%\n`;
-    msg += `║    IRQ: ${cpuTimePercent.irq}%\n`;
+    msg += `║ ⏱️ CPU TIME DISTRIBUTION\n`;
+    msg += `║ User: ${cpuTimePercent.user}%\n`;
+    msg += `║ Nice: ${cpuTimePercent.nice}%\n`;
+    msg += `║ System: ${cpuTimePercent.sys}%\n`;
+    msg += `║ Idle: ${cpuTimePercent.idle}%\n`;
+    msg += `║ IRQ: ${cpuTimePercent.irq}%\n`;
     msg += `║\n`;
     msg += `║ 📈 LOAD AVERAGE\n`;
-    msg += `║    1 min: ${loadAvg["1min"]}\n`;
-    msg += `║    5 min: ${loadAvg["5min"]}\n`;
-    msg += `║    15 min: ${loadAvg["15min"]}\n`;
+    msg += `║ 1 min: ${loadAvg["1min"]}\n`;
+    msg += `║ 5 min: ${loadAvg["5min"]}\n`;
+    msg += `║ 15 min: ${loadAvg["15min"]}\n`;
     msg += `║\n`;
     msg += `╠════════════════════════════════\n`;
     msg += `║ 🧮 MEMORY (SYSTEM)\n`;
@@ -225,7 +250,7 @@ export default async ({ m, sock }) => {
     msg += `╠════════════════════════════════\n`;
     msg += `║\n`;
     msg += `║ 📦 RSS: ${formatBytes(processMemUsage.rss)}\n`;
-    msg += `║ 🏔️  Heap Total: ${formatBytes(processMemUsage.heapTotal)}\n`;
+    msg += `║ 🏔️ Heap Total: ${formatBytes(processMemUsage.heapTotal)}\n`;
     msg += `║ 📊 Heap Used: ${formatBytes(processMemUsage.heapUsed)} (${heapUsedPercent}%)\n`;
     msg += `║ 🔧 External: ${formatBytes(processMemUsage.external)}\n`;
     msg += `║ 🔢 Array Buffers: ${formatBytes(processMemUsage.arrayBuffers)}\n`;
@@ -235,7 +260,7 @@ export default async ({ m, sock }) => {
     msg += `╠════════════════════════════════\n`;
     msg += `║${networkInfo}\n`;
     msg += `║\n`;
-    
+
     if (networkStats) {
         msg += `╠════════════════════════════════\n`;
         msg += `║ 📡 NETWORK STATISTICS\n`;
@@ -246,7 +271,7 @@ export default async ({ m, sock }) => {
         msg += `║ 📊 Total: ${networkStats.total}\n`;
         msg += `║\n`;
     }
-    
+
     if (diskUsage) {
         msg += `╠════════════════════════════════\n`;
         msg += `║ 💿 DISK USAGE\n`;
@@ -261,13 +286,13 @@ export default async ({ m, sock }) => {
         }
         msg += `║\n`;
     }
-    
+
     msg += `╠════════════════════════════════\n`;
     msg += `║ 🔧 NODE.JS RUNTIME\n`;
     msg += `╠════════════════════════════════\n`;
     msg += `║\n`;
     msg += `║ 📦 Version: ${process.version}\n`;
-    msg += `║ 🏗️  V8: ${process.versions.v8}\n`;
+    msg += `║ 🏗️ V8: ${process.versions.v8}\n`;
     msg += `║ 🔐 OpenSSL: ${process.versions.openssl}\n`;
     msg += `║ 📚 UV: ${process.versions.uv}\n`;
     msg += `║ 🔗 Zlib: ${process.versions.zlib}\n`;
@@ -279,6 +304,6 @@ export default async ({ m, sock }) => {
     msg += `║ 🔧 Exec Path: ${process.execPath}\n`;
     msg += `║\n`;
     msg += `╚════════════════════════════════`;
-    
+
     await m.reply(msg);
 };
