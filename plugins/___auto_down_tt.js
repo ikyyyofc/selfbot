@@ -59,15 +59,13 @@ export default async ({ m, sock }) => {
                 );
             }
 
-            if (data.music) {
+            if (data.play) {
                 await sock.sendMessage(
                     m.chat,
                     {
                         audio: {
-                            url: data.music
-                        },
-                        mimetype: "audio/mp3",
-                        fileName: "audio.mp3"
+                            url: data.play
+                        }
                     },
                     { quoted: m }
                 );
