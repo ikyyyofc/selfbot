@@ -2,16 +2,25 @@ import chat from "../lib/gemini.js";
 
 const conversationHistory = new Map();
 
+const cleanOldConversations = () => {
+    const now = Date.now();
+    const thirtyMinutes = 30 * 60 * 1000;
+    
+    for (const [key, value] of conversationHistory.entries()) {
+        if (now - value.timestamp > thirtyMinutes) {
+            conversationHistory.delete(key);
+        }
+    }
+};
+
+setInterval(cleanOldConversations, 5 * 60 * 1000);
+
 export default async ({ m, text, fileBuffer, reply }) => {
     if (!text && !fileBuffer) {
         return await reply("❌ Kirim teks atau media dengan caption!\n\nContoh:\n.ai halo\n.ai [reply image] jelaskan gambar ini");
     }
 
     try {
-        const messageId = m.key.id;
-        const chatId = m.chat;
-        const conversationKey = `${chatId}_${messageId}`;
-
         const messages = [
             {
                 role: "system",
@@ -24,18 +33,20 @@ export default async ({ m, text, fileBuffer, reply }) => {
         ];
 
         const response = await chat(messages, fileBuffer);
+        
+        const sentMsg = await reply(response);
+        const botMessageId = sentMsg.key.id;
+        const chatId = m.chat;
+        const conversationKey = `${chatId}_${botMessageId}`;
 
         conversationHistory.set(conversationKey, {
             messages: messages,
             lastResponse: response,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            botMessageId: botMessageId
         });
 
-        setTimeout(() => {
-            conversationHistory.delete(conversationKey);
-        }, 30 * 60 * 1000);
-
-        await reply(response);
+        console.log(`💾 Saved conversation: ${conversationKey}`);
     } catch (error) {
         console.error("AI Error:", error);
         await reply(`❌ Error: ${error.message}`);
