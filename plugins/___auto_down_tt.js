@@ -65,7 +65,9 @@ export default async ({ m, sock }) => {
                     {
                         audio: {
                             url: data.play
-                        }
+                        },
+                        mimetype: "audio/mp3",
+                        fileName: "audio.mp3"
                     },
                     { quoted: m }
                 );
