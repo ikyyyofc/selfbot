@@ -56,18 +56,19 @@ export default async ({ m, sock }) => {
             }
 
             if (data.music) {
-                const audioBuffer = (await axios.get(data.music, { responseType: "arraybuffer" })).data;
                 await sock.sendMessage(m.chat, {
-                    audio: audioBuffer,
+                    audio: {
+                      data.music
+                    },
                     mimetype: "audio/mp4",
                     fileName: "audio.mp3"
                 }, { quoted: m });
             }
         } else {
-            const videoBuffer = (await axios.get(data.play, { responseType: "arraybuffer" })).data;
-            
             await sock.sendMessage(m.chat, {
-                video: videoBuffer,
+                video: {
+                  data.play
+                },
                 caption: caption
             }, { quoted: m });
         }
