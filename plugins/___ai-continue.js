@@ -1,17 +1,34 @@
 import chat from "../lib/gemini.js";
-import { conversationHistory } from "./ai.js";
+
+let conversationHistory;
+
+try {
+    const aiModule = await import("./ai.js");
+    conversationHistory = aiModule.conversationHistory;
+} catch (error) {
+    console.error("Failed to import conversationHistory:", error);
+    conversationHistory = new Map();
+}
 
 export default async ({ m, reply, fileBuffer }) => {
     if (!m.quoted) return true;
+    if (!m.quoted.fromMe) return true;
+    if (!m.text && !fileBuffer) return true;
 
     const quotedMessageId = m.quoted.key.id;
     const chatId = m.chat;
     const conversationKey = `${chatId}_${quotedMessageId}`;
 
-    const conversation = conversationHistory.get(conversationKey);
-    if (!conversation) return true;
+    console.log(`🔍 Looking for conversation: ${conversationKey}`);
+    console.log(`📚 Available conversations: ${Array.from(conversationHistory.keys()).join(", ")}`);
 
-    if (!m.text && !fileBuffer) return true;
+    const conversation = conversationHistory.get(conversationKey);
+    if (!conversation) {
+        console.log(`❌ Conversation not found`);
+        return true;
+    }
+
+    console.log(`✅ Found conversation, continuing...`);
 
     try {
         await m.react("🤖");
@@ -30,20 +47,19 @@ export default async ({ m, reply, fileBuffer }) => {
 
         const response = await chat(newMessages, fileBuffer);
 
-        const newMessageId = m.key.id;
-        const newConversationKey = `${chatId}_${newMessageId}`;
+        const sentMsg = await reply(response);
+        const botMessageId = sentMsg.key.id;
+        const newConversationKey = `${chatId}_${botMessageId}`;
 
         conversationHistory.set(newConversationKey, {
             messages: newMessages,
             lastResponse: response,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            botMessageId: botMessageId
         });
 
-        setTimeout(() => {
-            conversationHistory.delete(newConversationKey);
-        }, 30 * 60 * 1000);
+        console.log(`💾 Saved new conversation: ${newConversationKey}`);
 
-        await reply(response);
         await m.react("");
         
         return false;
