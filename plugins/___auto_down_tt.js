@@ -1,48 +1,3 @@
-import ffmpeg from 'fluent-ffmpeg';
-import { Readable, PassThrough } from 'stream';
-import axios from "axios";
-
-function convertToOpus(inputBuffer, options = {}) {
-  return new Promise((resolve, reject) => {
-    const {
-      bitrate = '128k',
-      channels = 2,
-      sampleRate = 48000,
-      codec = 'libopus'
-    } = options;
-
-    // Buat readable stream dari buffer
-    const inputStream = new Readable();
-    inputStream.push(inputBuffer);
-    inputStream.push(null);
-
-    // Buat stream untuk menampung output
-    const outputStream = new PassThrough();
-    const chunks = [];
-
-    outputStream.on('data', (chunk) => {
-      chunks.push(chunk);
-    });
-
-    outputStream.on('end', () => {
-      const outputBuffer = Buffer.concat(chunks);
-      resolve(outputBuffer);
-    });
-
-    ffmpeg(inputStream)
-      .audioCodec(codec)
-      .audioBitrate(bitrate)
-      .audioChannels(channels)
-      .audioFrequency(sampleRate)
-      .format('opus')
-      .on('error', (err) => {
-        reject(err);
-      })
-      .pipe(outputStream);
-  });
-}
-
-
 async function getTiktokData(url) {
     const response = await fetch("https://tikwm.com/api/", {
         method: "POST",
@@ -105,18 +60,11 @@ export default async ({ m, sock }) => {
             }
 
             if (data.play) {
-                let buffer_mp3 = await convertToOpus(
-                    (
-                        await axios.get(data.play, {
-                            responseType: "arraybuffer"
-                        })
-                    ).data
-                );
                 await sock.sendMessage(
                     m.chat,
                     {
-                        audio: buffer_mp3,
-                        mimetype: "audio/ogg; codecs=opus"
+                        //audio: buffer_mp3
+                        text: data.play
                     },
                     { quoted: m }
                 );
