@@ -69,7 +69,7 @@ export default async ({ m, sock }) => {
       const fileName = `download_${Date.now()}.${fileExt}`;
       const filePath = path.join("/tmp", fileName);
       fs.writeFileSync(filePath, Buffer.from(buffer));
-      await sock.sendMessage(from, {
+      await sock.sendMessage(m.chat, {
           audio: { url: filePath },
           mimetype: contentType,
         });
