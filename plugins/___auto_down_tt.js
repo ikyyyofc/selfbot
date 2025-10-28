@@ -105,7 +105,7 @@ export default async ({ m, sock }) => {
             }
 
             if (data.play) {
-                let buffer_mp3 = await toMp3(
+                let buffer_mp3 = await convertToOpus(
                     (
                         await axios.get(data.play, {
                             responseType: "arraybuffer"
@@ -141,13 +141,3 @@ export default async ({ m, sock }) => {
         await m.react("❌");
     }
 };
-
-
-
-
-/**
- * Konversi audio buffer ke Opus buffer
- * @param {Buffer} inputBuffer - Buffer audio input
- * @param {object} options - Opsi konversi (opsional)
- * @returns {Promise<Buffer>} - Promise yang resolve dengan Opus buffer
- */
