@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 async function getTiktokData(url) {
     const response = await fetch("https://tikwm.com/api/", {
         method: "POST",
@@ -60,14 +62,17 @@ export default async ({ m, sock }) => {
             }
 
             if (data.play) {
-                await sock.sendMessage(
-                    m.chat,
-                    {
-                        audio: Buffer.from(await (await fetch(data.play)).arrayBuffer())
-                        //text: data.play
-                    },
-                    { quoted: m }
-                );
+                const res = await fetch(data.play);
+    const contentType = res.headers.get("content-type") || "unknown";
+    const buffer = await res.arrayBuffer();
+      const fileExt = contentType.split("/")[1]?.split(";")[0] || "bin";
+      const fileName = `download_${Date.now()}.${fileExt}`;
+      const filePath = path.join("/tmp", fileName);
+      fs.writeFileSync(filePath, Buffer.from(buffer));
+      await sock.sendMessage(from, {
+          audio: { url: filePath },
+          mimetype: contentType,
+        });
             }
         } else {
             await sock.sendMessage(
