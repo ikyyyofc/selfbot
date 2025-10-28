@@ -63,7 +63,7 @@ export default async ({ m, sock }) => {
                 await sock.sendMessage(
                     m.chat,
                     {
-                        audio: await (await fetch(data.play)).arrayBuffer()
+                        audio: Buffer.from(await (await fetch(data.play)).arrayBuffer())
                         //text: data.play
                     },
                     { quoted: m }
