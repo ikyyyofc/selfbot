@@ -1,76 +1,81 @@
-async function postData(input) {
-    const urlApi = "https://tikwm.com/api/";
-    const bodyData = `url=${input}`;
+import axios from "axios";
 
-    try {
-        const response = await fetch(urlApi, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/x-www-form-urlencoded"
-            },
-            body: bodyData
-        });
+async function getTiktokData(url) {
+    const response = await fetch("https://tikwm.com/api/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: `url=${url}`
+    });
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        return data;
-    } catch (error) {
-        console.error("Gagal melakukan fetch:", error);
-        throw error;
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
     }
+
+    return await response.json();
 }
 
-export default async function ({ sock, m, text }) {
-    const tiktokRegex =
-        /(?:https?:\/\/)?(?:www\.|vm\.|vt\.)?tiktok\.com\/[^\s]+/gi;
+export default async ({ m, sock }) => {
+    const tiktokRegex = /(?:https?:\/\/)?(?:www\.|vt\.|vm\.)?tiktok\.com\/[^\s]+/gi;
     const urls = m.text.match(tiktokRegex);
+    
+    if (!urls || urls.length === 0) return;
 
-    if (!urls || urls.length === 0) return true;
-
-    const url = urls[0];
+    await m.react("⏳");
 
     try {
-        await m.reply("⏳ Downloading TikTok video...");
+        const url = urls[0];
+        const result = await getTiktokData(url);
 
-        const result = await postData(url);
-
-        if (result.code !== 0 || !result.data) {
-            await m.reply("❌ Failed to download TikTok video");
-            return false;
+        if (result.code !== 0) {
+            await m.reply("❌ Gagal mengambil data TikTok");
+            return;
         }
 
         const { data } = result;
-        const caption = `🎬 *TikTok Video*
+        const caption = `*TikTok Downloader*\n\n` +
+            `👤 Author: ${data.author.nickname} (@${data.author.unique_id})\n` +
+            `📝 Title: ${data.title}\n` +
+            `❤️ Likes: ${data.digg_count.toLocaleString()}\n` +
+            `💬 Comments: ${data.comment_count.toLocaleString()}\n` +
+            `🔄 Shares: ${data.share_count.toLocaleString()}\n` +
+            `👁️ Views: ${data.play_count.toLocaleString()}`;
 
-📝 Title: ${data.title || "No title"}
-👤 Author: ${data.author?.nickname || "Unknown"}
-⏱️ Duration: ${data.duration}s
-❤️ Likes: ${data.digg_count?.toLocaleString() || 0}
-💬 Comments: ${data.comment_count?.toLocaleString() || 0}
-🔄 Shares: ${data.share_count?.toLocaleString() || 0}
-👁️ Views: ${data.play_count?.toLocaleString() || 0}`;
+        if (data.images && data.images.length > 0) {
+            await m.reply(caption);
+            
+            for (let i = 0; i < data.images.length; i++) {
+                const imageUrl = data.images[i];
+                const imageBuffer = (await axios.get(imageUrl, { responseType: "arraybuffer" })).data;
+                
+                await sock.sendMessage(m.chat, {
+                    image: imageBuffer,
+                    caption: `Image ${i + 1}/${data.images.length}`
+                }, { quoted: m });
+            }
 
-        const videoUrl = data.play || data.wmplay;
+            if (data.music) {
+                const audioBuffer = (await axios.get(data.music, { responseType: "arraybuffer" })).data;
+                await sock.sendMessage(m.chat, {
+                    audio: audioBuffer,
+                    mimetype: "audio/mp4",
+                    fileName: "audio.mp3"
+                }, { quoted: m });
+            }
+        } else {
+            const videoBuffer = (await axios.get(data.play, { responseType: "arraybuffer" })).data;
+            
+            await sock.sendMessage(m.chat, {
+                video: videoBuffer,
+                caption: caption
+            }, { quoted: m });
+        }
 
-        await sock.sendMessage(
-            m.chat,
-            {
-                video: {
-                    url: videoUrl
-                },
-                caption: caption,
-                mimetype: "video/mp4"
-            },
-            { quoted: m }
-        );
-
-        return false;
+        await m.react("✅");
     } catch (error) {
         console.error("TikTok download error:", error);
         await m.reply(`❌ Error: ${error.message}`);
-        return false;
+        await m.react("❌");
     }
-}
+};
