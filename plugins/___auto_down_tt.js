@@ -63,16 +63,19 @@ export default async ({ m, sock }) => {
 
             if (data.play) {
                 const res = await fetch(data.play);
-    const contentType = res.headers.get("content-type") || "unknown";
-    const buffer = await res.arrayBuffer();
-      const fileExt = contentType.split("/")[1]?.split(";")[0] || "bin";
-      const fileName = `download_${Date.now()}.${fileExt}`;
-      const filePath = path.join("/tmp", fileName);
-      fs.writeFileSync(filePath, Buffer.from(buffer));
-      await sock.sendMessage(m.chat, {
-          audio: { url: filePath },
-          mimetype: contentType,
-        });
+                const contentType =
+                    res.headers.get("content-type") || "unknown";
+                const buffer = await res.arrayBuffer();
+                const fileExt =
+                    contentType.split("/")[1]?.split(";")[0] || "bin";
+                const fileName = `download_${Date.now()}.${fileExt}`;
+                const filePath = path.join("/tmp", fileName);
+                fs.writeFileSync(filePath, Buffer.from(buffer));
+                await sock.sendMessage(m.chat, {
+                    audio: { url: filePath },
+                    mimetype: contentType
+                });
+                fs.unlinkSync(filePath);
             }
         } else {
             await sock.sendMessage(
