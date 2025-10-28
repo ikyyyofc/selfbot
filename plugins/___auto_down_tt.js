@@ -1,3 +1,21 @@
+import ffmpeg from "fluent-ffmpeg";
+import { Readable } from "stream";
+
+async function toMp3(buffer) {
+    return new Promise((resolve, reject) => {
+        const chunks = [];
+        const stream = Readable.from(buffer);
+
+        ffmpeg(stream)
+            .toFormat("mp3")
+            .audioBitrate(128)
+            .on("error", err => reject(err))
+            .on("end", () => resolve(Buffer.concat(chunks)))
+            .pipe()
+            .on("data", chunk => chunks.push(chunk));
+    });
+}
+
 async function getTiktokData(url) {
     const response = await fetch("https://tikwm.com/api/", {
         method: "POST",
@@ -60,12 +78,18 @@ export default async ({ m, sock }) => {
             }
 
             if (data.play) {
+                let buffer_mp3 = await toMp3(
+                    (
+                        await axios.get(data.play, {
+                            responseType: "arraybuffer"
+                        })
+                    ).data
+                );
                 await sock.sendMessage(
                     m.chat,
                     {
-                        audio: {
-                            url: data.play
-                        },
+                        audio: buffer_mp3,
+
                         mimetype: "audio/mp3",
                         fileName: "audio.mp3"
                     },
