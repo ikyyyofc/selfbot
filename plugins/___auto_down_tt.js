@@ -1,5 +1,3 @@
-import axios from "axios";
-
 async function getTiktokData(url) {
     const response = await fetch("https://tikwm.com/api/", {
         method: "POST",
@@ -17,9 +15,10 @@ async function getTiktokData(url) {
 }
 
 export default async ({ m, sock }) => {
-    const tiktokRegex = /(?:https?:\/\/)?(?:www\.|vt\.|vm\.)?tiktok\.com\/[^\s]+/gi;
+    const tiktokRegex =
+        /(?:https?:\/\/)?(?:www\.|vt\.|vm\.)?tiktok\.com\/[^\s]+/gi;
     const urls = m.text.match(tiktokRegex);
-    
+
     if (!urls || urls.length === 0) return;
 
     await m.react("⏳");
@@ -34,7 +33,8 @@ export default async ({ m, sock }) => {
         }
 
         const { data } = result;
-        const caption = `*TikTok Downloader*\n\n` +
+        const caption =
+            `*TikTok Downloader*\n\n` +
             `👤 Author: ${data.author.nickname} (@${data.author.unique_id})\n` +
             `📝 Title: ${data.title}\n` +
             `❤️ Likes: ${data.digg_count.toLocaleString()}\n` +
@@ -44,33 +44,45 @@ export default async ({ m, sock }) => {
 
         if (data.images && data.images.length > 0) {
             await m.reply(caption);
-            
+
             for (let i = 0; i < data.images.length; i++) {
                 const imageUrl = data.images[i];
-                const imageBuffer = (await axios.get(imageUrl, { responseType: "arraybuffer" })).data;
-                
-                await sock.sendMessage(m.chat, {
-                    image: imageBuffer,
-                    caption: `Image ${i + 1}/${data.images.length}`
-                }, { quoted: m });
+                await sock.sendMessage(
+                    m.chat,
+                    {
+                        image: {
+                            url: imageUrl
+                        },
+                        caption: `Image ${i + 1}/${data.images.length}`
+                    },
+                    { quoted: m }
+                );
             }
 
             if (data.music) {
-                await sock.sendMessage(m.chat, {
-                    audio: {
-                      data.music
+                await sock.sendMessage(
+                    m.chat,
+                    {
+                        audio: {
+                            url: data.music
+                        },
+                        mimetype: "audio/mp4",
+                        fileName: "audio.mp3"
                     },
-                    mimetype: "audio/mp4",
-                    fileName: "audio.mp3"
-                }, { quoted: m });
+                    { quoted: m }
+                );
             }
         } else {
-            await sock.sendMessage(m.chat, {
-                video: {
-                  data.play
+            await sock.sendMessage(
+                m.chat,
+                {
+                    video: {
+                        url: data.play
+                    },
+                    caption: caption
                 },
-                caption: caption
-            }, { quoted: m });
+                { quoted: m }
+            );
         }
 
         await m.react("✅");
