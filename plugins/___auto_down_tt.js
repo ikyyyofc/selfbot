@@ -1,5 +1,3 @@
-import axios from "axios";
-
 async function postData(input) {
     const urlApi = "https://tikwm.com/api/";
     const bodyData = `url=${input}`;
@@ -26,7 +24,8 @@ async function postData(input) {
 }
 
 export default async function ({ sock, m, text }) {
-    const tiktokRegex = /(?:https?:\/\/)?(?:www\.|vm\.|vt\.)?tiktok\.com\/[^\s]+/gi;
+    const tiktokRegex =
+        /(?:https?:\/\/)?(?:www\.|vm\.|vt\.)?tiktok\.com\/[^\s]+/gi;
     const urls = m.text.match(tiktokRegex);
 
     if (!urls || urls.length === 0) return true;
@@ -56,21 +55,12 @@ export default async function ({ sock, m, text }) {
 
         const videoUrl = data.play || data.wmplay;
 
-        if (!videoUrl) {
-            await m.reply("❌ No video URL found");
-            return false;
-        }
-
-        const videoResponse = await axios.get(videoUrl, {
-            responseType: "arraybuffer"
-        });
-
-        const videoBuffer = Buffer.from(videoResponse.data);
-
         await sock.sendMessage(
             m.chat,
             {
-                video: videoBuffer,
+                video: {
+                    url: videoUrl
+                },
                 caption: caption,
                 mimetype: "video/mp4"
             },
