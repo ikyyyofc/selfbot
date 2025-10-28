@@ -1,5 +1,5 @@
-import ffmpeg from "fluent-ffmpeg";
-import { Readable } from "stream";
+import ffmpeg from 'fluent-ffmpeg';
+import { Readable, PassThrough } from 'stream';
 import axios from "axios";
 
 async function toMp3(buffer) {
@@ -124,3 +124,52 @@ export default async ({ m, sock }) => {
         await m.react("❌");
     }
 };
+
+
+
+
+/**
+ * Konversi audio buffer ke Opus buffer
+ * @param {Buffer} inputBuffer - Buffer audio input
+ * @param {object} options - Opsi konversi (opsional)
+ * @returns {Promise<Buffer>} - Promise yang resolve dengan Opus buffer
+ */
+export function convertToOpus(inputBuffer, options = {}) {
+  return new Promise((resolve, reject) => {
+    const {
+      bitrate = '128k',
+      channels = 2,
+      sampleRate = 48000,
+      codec = 'libopus'
+    } = options;
+
+    // Buat readable stream dari buffer
+    const inputStream = new Readable();
+    inputStream.push(inputBuffer);
+    inputStream.push(null);
+
+    // Buat stream untuk menampung output
+    const outputStream = new PassThrough();
+    const chunks = [];
+
+    outputStream.on('data', (chunk) => {
+      chunks.push(chunk);
+    });
+
+    outputStream.on('end', () => {
+      const outputBuffer = Buffer.concat(chunks);
+      resolve(outputBuffer);
+    });
+
+    ffmpeg(inputStream)
+      .audioCodec(codec)
+      .audioBitrate(bitrate)
+      .audioChannels(channels)
+      .audioFrequency(sampleRate)
+      .format('opus')
+      .on('error', (err) => {
+        reject(err);
+      })
+      .pipe(outputStream);
+  });
+}
