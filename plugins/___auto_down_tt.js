@@ -98,7 +98,8 @@ export default async ({ m, sock }) => {
                 await sock.sendMessage(
                     m.chat,
                     {
-                        audio: buffer_mp3
+                        audio: buffer_mp3,
+                        mimetype: "audio/ogg; codecs=opus"
                     },
                     { quoted: m }
                 );
