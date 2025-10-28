@@ -1,5 +1,6 @@
 import ffmpeg from "fluent-ffmpeg";
 import { Readable } from "stream";
+import axios from "axios";
 
 async function toMp3(buffer) {
     return new Promise((resolve, reject) => {
