@@ -10,25 +10,31 @@ try {
     conversationHistory = new Map();
 }
 
-export default async ({ m, reply, fileBuffer }) => {
+export default async ({ m, reply, fileBuffer, text }) => {
     if (!m.quoted) return true;
     if (!m.quoted.fromMe) return true;
+    
+    const config = await import("../config.js").then(mod => mod.default);
+    const prefixes = config.PREFIX || ["."];
+    const hasPrefix = prefixes.some(p => (m.text || "").startsWith(p));
+    if (hasPrefix) return true;
+    
     if (!m.text && !fileBuffer) return true;
 
     const quotedMessageId = m.quoted.key.id;
     const chatId = m.chat;
     const conversationKey = `${chatId}_${quotedMessageId}`;
 
-    console.log(`🔍 Looking for conversation: ${conversationKey}`);
-    console.log(`📚 Available conversations: ${Array.from(conversationHistory.keys()).join(", ")}`);
-
+    console.log(`🔍 Checking conversation: ${conversationKey}`);
+    console.log(`📚 Total conversations: ${conversationHistory.size}`);
+    
     const conversation = conversationHistory.get(conversationKey);
     if (!conversation) {
-        console.log(`❌ Conversation not found`);
+        console.log(`❌ Not an AI conversation`);
         return true;
     }
 
-    console.log(`✅ Found conversation, continuing...`);
+    console.log(`✅ Continuing AI conversation...`);
 
     try {
         await m.react("🤖");
@@ -58,7 +64,7 @@ export default async ({ m, reply, fileBuffer }) => {
             botMessageId: botMessageId
         });
 
-        console.log(`💾 Saved new conversation: ${newConversationKey}`);
+        console.log(`💾 Saved continuation: ${newConversationKey}`);
 
         await m.react("");
         
