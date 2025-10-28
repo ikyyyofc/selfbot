@@ -1,52 +1,56 @@
-import gemini from "../lib/gemini.js";
+import chat from "../lib/gemini.js";
+import { conversationHistory } from "./ai.js";
 
-const conversations = new Map();
-const lastMessageIds = new Map();
-
-export default async ({ m, sock }) => {
-    const userId = m.sender;
-    
+export default async ({ m, reply, fileBuffer }) => {
     if (!m.quoted) return true;
-    
-    const quotedId = m.quoted.key.id;
-    const lastAiMessageId = lastMessageIds.get(userId);
-    
-    if (quotedId !== lastAiMessageId) return true;
-    
-    if (!m.text || m.text.startsWith(".")) return true;
-    
-    if (!conversations.has(userId)) return true;
-    
-    const conversation = conversations.get(userId);
-    
-    conversation.push({
-        role: "user",
-        content: m.text
-    });
+
+    const quotedMessageId = m.quoted.key.id;
+    const chatId = m.chat;
+    const conversationKey = `${chatId}_${quotedMessageId}`;
+
+    const conversation = conversationHistory.get(conversationKey);
+    if (!conversation) return true;
+
+    if (!m.text && !fileBuffer) return true;
 
     try {
         await m.react("🤖");
-        
-        const response = await gemini(conversation);
-        
-        conversation.push({
-            role: "assistant",
-            content: response
+
+        const newMessages = [
+            ...conversation.messages,
+            {
+                role: "assistant",
+                content: conversation.lastResponse
+            },
+            {
+                role: "user",
+                content: m.text || "Jelaskan gambar/file ini"
+            }
+        ];
+
+        const response = await chat(newMessages, fileBuffer);
+
+        const newMessageId = m.key.id;
+        const newConversationKey = `${chatId}_${newMessageId}`;
+
+        conversationHistory.set(newConversationKey, {
+            messages: newMessages,
+            lastResponse: response,
+            timestamp: Date.now()
         });
 
-        if (conversation.length > 20) {
-            conversation.splice(0, conversation.length - 20);
-        }
+        setTimeout(() => {
+            conversationHistory.delete(newConversationKey);
+        }, 30 * 60 * 1000);
 
-        const sent = await m.reply(response);
-        lastMessageIds.set(userId, sent.key.id);
+        await reply(response);
+        await m.react("");
         
-        await m.react("");
+        return false;
     } catch (error) {
-        console.error("AI continue error:", error.message);
-        await m.reply("Error nih, coba lagi");
+        console.error("AI Continue Error:", error);
+        await reply(`❌ Error: ${error.message}`);
         await m.react("");
+        return false;
     }
-    
-    return true;
 };
