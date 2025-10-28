@@ -2,20 +2,29 @@ import ffmpeg from "fluent-ffmpeg";
 import { Readable } from "stream";
 import axios from "axios";
 
-async function toMp3(buffer) {
+async function toMp3(buffer) => {
     return new Promise((resolve, reject) => {
         const chunks = [];
         const stream = Readable.from(buffer);
 
         ffmpeg(stream)
-            .toFormat("mp3")
-            .audioBitrate(128)
-            .on("error", err => reject(err))
-            .on("end", () => resolve(Buffer.concat(chunks)))
+            .toFormat("opus")
+            .audioCodec("libopus")
+            .audioBitrate("128k")
+            .audioChannels(2)
+            .audioFrequency(48000)
+            .on("error", (err) => {
+                reject(err);
+            })
+            .on("end", () => {
+                resolve(Buffer.concat(chunks));
+            })
             .pipe()
-            .on("data", chunk => chunks.push(chunk));
+            .on("data", (chunk) => {
+                chunks.push(chunk);
+            });
     });
-}
+};
 
 async function getTiktokData(url) {
     const response = await fetch("https://tikwm.com/api/", {
