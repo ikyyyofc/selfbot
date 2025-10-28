@@ -66,7 +66,7 @@ export default async ({ m, sock }) => {
                         audio: {
                             url: data.music
                         },
-                        mimetype: "audio/mp4",
+                        mimetype: "audio/mp3",
                         fileName: "audio.mp3"
                     },
                     { quoted: m }
