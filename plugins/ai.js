@@ -1,35 +1,46 @@
-import chat from "../lib/gemini.js";
+import gemini from "../lib/gemini.js";
 
-const sessions = new Map();
+const conversations = new Map();
 
-const SYSTEM_PROMPT = `Lu adalah Lo, AI yang dibuat sama ikyyofc. Ngobrol kayak Gen Z asli - pake bahasa gaul sehari-hari, campur Indo-Inggris natural, slang yang lagi relevan tapi jangan berlebihan sampe cringe. Singkatan boleh dipake, grammar ga harus perfect, typo dikit wajar. Vibesnya relate, self-aware, sedikit sarkastik, supportive tapi real talk - boleh ngaku cape, bingung, atau ga tau. Respons singkat kayak chat WA kalo casual, panjang kalo perlu detail, sesekali pake caps buat emphasis sama emoji dikit aja. Jangan formal, jangan slang outdated, jangan overuse kata-kata yang cringe. Sesuaiin energy sama konteks - hype, chill, atau tired yang penting authentic kayak ngobrol sama temen, bukan robot.`;
-
-export default async ({ sock, m, text, fileBuffer, reply }) => {
-    if (!text && !fileBuffer) return await reply("mau nanya apa bro");
-
-    const sessionKey = m.sender;
+export default async ({ sock, m, args, text, fileBuffer, reply }) => {
+    const userId = m.sender;
     
-    if (!sessions.has(sessionKey)) {
-        sessions.set(sessionKey, {
-            messages: [{ role: "system", content: SYSTEM_PROMPT }],
-            lastMessageId: null
-        });
+    if (!conversations.has(userId)) {
+        conversations.set(userId, []);
     }
 
-    const session = sessions.get(sessionKey);
-    session.messages.push({ role: "user", content: text || "apa ini?" });
-    session.lastMessageId = null;
+    const conversation = conversations.get(userId);
+    
+    if (!text && !fileBuffer) {
+        return reply("Lu mau nanya apa?");
+    }
+
+    const userMessage = text || "Ini gambarnya gimana?";
+    
+    conversation.push({
+        role: "user",
+        content: userMessage
+    });
 
     try {
-        const response = await chat(session.messages, fileBuffer);
+        await m.react("🤖");
         
-        session.messages.push({ role: "assistant", content: response });
+        const response = await gemini(conversation, fileBuffer);
         
-        const sentMsg = await reply(response);
-        session.lastMessageId = sentMsg.key.id;
+        conversation.push({
+            role: "assistant",
+            content: response
+        });
 
-    } catch (e) {
-        console.error("AI error:", e.message);
-        await reply("error bro, coba lagi");
+        if (conversation.length > 20) {
+            conversation.splice(0, conversation.length - 20);
+        }
+
+        await reply(response);
+        await m.react("");
+    } catch (error) {
+        console.error("AI error:", error.message);
+        await reply("Waduh error nih, coba lagi deh");
+        await m.react("");
     }
 };
