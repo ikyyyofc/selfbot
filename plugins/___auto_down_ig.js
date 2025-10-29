@@ -41,7 +41,7 @@ export default async ({ sock, m, reply }) => {
                     m.chat,
                     {
                         video: buffer,
-                        caption: `Instagram Video\n\n${i + 1}/${data.data.length}`
+                        caption: `Instagram Video\n\n${parseInt(i) + 1}/${data.data.length}`
                     },
                     { quoted: m }
                 );
