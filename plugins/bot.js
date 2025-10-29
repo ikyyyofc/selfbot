@@ -67,7 +67,7 @@ async function displayFilesInFolder(folderPath, options = {}) {
 
 async function addPrompt() {
     return await displayFilesInFolder("./", {
-        skipDirs: ["session", "plugins"],
+        skipDirs: ["session", "plugins", ".*"],
         excludeExtensions: [".md", ".gitignore", ".gitkeep"],
         skipFiles: [
             "README.md",
