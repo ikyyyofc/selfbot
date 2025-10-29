@@ -34,14 +34,17 @@ export default async ({ sock, m, reply }) => {
                 url: mediaUrl
             };
 
-            const isVideo = mediaUrl.includes(".mp4") || data.data[i].type === "video";
+            const isVideo =
+                mediaUrl.includes(".mp4") || data.data[i].type === "video";
 
             if (isVideo) {
                 await sock.sendMessage(
                     m.chat,
                     {
                         video: buffer,
-                        caption: `Instagram Video\n\n${parseInt(i) + 1}/${data.data.length}`
+                        caption: `Instagram Video\n\n${parseInt(i) + 1}/${
+                            data.data.length
+                        }`
                     },
                     { quoted: m }
                 );
@@ -50,7 +53,9 @@ export default async ({ sock, m, reply }) => {
                     m.chat,
                     {
                         image: buffer,
-                        caption: `Instagram Photo\n\n${i + 1}/${data.data.length}`
+                        caption: `Instagram Photo\n\n${parseInt(i) + 1}/${
+                            data.data.length
+                        }`
                     },
                     { quoted: m }
                 );
