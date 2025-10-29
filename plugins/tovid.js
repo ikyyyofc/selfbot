@@ -37,6 +37,6 @@ export default async ({ m, fileBuffer, reply }) => {
         fs.unlinkSync(srcPath);
         fs.unlinkSync(outPath);
     } catch (e) {
-        return reply("Failed convert stiker! " + e?.message || e);
+        return reply("Failed convert stiker! " + e);
     }
 };
