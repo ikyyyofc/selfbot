@@ -15,7 +15,10 @@ export default async ({ sock, m, reply }) => {
     try {
         const files = fs
             .readdirSync(PLUGIN_DIR)
-            .filter(f => f.endsWith(".js") && !f.startsWith("___") && f !== "menu.js");
+            .filter(
+                f =>
+                    f.endsWith(".js") && !f.startsWith("___") && f !== "menu.js"
+            );
 
         for (const file of files) {
             const pluginPath = path.join(PLUGIN_DIR, file);
@@ -27,19 +30,16 @@ export default async ({ sock, m, reply }) => {
 
                 if (typeof module.default === "function") {
                     const category = module.category || "General";
-                    const description = module.description || "No description";
 
                     plugins.set(command, {
-                        category,
-                        description
+                        category
                     });
 
                     if (!categories.has(category)) {
                         categories.set(category, []);
                     }
                     categories.get(category).push({
-                        command,
-                        description
+                        command
                     });
                 }
             } catch (e) {
@@ -57,9 +57,8 @@ export default async ({ sock, m, reply }) => {
 
         for (const [category, commands] of categories) {
             menuText += `╭━━『 ${category} 』\n`;
-            commands.forEach(({ command, description }) => {
+            commands.forEach(({ command }) => {
                 menuText += `┃ ${config.PREFIX[0]}${command}\n`;
-                menuText += `┃ ↳ ${description}\n`;
             });
             menuText += `╰━━━━━━━━━━━━━━━\n\n`;
         }
