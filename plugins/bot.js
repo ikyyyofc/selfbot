@@ -125,7 +125,7 @@ export default async function ({ sock, m, text, fileBuffer, reply }) {
             );
         }
     } catch (error) {
-        console.error("Error saat memanggil Claude API:", error);
+        console.error("Error saat memanggil Claude API:", error.response.data);
         await reply(
             `Terjadi kesalahan saat berkomunikasi dengan AI: ${error.message}`
         );
