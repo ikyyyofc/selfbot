@@ -306,12 +306,12 @@ export default async function ({ sock, m, text, fileBuffer, reply }) {
     }
 
     try {
-        const response = (
+        /*const response = (
             await axios.post(
                 "https://api.nekolabs.web.id/ai/claude/sonnet-4.5",
                 payload
             )
-        ).data.result;
+        ).data.result;*/
        /* const response = await gmn(
             [
                 { role: "system", content: payload.systemPrompt },
@@ -319,7 +319,7 @@ export default async function ({ sock, m, text, fileBuffer, reply }) {
             ],
             fileBuffer
         );*/
-        /*const response = (await (new ChatAPI()).chat({messages: [{role: "system", content: payload.systemPrompt},{role:"user", content:payload.text}]})).resAi*/
+        const response = (await (new ChatAPI()).chat({messages: [{role: "system", content: payload.systemPrompt},{role:"user", content:payload.text}]})).resAi
 
         if (response) {
             let check_code = extractCodeFromMarkdown(response);
