@@ -30,10 +30,9 @@ export default async ({ sock, m, reply }) => {
         for (let media of data.data) {
             const mediaUrl = media.url;
 
-            const mediaResponse = await axios.get(mediaUrl, {
-                responseType: "arraybuffer"
-            });
-            const buffer = Buffer.from(mediaResponse.data);
+            const buffer = {
+                url: mediaUrl
+            };
 
             const isVideo = mediaUrl.includes(".mp4") || media.type === "video";
 
