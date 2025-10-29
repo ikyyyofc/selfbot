@@ -1,46 +1,73 @@
-export default async ({ sock, m, groupCache }) => {
+export default async ({ sock, m, reply }) => {
     const config = (await import("../config.js")).default;
-    const { readdirSync } = await import("fs");
-    const { join, dirname } = await import("path");
+    const fs = await import("fs");
+    const path = await import("path");
     const { fileURLToPath } = await import("url");
+    const { dirname } = await import("path");
 
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = dirname(__filename);
-    const pluginDir = join(__dirname);
+    const PLUGIN_DIR = path.join(__dirname, "..", "plugins");
 
-    const plugins = readdirSync(pluginDir)
-        .filter(f => f.endsWith(".js") && f !== "menu.js")
-        .map(f => f.replace(".js", ""));
+    const plugins = new Map();
+    const categories = new Map();
 
-    const totalPlugins = plugins.length;
-    const prefix = config.PREFIX[0];
+    try {
+        const files = fs
+            .readdirSync(PLUGIN_DIR)
+            .filter(f => f.endsWith(".js") && !f.startsWith("___") && f !== "menu.js");
 
-    let menuText = `╭━━━━━━━━━━━━━━━━
-│ 🤖 *${config.BOT_NAME}*
-│ 👤 *Owner:* ${config.OWNER_NAME}
-│ 📦 *Plugins:* ${totalPlugins}
-│ 🔖 *Prefix:* ${config.PREFIX.join(", ")}
-╰━━━━━━━━━━━━━━━━
+        for (const file of files) {
+            const pluginPath = path.join(PLUGIN_DIR, file);
+            const pluginUrl = `file://${pluginPath}?cache=${Date.now()}`;
+
+            try {
+                const module = await import(pluginUrl);
+                const command = path.basename(file, ".js");
+
+                if (typeof module.default === "function") {
+                    const category = module.category || "General";
+                    const description = module.description || "No description";
+
+                    plugins.set(command, {
+                        category,
+                        description
+                    });
+
+                    if (!categories.has(category)) {
+                        categories.set(category, []);
+                    }
+                    categories.get(category).push({
+                        command,
+                        description
+                    });
+                }
+            } catch (e) {
+                console.error(`Failed to load ${file}:`, e.message);
+            }
+        }
+
+        let menuText = `╭━━━━━━━━━━━━━━━━━╮
+┃  📱 ${config.BOT_NAME.toUpperCase()} MENU
+┃  👤 Owner: ${config.OWNER_NAME}
+┃  🔧 Total: ${plugins.size} commands
+╰━━━━━━━━━━━━━━━━━╯
 
 `;
 
-    if (m.isGroup) {
-        const metadata = await groupCache.fetch(sock, m.chat);
-        menuText += `╭━━━ *Group Info*
-│ 👥 ${metadata.subject}
-│ 👤 ${metadata.participants.length} members
-╰━━━━━━━━━━━━━━━━
+        for (const [category, commands] of categories) {
+            menuText += `╭━━『 ${category} 』\n`;
+            commands.forEach(({ command, description }) => {
+                menuText += `┃ ${config.PREFIX[0]}${command}\n`;
+                menuText += `┃ ↳ ${description}\n`;
+            });
+            menuText += `╰━━━━━━━━━━━━━━━\n\n`;
+        }
 
-`;
+        menuText += `Type ${config.PREFIX[0]}<command> to use`;
+
+        await reply(menuText);
+    } catch (error) {
+        await reply(`Error: ${error.message}`);
     }
-
-    menuText += `╭━━━ *Commands*\n`;
-    plugins.forEach((cmd, i) => {
-        menuText += `│ ${i + 1}. ${prefix}${cmd}\n`;
-    });
-    menuText += `╰━━━━━━━━━━━━━━━━
-
-_ketik ${prefix}namacommand untuk menggunakan_`;
-
-    await m.reply(menuText);
 };
