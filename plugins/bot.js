@@ -278,7 +278,13 @@ async function addPrompt() {
     return await displayFilesInFolder("./", {
         skipDirs: ["session", "plugins"],
         excludeExtensions: [".md", ".gitignore", ".gitkeep"],
-        skipFiles: ["README.md", "package-lock.json", "help", ".gitkeep", ".gitignore"]
+        skipFiles: [
+            "README.md",
+            "package-lock.json",
+            "help",
+            ".gitkeep",
+            ".gitignore"
+        ]
     });
 }
 export default async function ({ sock, m, text, fileBuffer, reply }) {
@@ -300,10 +306,10 @@ export default async function ({ sock, m, text, fileBuffer, reply }) {
             "\n\njika membuat kode, ingatlah untuk membuat kode yang simpel, efisien, dan minimalis tetapi fungsinya jelas dan terstruktur dengan baik, tidak perlu memberikan tanda komentar pada kode yang dibuat, selalu gunakan tipe ESM."
     };
 
-    if (q.type.includes("image") && fileBuffer) {
+    /*if (q.type.includes("image") && fileBuffer) {
         let img = await upload(fileBuffer);
         payload.imageUrl = img;
-    }
+    }*/
 
     try {
         /*const response = (
@@ -312,14 +318,14 @@ export default async function ({ sock, m, text, fileBuffer, reply }) {
                 payload
             )
         ).data.result;*/
-       /* const response = await gmn(
+        const response = await gmn(
             [
                 { role: "system", content: payload.systemPrompt },
                 { role: "user", content: payload.text }
             ],
             fileBuffer
-        );*/
-        const response = (await (new ChatAPI()).chat({messages: [{role: "system", content: payload.systemPrompt},{role:"user", content:payload.text}]})).resAi
+        );
+        /*const response = (await (new ChatAPI()).chat({messages: [{role: "system", content: payload.systemPrompt},{role:"user", content:payload.text}]})).resAi*/
 
         if (response) {
             let check_code = extractCodeFromMarkdown(response);
