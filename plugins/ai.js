@@ -15,6 +15,7 @@ import chat from "../lib/gemini.js";
  * - context.reply (async function) <-- reply helper
  */
 export default {
+  desc: "bertanya ke ai",
     rules: {
         limit: 3
     },
