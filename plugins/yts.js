@@ -1,6 +1,7 @@
 import axios from "axios";
 
 export default {
+  desc: "mencari video youtube",
     rules: {
         limit: 3
     },
