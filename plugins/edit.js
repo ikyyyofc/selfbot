@@ -2,6 +2,7 @@ import axios from "axios";
 import upload from "../lib/upload.js";
 
 export default {
+  desc: "edit gambar dengan ai",
     rules: {
         limit: 5
     },
