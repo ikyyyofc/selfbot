@@ -1,73 +1,78 @@
 // plugins/___autodown.js
 import axios from "axios";
 
-export default async ({ sock, m, reply }) => {
-    const text = m.text;
+export default {
+    rules: {
+        limit: 1
+    },
+    async execute({ sock, m, reply }) {
+        const text = m.text;
 
-    const igRegex =
-        /(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)\/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/i;
-    const match = text.match(igRegex);
+        const igRegex =
+            /(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)\/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/i;
+        const match = text.match(igRegex);
 
-    if (!match) return true;
+        if (!match) return true;
 
-    const url = match[0];
+        const url = match[0];
 
-    try {
-        await m.react("⏳");
+        try {
+            await m.react("⏳");
 
-        const response = await axios.get(
-            `https://api.siputzx.my.id/api/d/igdl?url=${encodeURIComponent(
-                url
-            )}`
-        );
-        const data = response.data;
+            const response = await axios.get(
+                `https://api.siputzx.my.id/api/d/igdl?url=${encodeURIComponent(
+                    url
+                )}`
+            );
+            const data = response.data;
 
-        if (!data.status || !data.data || data.data.length === 0) {
-            await reply("❌ Gagal mengunduh konten");
+            if (!data.status || !data.data || data.data.length === 0) {
+                await reply("❌ Gagal mengunduh konten");
+                return false;
+            }
+
+            for (let i in data.data) {
+                const mediaUrl = data.data[i].url;
+
+                const buffer = {
+                    url: mediaUrl
+                };
+
+                const isVideo =
+                    mediaUrl.includes(".mp4") || data.data[i].type === "video";
+
+                if (isVideo) {
+                    await sock.sendMessage(
+                        m.chat,
+                        {
+                            video: buffer,
+                            caption: `Instagram Video\n\n${parseInt(i) + 1}/${
+                                data.data.length
+                            }`
+                        },
+                        { quoted: m }
+                    );
+                } else {
+                    await sock.sendMessage(
+                        m.chat,
+                        {
+                            image: buffer,
+                            caption: `Instagram Photo\n\n${parseInt(i) + 1}/${
+                                data.data.length
+                            }`
+                        },
+                        { quoted: m }
+                    );
+                }
+            }
+
+            await m.react("✅");
+            return false;
+        } catch (error) {
+            console.error("Instagram download error:", error.message);
+            await reply(`❌ Error: ${error.message}`);
+            await m.react("❌");
             return false;
         }
-
-        for (let i in data.data) {
-            const mediaUrl = data.data[i].url;
-
-            const buffer = {
-                url: mediaUrl
-            };
-
-            const isVideo =
-                mediaUrl.includes(".mp4") || data.data[i].type === "video";
-
-            if (isVideo) {
-                await sock.sendMessage(
-                    m.chat,
-                    {
-                        video: buffer,
-                        caption: `Instagram Video\n\n${parseInt(i) + 1}/${
-                            data.data.length
-                        }`
-                    },
-                    { quoted: m }
-                );
-            } else {
-                await sock.sendMessage(
-                    m.chat,
-                    {
-                        image: buffer,
-                        caption: `Instagram Photo\n\n${parseInt(i) + 1}/${
-                            data.data.length
-                        }`
-                    },
-                    { quoted: m }
-                );
-            }
-        }
-
-        await m.react("✅");
-        return false;
-    } catch (error) {
-        console.error("Instagram download error:", error.message);
-        await reply(`❌ Error: ${error.message}`);
-        await m.react("❌");
-        return false;
     }
 };
