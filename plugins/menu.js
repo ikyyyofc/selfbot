@@ -187,7 +187,7 @@ export default {
         text += "[L] = Limit Required\n" 
         text += "[P] = Premium Required\n"
         
-        text += "[O] Owner Required`;
+        text += "[O] Owner Required";
 
         await m.reply(text, { mentions: [m.sender] });
     }
