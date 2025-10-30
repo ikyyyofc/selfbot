@@ -182,7 +182,12 @@ export default {
         text += `╰━━━━━━━━━━━━━━━━━━\n\n`;
 
         text += `_💡 Tip: Ketik ${config.PREFIX[0]}help <command> untuk detail_\n`;
-        text += `_📌 [L] = Limit required | 💎 = Premium | 👑 = Owner_`;
+        text += "*_📌 Note_*\n" 
+        
+        text += "[L] = Limit Required\n" 
+        text += "[P] = Premium Required\n"
+        
+        text += "[O] Owner Required`;
 
         await m.reply(text, { mentions: [m.sender] });
     }
