@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node index.js"
+    "start": "node index.js",
+    "pm2": "npx pm2 start bot.js && npx pm2 logs"
   },
   "keywords": [],
   "author": "",
@@ -22,6 +23,7 @@
     "fluent-ffmpeg": "latest",
     "mongodb": "latest",
     "node-cache": "latest",
+    "pm2": "latest",
     "wa-sticker-formatter": "latest"
   }
 }
