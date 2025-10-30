@@ -1,4 +1,5 @@
 export default {
+  desc: "menampilkan waktu bot berjalan",
     async execute({ reply }) {
         try {
             // Hitung uptime dari process.uptime() dalam detik
