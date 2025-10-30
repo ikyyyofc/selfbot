@@ -1,6 +1,7 @@
 import { Sticker, StickerTypes } from "wa-sticker-formatter";
 
 export default {
+  desc: "mengubah watermark stiker",
     rules: {
         limit: 1
     },
