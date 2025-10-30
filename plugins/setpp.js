@@ -1,6 +1,7 @@
 import fs from "fs";
 
 export default {
+  desc: "Mengubah foto profil"
     rules: {
         owner: true
     },
