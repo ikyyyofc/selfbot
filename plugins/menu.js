@@ -147,7 +147,7 @@ export default {
             text += `╭━━━『 *PREMIUM COMMANDS* 』\n`;
             categories.premium.forEach(cmd => {
                 const detail = pluginDetails.get(cmd);
-                text += `│ ✦ ${config.PREFIX[0]}${cmd} 💎\n`;
+                text += `│ ✦ ${config.PREFIX[0]}${cmd} [P]\n`;
                 text += `│   └ ${detail.desc.charAt(0).toUpperCase() + detail.desc.slice(1)}\n`;
             });
             text += `╰━━━━━━━━━━━━━━━━━━\n\n`;
