@@ -1,6 +1,7 @@
 import db from "../lib/Database.js";
 
 export default {
+  desc: "menampilkan profile",
     async execute({ sender, reply }) {
         const user = await db.getOrCreateUser(sender);
 
