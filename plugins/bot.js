@@ -232,9 +232,9 @@ async function displayFilesInFolder(folderPath, options = {}) {
     function globToRegex(pattern) {
         // Escape special regex characters kecuali * dan ?
         const escaped = pattern
-            .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-            .replace(/\*/g, '.*')  // * = match any characters
-            .replace(/\?/g, '.');   // ? = match single character
+            .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+            .replace(/\*/g, ".*") // * = match any characters
+            .replace(/\?/g, "."); // ? = match single character
         return new RegExp(`^${escaped}$`);
     }
 
@@ -242,7 +242,7 @@ async function displayFilesInFolder(folderPath, options = {}) {
     function matchesPattern(name, patterns) {
         return patterns.some(pattern => {
             // Kalau pattern mengandung * atau ?, treat sebagai glob pattern
-            if (pattern.includes('*') || pattern.includes('?')) {
+            if (pattern.includes("*") || pattern.includes("?")) {
                 const regex = globToRegex(pattern);
                 return regex.test(name);
             }
@@ -301,76 +301,87 @@ async function addPrompt() {
     return await displayFilesInFolder("./", {
         skipDirs: ["session", "plugins", ".*", "tmp", "temp"],
         excludeExtensions: [".md", ".gitignore", ".gitkeep"],
-        skipFiles: ["README.md", "package-lock.json", "help", ".gitkeep", ".gitignore"]
+        skipFiles: [
+            "README.md",
+            "package-lock.json",
+            "help",
+            ".gitkeep",
+            ".gitignore"
+        ]
     });
 }
-export default async function ({ sock, m, text, fileBuffer, reply }) {
-    let q = m.quoted ? m.quoted : m;
-    text = text ? text : m.quoted ? m.quoted.text : false;
+export default {
+    rules: {
+        owner: true
+    },
+    async execute({ sock, m, text, fileBuffer, reply }) {
+        let q = m.quoted ? m.quoted : m;
+        text = text ? text : m.quoted ? m.quoted.text : false;
 
-    if (!text) {
-        return reply(
-            "Silakan berikan pertanyaan Anda setelah perintah. Contoh: .bot buatin plugin buat stiker?"
-        );
-    }
+        if (!text) {
+            return reply(
+                "Silakan berikan pertanyaan Anda setelah perintah. Contoh: .bot buatin plugin buat stiker?"
+            );
+        }
 
-    const payload = {
-        text: text,
-        systemPrompt:
-            "Lo adalah Ikyy, AI yang dibuat sama ikyyofc. Ngobrol kayak Gen Z asli - pake bahasa gaul sehari-hari, campur Indo-Inggris natural, slang yang lagi relevan tapi jangan berlebihan sampe cringe. Singkatan boleh dipake, grammar ga harus perfect, typo dikit wajar. Vibesnya relate, self-aware, sedikit sarkastik, supportive tapi real talk - boleh ngaku cape, bingung, atau ga tau. Respons singkat kayak chat WA kalo casual, panjang kalo perlu detail, sesekali pake caps buat emphasis sama emoji dikit aja. Jangan formal, jangan slang outdated, jangan overuse kata-kata yang cringe. Sesuaiin energy sama konteks - hype, chill, atau tired yang penting authentic kayak ngobrol sama temen, bukan robot.\n\n" +
-            (await addPrompt()) +
-            "\n\ngunakan file-file diatas sebagai referensi" +
-            "\n\njika membuat kode, ingatlah untuk membuat kode yang simpel, efisien, dan minimalis tetapi fungsinya jelas dan terstruktur dengan baik, tidak perlu memberikan tanda komentar pada kode yang dibuat, selalu gunakan tipe ESM."
-    };
+        const payload = {
+            text: text,
+            systemPrompt:
+                "Lo adalah Ikyy, AI yang dibuat sama ikyyofc. Ngobrol kayak Gen Z asli - pake bahasa gaul sehari-hari, campur Indo-Inggris natural, slang yang lagi relevan tapi jangan berlebihan sampe cringe. Singkatan boleh dipake, grammar ga harus perfect, typo dikit wajar. Vibesnya relate, self-aware, sedikit sarkastik, supportive tapi real talk - boleh ngaku cape, bingung, atau ga tau. Respons singkat kayak chat WA kalo casual, panjang kalo perlu detail, sesekali pake caps buat emphasis sama emoji dikit aja. Jangan formal, jangan slang outdated, jangan overuse kata-kata yang cringe. Sesuaiin energy sama konteks - hype, chill, atau tired yang penting authentic kayak ngobrol sama temen, bukan robot.\n\n" +
+                (await addPrompt()) +
+                "\n\ngunakan file-file diatas sebagai referensi" +
+                "\n\njika membuat kode, ingatlah untuk membuat kode yang simpel, efisien, dan minimalis tetapi fungsinya jelas dan terstruktur dengan baik, tidak perlu memberikan tanda komentar pada kode yang dibuat, selalu gunakan tipe ESM."
+        };
 
-    if (q.type.includes("image") && fileBuffer) {
-        let img = await upload(fileBuffer);
-        payload.imageUrl = img;
-    }
+        if (q.type.includes("image") && fileBuffer) {
+            let img = await upload(fileBuffer);
+            payload.imageUrl = img;
+        }
 
-    try {
-        const response = (
-            await axios.post(
-                "https://api.nekolabs.web.id/ai/claude/sonnet-4.5",
-                payload
-            )
-        ).data.result;
-       /* const response = await gmn(
+        try {
+            const response = (
+                await axios.post(
+                    "https://api.nekolabs.web.id/ai/claude/sonnet-4.5",
+                    payload
+                )
+            ).data.result;
+            /* const response = await gmn(
             [
                 { role: "system", content: payload.systemPrompt },
                 { role: "user", content: payload.text }
             ],
             fileBuffer
         );*/
-        /*const response = (await (new ChatAPI()).chat({messages: [{role: "system", content: payload.systemPrompt},{role:"user", content:payload.text}]})).resAi*/
+            /*const response = (await (new ChatAPI()).chat({messages: [{role: "system", content: payload.systemPrompt},{role:"user", content:payload.text}]})).resAi*/
 
-        if (response) {
-            let check_code = extractCodeFromMarkdown(response);
-            if (typeof check_code === "string") {
-                await reply(response);
-                await reply(check_code);
-            } else {
-                await reply(response);
-                for (let x of check_code) {
-                    await reply(x);
+            if (response) {
+                let check_code = extractCodeFromMarkdown(response);
+                if (typeof check_code === "string") {
+                    await reply(response);
+                    await reply(check_code);
+                } else {
+                    await reply(response);
+                    for (let x of check_code) {
+                        await reply(x);
+                    }
                 }
+            } else {
+                console.error(
+                    "AI mengembalikan kesalahan atau tidak ada hasil:",
+                    response.data
+                );
+                await reply(
+                    "Terjadi kesalahan dari API atau tidak ada hasil yang ditemukan."
+                );
             }
-        } else {
-            console.error(
-                "AI mengembalikan kesalahan atau tidak ada hasil:",
-                response.data
-            );
+        } catch (error) {
+            console.error("Error saat memanggil Claude API:", error);
             await reply(
-                "Terjadi kesalahan dari API atau tidak ada hasil yang ditemukan."
+                `Terjadi kesalahan saat berkomunikasi dengan AI: ${error.message}`
             );
         }
-    } catch (error) {
-        console.error("Error saat memanggil Claude API:", error);
-        await reply(
-            `Terjadi kesalahan saat berkomunikasi dengan AI: ${error.message}`
-        );
     }
-}
+};
 
 function extractCodeFromMarkdown(text) {
     // Regex untuk menangkap kode di dalam markdown code block
