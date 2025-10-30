@@ -1,6 +1,7 @@
 import db from "../lib/Database.js";
 
 export default {
+  desc: "tambah user premium",
     rules: {
         owner: true
     },
