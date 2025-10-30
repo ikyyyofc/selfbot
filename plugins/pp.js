@@ -1,5 +1,6 @@
 // plugins/get-pp.js
 export default {
+  desc: "mendapatkan foto profil",
     async execute({ sock, from, args, text, m, reply }) {
         try {
             const toJid = num => {
