@@ -26,7 +26,7 @@ export default {
     SESSION_CLEANUP_INTERVAL: 1,
     SESSION_MAX_SIZE_MB: 50,
 
-    BOT_MODE: "self",
+    BOT_MODE: "public",
 
     DB_MODE: "local",
     MONGODB_URI: "",
