@@ -3,6 +3,7 @@ import axios from "axios";
 import upload from "../lib/upload.js";
 
 export default {
+  desc: "menjernihkan foto",
     rules: {
         limit: 3
     },
