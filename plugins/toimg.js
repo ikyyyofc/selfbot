@@ -2,6 +2,7 @@ import fs from "fs";
 import { downloadMediaMessage } from "@whiskeysockets/baileys";
 
 export default {
+  desc: "mengubah stiker menjadi gambar",
     rules: {
         limit: 1
     },
