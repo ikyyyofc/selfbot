@@ -181,7 +181,7 @@ export default {
         if (isOwner) text += `│ • Owner: ${categories.owner.length}\n`;
         text += `╰━━━━━━━━━━━━━━━━━━\n\n`;
 
-        text += `_💡 Tip: Ketik ${config.PREFIX[0]}help <command> untuk detail_\n`;
+        text += `_💡 Tip: Ketik ${config.PREFIX[0]}<command> untuk menggunakan fitur_\n`;
         text += "*_📌 Note_*\n" 
         
         text += "[L] = Limit Required\n" 
