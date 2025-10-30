@@ -20,6 +20,29 @@ async function displayFilesInFolder(folderPath, options = {}) {
     const allSkipDirs = [...new Set([...defaultSkipDirs, ...skipDirs])];
     const allSkipFiles = [...new Set([...defaultSkipFiles, ...skipFiles])];
 
+    // Helper function untuk convert glob pattern ke regex
+    function globToRegex(pattern) {
+        // Escape special regex characters kecuali * dan ?
+        const escaped = pattern
+            .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+            .replace(/\*/g, '.*')  // * = match any characters
+            .replace(/\?/g, '.');   // ? = match single character
+        return new RegExp(`^${escaped}$`);
+    }
+
+    // Helper function untuk check apakah nama match dengan patterns
+    function matchesPattern(name, patterns) {
+        return patterns.some(pattern => {
+            // Kalau pattern mengandung * atau ?, treat sebagai glob pattern
+            if (pattern.includes('*') || pattern.includes('?')) {
+                const regex = globToRegex(pattern);
+                return regex.test(name);
+            }
+            // Kalau tidak, exact match
+            return name === pattern;
+        });
+    }
+
     let result = "";
 
     async function readFilesRecursively(dir, basePath = "") {
@@ -31,11 +54,11 @@ async function displayFilesInFolder(folderPath, options = {}) {
             const stats = await fs.stat(fullPath);
 
             if (stats.isDirectory()) {
-                if (!allSkipDirs.includes(item)) {
+                if (!matchesPattern(item, allSkipDirs)) {
                     await readFilesRecursively(fullPath, relativePath);
                 }
             } else if (stats.isFile()) {
-                if (allSkipFiles.includes(item)) {
+                if (matchesPattern(item, allSkipFiles)) {
                     continue;
                 }
 
