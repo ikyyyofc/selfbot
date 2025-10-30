@@ -4,6 +4,7 @@ import { promisify } from "util";
 const execAsync = promisify(exec);
 
 export default {
+  desc: "mengupdate bot",
     rules: {
         owner: true
     },
