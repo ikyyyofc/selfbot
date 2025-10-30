@@ -10,10 +10,30 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PLUGIN_DIR = path.join(__dirname);
 
-// Helper function untuk memotong teks panjang
-const truncateText = (text, maxLength = 45) => {
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength - 3) + "...";
+// Helper function untuk word wrap dengan indentasi
+const wrapText = (text, maxWidth = 35, indent = "┃    ") => {
+    const words = text.split(" ");
+    let lines = [];
+    let currentLine = "";
+    
+    for (let word of words) {
+        const testLine = currentLine ? `${currentLine} ${word}` : word;
+        
+        if (testLine.length <= maxWidth) {
+            currentLine = testLine;
+        } else {
+            if (currentLine) lines.push(currentLine);
+            currentLine = word;
+        }
+    }
+    
+    if (currentLine) lines.push(currentLine);
+    
+    // Join dengan indentasi untuk baris kedua dan seterusnya
+    return lines.map((line, index) => {
+        if (index === 0) return line;
+        return `${indent}${line}`;
+    }).join("\n");
 };
 
 // Helper function untuk capitalize
@@ -104,33 +124,39 @@ export default {
         const usedMem = ((os.totalmem() - os.freemem()) / 1024 / 1024 / 1024).toFixed(2);
 
         // Header dengan box style yang lebih rapi
-        let text = `┏━━━━━━━━━━━━━━━━━━━━━━━\n`;
-        text += `┃ *${config.BOT_NAME}*\n`;
-        text += `┗━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+        let text = `╭─────────────────────────╮\n`;
+        text += `│   *${config.BOT_NAME}*\n`;
+        text += `╰─────────────────────────╯\n\n`;
 
         // User Info Section
-        text += `┏━━━ *USER INFO* ━━━\n`;
-        text += `┃ Name : ${m.pushName}\n`;
-        text += `┃ Number : @${senderNumber}\n`;
-        text += `┃ Status : ${isPremium ? "PREMIUM ✨" : isOwner ? "OWNER 👑" : "FREE USER"}\n`;
-        text += `┃ Limit : ${isPremium || isOwner ? "Unlimited ∞" : `${limit}/${config.DEFAULT_LIMIT}`}\n`;
-        text += `┗━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+        text += `╭───〔 *USER INFO* 〕\n`;
+        text += `│\n`;
+        text += `│ ◦ Name: ${m.pushName}\n`;
+        text += `│ ◦ Number: @${senderNumber}\n`;
+        text += `│ ◦ Status: ${isPremium ? "PREMIUM ✨" : isOwner ? "OWNER 👑" : "FREE USER"}\n`;
+        text += `│ ◦ Limit: ${isPremium || isOwner ? "Unlimited ∞" : `${limit}/${config.DEFAULT_LIMIT}`}\n`;
+        text += `│\n`;
+        text += `╰────────────────────────\n\n`;
 
         // Bot Info Section
-        text += `┏━━━ *BOT INFO* ━━━\n`;
-        text += `┃ Mode : ${config.BOT_MODE.toUpperCase()}\n`;
-        text += `┃ Runtime : ${runtimeText}\n`;
-        text += `┃ Platform : ${platform} (${arch})\n`;
-        text += `┃ Memory : ${usedMem}GB/${totalMem}GB\n`;
-        text += `┃ Owner : ${config.OWNER_NAME}\n`;
-        text += `┃ Prefix : ${config.PREFIX.join(", ")}\n`;
-        text += `┗━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+        text += `╭───〔 *BOT INFO* 〕\n`;
+        text += `│\n`;
+        text += `│ ◦ Mode: ${config.BOT_MODE.toUpperCase()}\n`;
+        text += `│ ◦ Runtime: ${runtimeText}\n`;
+        text += `│ ◦ Platform: ${platform} (${arch})\n`;
+        text += `│ ◦ Memory: ${usedMem}GB/${totalMem}GB\n`;
+        text += `│ ◦ Owner: ${config.OWNER_NAME}\n`;
+        text += `│ ◦ Prefix: ${config.PREFIX.join(", ")}\n`;
+        text += `│\n`;
+        text += `╰────────────────────────\n\n`;
 
         // Commands Section dengan format yang lebih rapi
         const displayCategory = (title, cmds, showForOwner = true) => {
             if (!showForOwner || cmds.length === 0) return "";
             
-            let section = `┏━━━ *${title}* ━━━\n`;
+            let section = `╭───〔 *${title}* 〕\n`;
+            section += `│\n`;
+            
             cmds.forEach((cmd, index) => {
                 const detail = pluginDetails.get(cmd);
                 const limitInfo = detail.rules.limit ? ` [${detail.rules.limit}L]` : "";
@@ -138,14 +164,20 @@ export default {
                 const ownerInfo = detail.rules.owner ? " [O]" : "";
                 const badges = limitInfo + premiumInfo + ownerInfo;
                 
-                // Truncate description jika terlalu panjang
-                const desc = truncateText(capitalize(detail.desc));
+                // Wrap description dengan indentasi yang tepat
+                const desc = wrapText(capitalize(detail.desc));
                 
-                section += `┃\n`;
-                section += `┃ ${config.PREFIX[0]}${cmd}${badges}\n`;
-                section += `┃ ↳ ${desc}\n`;
+                section += `│ • ${config.PREFIX[0]}${cmd}${badges}\n`;
+                section += `│   ${desc}\n`;
+                
+                // Spacing antar command
+                if (index < cmds.length - 1) {
+                    section += `│\n`;
+                }
             });
-            section += `┗━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+            
+            section += `│\n`;
+            section += `╰────────────────────────\n\n`;
             
             return section;
         };
@@ -161,37 +193,42 @@ export default {
         }
 
         // Eval Commands
-        text += `┏━━━ *EVAL COMMANDS* ━━━\n`;
-        text += `┃\n`;
-        text += `┃ > <code>\n`;
-        text += `┃ ↳ Execute JavaScript code\n`;
-        text += `┃\n`;
-        text += `┃ => <code>\n`;
-        text += `┃ ↳ Execute & return result\n`;
-        text += `┃\n`;
-        text += `┃ $ <command>\n`;
-        text += `┃ ↳ Execute terminal command\n`;
-        text += `┗━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+        text += `╭───〔 *EVAL COMMANDS* 〕\n`;
+        text += `│\n`;
+        text += `│ • > <code>\n`;
+        text += `│   Execute JavaScript code\n`;
+        text += `│\n`;
+        text += `│ • => <code>\n`;
+        text += `│   Execute & return result\n`;
+        text += `│\n`;
+        text += `│ • $ <command>\n`;
+        text += `│   Execute terminal command\n`;
+        text += `│\n`;
+        text += `╰────────────────────────\n\n`;
 
         // Statistics
-        text += `┏━━━ *STATISTICS* ━━━\n`;
-        text += `┃ Total Commands : ${files.length}\n`;
-        text += `┃ General : ${categories.general.length}\n`;
-        text += `┃ Group : ${categories.group.length}\n`;
-        text += `┃ Admin : ${categories.admin.length}\n`;
-        text += `┃ Premium : ${categories.premium.length}\n`;
-        if (isOwner) text += `┃ Owner : ${categories.owner.length}\n`;
-        text += `┗━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+        text += `╭───〔 *STATISTICS* 〕\n`;
+        text += `│\n`;
+        text += `│ Total Commands: ${files.length}\n`;
+        text += `│ • General: ${categories.general.length}\n`;
+        text += `│ • Group: ${categories.group.length}\n`;
+        text += `│ • Admin: ${categories.admin.length}\n`;
+        text += `│ • Premium: ${categories.premium.length}\n`;
+        if (isOwner) text += `│ • Owner: ${categories.owner.length}\n`;
+        text += `│\n`;
+        text += `╰────────────────────────\n\n`;
 
         // Footer
-        text += `┏━━━ *NOTES* ━━━\n`;
-        text += `┃ [L] = Limit Required\n`;
-        text += `┃ [P] = Premium Required\n`;
-        text += `┃ [O] = Owner Only\n`;
-        text += `┃\n`;
-        text += `┃ 💡 Ketik ${config.PREFIX[0]}<command>\n`;
-        text += `┃    untuk menggunakan fitur\n`;
-        text += `┗━━━━━━━━━━━━━━━━━━━━━━━`;
+        text += `╭───〔 *LEGEND* 〕\n`;
+        text += `│\n`;
+        text += `│ [L] = Limit Required\n`;
+        text += `│ [P] = Premium Only\n`;
+        text += `│ [O] = Owner Only\n`;
+        text += `│\n`;
+        text += `│ 💡 Tip: Ketik ${config.PREFIX[0]}<command>\n`;
+        text += `│    untuk menggunakan fitur\n`;
+        text += `│\n`;
+        text += `╰────────────────────────`;
 
         await m.reply(text, [m.key.participant], { mentions: [m.key.participant] });
     }
