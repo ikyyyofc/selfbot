@@ -3,24 +3,37 @@ import db from "../lib/Database.js";
 
 const config = await import("../config.js").then(m => m.default);
 
+const checkedGroups = new Set();
+
 export default {
-    async execute({ sock, m, isGroup, chat }) {
+    async execute({ sock, m, isGroup, chat, sender }) {
         if (!isGroup) return true;
         if (config.BOT_MODE === "self") return true;
+        if (m.fromMe) return true;
 
         try {
+            if (checkedGroups.has(chat)) return true;
+
             const botJid = sock.user.id.split(":")[0] + "@s.whatsapp.net";
+            const botLid = sock.user.lid?.split(":")[0] + "@lid";
 
-            if (m.type === "notification" || m.key.id.includes("NOTIFY")) {
-                const groupData = await db.getGroup(chat);
+            const groupData = await db.getGroup(chat);
 
-                if (!groupData?.approved) {
-                    console.log(
-                        colors.yellow(
-                            `⚠️  Bot ditambahkan ke grup tidak disetujui: ${chat}`
-                        )
-                    );
+            if (!groupData?.approved) {
+                checkedGroups.add(chat);
 
+                console.log(
+                    colors.yellow(
+                        `⚠️  Bot di grup tidak disetujui: ${chat}`
+                    )
+                );
+
+                const metadata = await sock.groupMetadata(chat);
+                const botInGroup = metadata.participants.some(
+                    p => p.id === botJid || p.id === botLid
+                );
+
+                if (botInGroup) {
                     await sock.sendMessage(chat, {
                         text: `⚠️ *ANTI CULIK AKTIF*\n\nBot ini tidak bisa digunakan di grup yang tidak terdaftar.\n\nHubungi owner untuk approve grup ini:\nwa.me/${config.OWNER_NUMBER.replace(/[^0-9]/g, "")}`
                     });
@@ -37,7 +50,7 @@ export default {
                         config.OWNER_NUMBER.replace(/[^0-9]/g, "") +
                         "@s.whatsapp.net";
                     await sock.sendMessage(ownerJid, {
-                        text: `🚨 *ANTI CULIK NOTIFICATION*\n\n❌ Bot diculik masuk grup:\n📱 ID: ${chat}\n\n✅ Bot sudah keluar otomatis.\n\n💡 Gunakan .approvegc di grup tersebut untuk approve.`
+                        text: `🚨 *ANTI CULIK NOTIFICATION*\n\n❌ Bot diculik masuk grup:\n📱 Nama: ${metadata.subject}\n🆔 ID: ${chat}\n\n✅ Bot sudah keluar otomatis.\n\n💡 Gunakan .approvegc di grup tersebut untuk approve.`
                     });
 
                     return false;
