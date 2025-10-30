@@ -116,7 +116,7 @@ export default {
                 const detail = pluginDetails.get(cmd);
                 const limitInfo = detail.rules.limit ? ` (${detail.rules.limit} limit)` : "";
                 text += `│ ✦ ${config.PREFIX[0]}${cmd}${limitInfo}\n`;
-                text += `│   └ ${detail.desc}\n`;
+                text += `│   └ ${detail.desc.charAt(0).toUpperCase() + detail.desc.slice(1)}\n`;
             });
             text += `╰━━━━━━━━━━━━━━━━━━\n\n`;
         }
