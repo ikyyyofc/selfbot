@@ -24,7 +24,7 @@ async function postData(input) {
 }
 
 export default {
-  desc: "download media tiktok",
+  desc: "download media tiktok dari jembotttjrjrjfnfnndndndmdmdmxmxmxkxkxkkxkxkxkxkkxxcccc",
     rules: {
         limit: 2
     },
