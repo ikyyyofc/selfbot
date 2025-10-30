@@ -1,6 +1,7 @@
 import uploadFile from "../lib/upload.js";
 
 export default {
+  desc: "mengupload media ke cloud",
     async execute({ sock, from, args, text, m, fileBuffer, reply }) {
         try {
             // Cek apakah ada file
