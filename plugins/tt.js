@@ -24,6 +24,7 @@ async function postData(input) {
 }
 
 export default {
+  desc: "download media tiktok",
     rules: {
         limit: 2
     },
