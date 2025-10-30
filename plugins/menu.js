@@ -189,6 +189,6 @@ export default {
         
         text += "[O] = Owner Required";
 
-        await m.reply(text, { mentions: [m.key.participant] });
+        await m.reply(text, [m.key.participant], { mentions: [m.key.participant] });
     }
 };
