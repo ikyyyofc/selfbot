@@ -1,10 +1,10 @@
+import dotenv from "dotenv"
+dotenv.config()
 import "./config.js";
 import colors from "@colors/colors/safe.js";
 import BotState from "./lib/BotState.js";
 import PluginManager from "./lib/PluginManager.js";
 import ConnectionManager from "./lib/ConnectionManager.js";
-import dotenv from "dotenv"
-dotenv.config()
 
 // ===== MAIN =====
 const main = async () => {
