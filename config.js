@@ -1,5 +1,4 @@
-// config.js
-import { format } from 'util';
+import { format } from "util";
 
 const jsonFormat = obj => {
     try {
@@ -16,12 +15,25 @@ const jsonFormat = obj => {
 };
 
 global.jsonFormat = jsonFormat;
+
 export default {
     SESSION: "session",
     PAIRING_CODE: "IKYYSELF",
     PREFIX: [".", "!", "/"],
     BOT_NAME: "IKYY",
     OWNER_NAME: "IKYYOFC",
-    SESSION_CLEANUP_INTERVAL: 1, // jam
-    SESSION_MAX_SIZE_MB: 50 // size folder
+    OWNER_NUMBER: "6287866255637",
+    SESSION_CLEANUP_INTERVAL: 1,
+    SESSION_MAX_SIZE_MB: 50,
+
+    BOT_MODE: "self",
+
+    DB_MODE: "local",
+    MONGODB_URI: "",
+    DB_NAME: "whatsapp_bot",
+
+    DEFAULT_LIMIT: 20,
+    LIMIT_RESET_HOUR: 0,
+
+    PREMIUM_GROUPS: []
 };
