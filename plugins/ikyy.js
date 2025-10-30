@@ -60,6 +60,7 @@ async function hackai(messages, webSearch = false) {
 }
 
 export default {
+  desc: "mode ai tanpa batasan",
     rules: {
         limit: 2
     },
