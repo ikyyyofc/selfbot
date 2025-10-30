@@ -1,6 +1,7 @@
 import { Sticker, StickerTypes } from "wa-sticker-formatter";
 
 export default {
+  desc: "membuat stiker",
     rules: {
         limit: 1
     },
