@@ -19,7 +19,7 @@ export default async ({ m, text, reply }) => {
         const checkUrl = initData.check_url;
         let processing = true;
         let attempts = 0;
-        const maxAttempts = 60;
+        const maxAttempts = 120;
 
         while (processing && attempts < maxAttempts) {
             await new Promise(resolve => setTimeout(resolve, 5000));
@@ -44,7 +44,7 @@ export default async ({ m, text, reply }) => {
 
             attempts++;
 
-            if (attempts % 6 === 0) {
+            if (attempts % 12 === 0) {
                 await reply(`⏳ Masih diproses... (${attempts * 5}s)`);
             }
         }
