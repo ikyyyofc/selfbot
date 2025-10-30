@@ -1,4 +1,5 @@
 export default {
+  desc: "tag semua member",
     rules: {
         admin: true
     },
