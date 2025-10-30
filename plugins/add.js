@@ -14,7 +14,7 @@ export default {
             const botNumber =
                 (await sock.user.id).split(":")[0] + "@s.whatsapp.net";
             const isBotAdmin = metadata.participants.find(
-                p => p.jid === botNumber && p.admin
+                p => p.phoneNumber === botNumber && p.admin
             );
             if (!isBotAdmin)
                 return reply(
