@@ -1,5 +1,6 @@
 // plugins/instagram.js
 export default {
+  desc: "download media instagram",
     rules: {
         limit: 3
     },
