@@ -157,7 +157,7 @@ export default {
             text += `╭━━━『 *OWNER COMMANDS* 』\n`;
             categories.owner.forEach(cmd => {
                 const detail = pluginDetails.get(cmd);
-                text += `│ ✦ ${config.PREFIX[0]}${cmd} 👑\n`;
+                text += `│ ✦ ${config.PREFIX[0]}${cmd} [O]\n`;
                 text += `│   └ ${detail.desc.charAt(0).toUpperCase() + detail.desc.slice(1)}\n`;
             });
             text += `╰━━━━━━━━━━━━━━━━━━\n\n`;
