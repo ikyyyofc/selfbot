@@ -12,7 +12,33 @@ export default {
         if (m.fromMe) return true;
 
         try {
-            if (checkedGroups.has(chat)) return true;
+            if (checkedGroups.has(chat)) {
+                const groupData = await db.getGroup(chat);
+                
+                if (groupData?.approved && groupData?.expiresAt) {
+                    if (Date.now() > groupData.expiresAt) {
+                        checkedGroups.delete(chat);
+                        
+                        await sock.sendMessage(chat, {
+                            text: `⏰ *MASA SEWA HABIS*\n\nSewa bot di grup ini sudah expired.\n\nBot akan keluar dalam 5 detik...\n\nHubungi owner untuk perpanjang:\nwa.me/${config.OWNER_NUMBER.replace(/[^0-9]/g, "")}`
+                        });
+
+                        await new Promise(resolve => setTimeout(resolve, 5000));
+                        await sock.groupLeave(chat);
+
+                        const ownerJid = config.OWNER_NUMBER.replace(/[^0-9]/g, "") + "@s.whatsapp.net";
+                        await sock.sendMessage(ownerJid, {
+                            text: `⏰ *SEWA EXPIRED*\n\n❌ Bot keluar dari grup:\n📱 Nama: ${groupData.subject}\n🆔 ID: ${chat}\n\nAlasan: Masa sewa habis`
+                        });
+
+                        await db.updateGroup(chat, { approved: false });
+                        
+                        return false;
+                    }
+                }
+                
+                return true;
+            }
 
             const botJid = sock.user.id.split(":")[0] + "@s.whatsapp.net";
             const botLid = sock.user.lid?.split(":")[0] + "@lid";
@@ -53,6 +79,26 @@ export default {
                         text: `🚨 *ANTI CULIK NOTIFICATION*\n\n❌ Bot diculik masuk grup:\n📱 Nama: ${metadata.subject}\n🆔 ID: ${chat}\n\n✅ Bot sudah keluar otomatis.\n\n💡 Gunakan .approvegc di grup tersebut untuk approve.`
                     });
 
+                    return false;
+                }
+            } else {
+                checkedGroups.add(chat);
+                
+                if (groupData.expiresAt && Date.now() > groupData.expiresAt) {
+                    await sock.sendMessage(chat, {
+                        text: `⏰ *MASA SEWA HABIS*\n\nSewa bot di grup ini sudah expired.\n\nBot akan keluar dalam 5 detik...\n\nHubungi owner untuk perpanjang:\nwa.me/${config.OWNER_NUMBER.replace(/[^0-9]/g, "")}`
+                    });
+
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                    await sock.groupLeave(chat);
+
+                    const ownerJid = config.OWNER_NUMBER.replace(/[^0-9]/g, "") + "@s.whatsapp.net";
+                    await sock.sendMessage(ownerJid, {
+                        text: `⏰ *SEWA EXPIRED*\n\n❌ Bot keluar dari grup:\n📱 Nama: ${groupData.subject}\n🆔 ID: ${chat}\n\nAlasan: Masa sewa habis`
+                    });
+
+                    await db.updateGroup(chat, { approved: false });
+                    
                     return false;
                 }
             }
