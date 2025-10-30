@@ -10,6 +10,7 @@ export default {
         if (!isGroup) return true;
         if (config.BOT_MODE === "self") return true;
         if (m.fromMe) return true;
+        if (m.isOwner) return true;
 
         try {
             if (checkedGroups.has(chat)) {
