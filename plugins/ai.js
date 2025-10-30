@@ -16,7 +16,6 @@ import chat from "../lib/gemini.js";
  */
 export default {
   desc: "bertanya ke ai",
-  eg: "ah ah ah",
     rules: {
         limit: 3
     },
