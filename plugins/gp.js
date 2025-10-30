@@ -8,6 +8,7 @@ const __dirname = path.dirname(__filename);
 const PLUGIN_DIR = __dirname; // folder plugin
 
 export default {
+  desc: "menampilkan / mengambil plugin",
     rules: {
         owner: true
     },
