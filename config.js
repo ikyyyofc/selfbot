@@ -26,10 +26,10 @@ export default {
     SESSION_CLEANUP_INTERVAL: 1,
     SESSION_MAX_SIZE_MB: 50,
 
-    BOT_MODE: "self",
+    BOT_MODE: process.env.mode || "self",
 
-    DB_MODE: "local",
-    MONGODB_URI: "",
+    DB_MODE: process.env.db_mode || "local",
+    MONGODB_URI: process.env.mongodb || "",
     DB_NAME: "whatsapp_bot",
 
     DEFAULT_LIMIT: 20,
