@@ -35,5 +35,7 @@ export default {
     DEFAULT_LIMIT: 20,
     LIMIT_RESET_HOUR: 0,
 
-    PREMIUM_GROUPS: []
+    PREMIUM_GROUPS: [],
+    
+    RENT_REMINDER_DAYS: 3
 };
