@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 
 export default {
+  desc: "mendapatkan konten dari url",
     async execute({ sock, from, args, text, reply }) {
         if (!text)
             return reply(
