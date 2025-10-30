@@ -1,4 +1,5 @@
 export default {
+  desc: "menjalankan ulang bot",
     rules: {
         owner: true
     },
