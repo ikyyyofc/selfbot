@@ -52,7 +52,11 @@ export default {
     },
 
     async execute({ sock, m, args }) {
-        const files = fs.readdirSync(PLUGIN_DIR).filter(f => f.endsWith(".js") && !f.startsWith("___"));
+        const files = fs.readdirSync(PLUGIN_DIR).filter(f => 
+            f.endsWith(".js") && 
+            !f.startsWith("___") && 
+            f !== "menu.js"
+        );
         
         const categories = {
             owner: [],
