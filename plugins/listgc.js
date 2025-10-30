@@ -21,12 +21,27 @@ export default {
                 message += `✅ *APPROVED (${approved.length})*\n`;
                 approved.forEach((g, i) => {
                     const name = g.subject || "Unknown";
-                    const date = new Date(g.approvedAt || 0).toLocaleDateString(
-                        "id-ID"
-                    );
+                    const date = new Date(g.approvedAt || 0).toLocaleDateString("id-ID");
+                    
                     message += `${i + 1}. ${name}\n`;
-                    message += `   ID: ${g.groupId}\n`;
-                    message += `   Date: ${date}\n\n`;
+                    message += `   ID: ${g.groupId.split("@")[0]}\n`;
+                    message += `   Date: ${date}\n`;
+                    
+                    if (g.expiresAt) {
+                        const now = Date.now();
+                        const timeLeft = g.expiresAt - now;
+                        
+                        if (timeLeft > 0) {
+                            const daysLeft = Math.ceil(timeLeft / (1000 * 60 * 60 * 24));
+                            message += `   ⏰ Sisa: ${daysLeft} hari\n`;
+                        } else {
+                            message += `   ⏰ Status: EXPIRED\n`;
+                        }
+                    } else {
+                        message += `   ⏰ Permanent\n`;
+                    }
+                    
+                    message += `\n`;
                 });
             }
 
@@ -35,7 +50,7 @@ export default {
                 unapproved.forEach((g, i) => {
                     const name = g.subject || "Unknown";
                     message += `${i + 1}. ${name}\n`;
-                    message += `   ID: ${g.groupId}\n\n`;
+                    message += `   ID: ${g.groupId.split("@")[0]}\n\n`;
                 });
             }
 
