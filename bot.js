@@ -1,5 +1,3 @@
-import dotenv from "dotenv"
-dotenv.config()
 import "./config.js";
 import colors from "@colors/colors/safe.js";
 import BotState from "./lib/BotState.js";
