@@ -45,9 +45,9 @@ export default {
                 if (!plugin || typeof plugin.execute !== "function") continue;
                 
                 const rules = plugin.rules || {};
-                const desc = plugin.description || "No description";
-                const usage = plugin.usage || `${config.PREFIX[0]}${cmd}`;
-                const example = plugin.example || "";
+                const desc = plugin.desc || "No description";
+                const usage = plugin.usg || `${config.PREFIX[0]}${cmd}`;
+                const example = plugin.eg || "";
                 
                 pluginDetails.set(cmd, { rules, desc, usage, example });
                 
