@@ -1,4 +1,5 @@
 export default {
+  desc: "memutar lagu",
     rules: {
         limit: 3
     },
