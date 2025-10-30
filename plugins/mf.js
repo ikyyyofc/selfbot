@@ -1,6 +1,7 @@
 import axios from "axios";
 
 export default {
+  desc: "download mediafire",
     rules: {
         limit: 3
     },
