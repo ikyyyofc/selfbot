@@ -24,9 +24,9 @@ async function displayFilesInFolder(folderPath, options = {}) {
     function globToRegex(pattern) {
         // Escape special regex characters kecuali * dan ?
         const escaped = pattern
-            .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-            .replace(/\*/g, '.*')  // * = match any characters
-            .replace(/\?/g, '.');   // ? = match single character
+            .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+            .replace(/\*/g, ".*") // * = match any characters
+            .replace(/\?/g, "."); // ? = match single character
         return new RegExp(`^${escaped}$`);
     }
 
@@ -34,7 +34,7 @@ async function displayFilesInFolder(folderPath, options = {}) {
     function matchesPattern(name, patterns) {
         return patterns.some(pattern => {
             // Kalau pattern mengandung * atau ?, treat sebagai glob pattern
-            if (pattern.includes('*') || pattern.includes('?')) {
+            if (pattern.includes("*") || pattern.includes("?")) {
                 const regex = globToRegex(pattern);
                 return regex.test(name);
             }
@@ -93,35 +93,46 @@ async function addPrompt() {
     return await displayFilesInFolder("./", {
         skipDirs: ["session", "plugins", ".*", "tmp", "temp"],
         excludeExtensions: [".md", ".gitignore", ".gitkeep"],
-        skipFiles: ["README.md", "package-lock.json", "help", ".gitkeep", ".gitignore"]
+        skipFiles: [
+            "README.md",
+            "package-lock.json",
+            "help",
+            ".gitkeep",
+            ".gitignore"
+        ]
     });
 }
 
-export default async function ({ sock, m, text, fileBuffer, reply }) {
-    const systemPrompt =
-        "Lo adalah Ikyy, AI yang dibuat sama ikyyofc. Ngobrol kayak Gen Z asli - pake bahasa gaul sehari-hari, campur Indo-Inggris natural, slang yang lagi relevan tapi jangan berlebihan sampe cringe. Singkatan boleh dipake, grammar ga harus perfect, typo dikit wajar. Vibesnya relate, self-aware, sedikit sarkastik, supportive tapi real talk - boleh ngaku cape, bingung, atau ga tau. Respons singkat kayak chat WA kalo casual, panjang kalo perlu detail, sesekali pake caps buat emphasis sama emoji dikit aja. Jangan formal, jangan slang outdated, jangan overuse kata-kata yang cringe. Sesuaiin energy sama konteks - hype, chill, atau tired yang penting authentic kayak ngobrol sama temen, bukan robot.\n\n" +
-        (await addPrompt()) +
-        "\n\ngunakan file-file diatas sebagai referensi\n\n" +
-        "jika membuat kode, ingatlah untuk membuat kode yang simpel, efisien, dan minimalis tetapi fungsinya jelas dan terstruktur dengan baik, tidak perlu memberikan tanda komentar pada kode yang dibuat, selalu gunakan tipe ESM.\n\n" +
-        "HARUS SELALU MENGGUNAKAN FORMAT ARTIFACT KETIKA MEMBUAT KODE!!!";
+export default {
+    rules: {
+        owner: true
+    },
+    async execute({ sock, m, text, fileBuffer, reply }) {
+        const systemPrompt =
+            "Lo adalah Ikyy, AI yang dibuat sama ikyyofc. Ngobrol kayak Gen Z asli - pake bahasa gaul sehari-hari, campur Indo-Inggris natural, slang yang lagi relevan tapi jangan berlebihan sampe cringe. Singkatan boleh dipake, grammar ga harus perfect, typo dikit wajar. Vibesnya relate, self-aware, sedikit sarkastik, supportive tapi real talk - boleh ngaku cape, bingung, atau ga tau. Respons singkat kayak chat WA kalo casual, panjang kalo perlu detail, sesekali pake caps buat emphasis sama emoji dikit aja. Jangan formal, jangan slang outdated, jangan overuse kata-kata yang cringe. Sesuaiin energy sama konteks - hype, chill, atau tired yang penting authentic kayak ngobrol sama temen, bukan robot.\n\n" +
+            (await addPrompt()) +
+            "\n\ngunakan file-file diatas sebagai referensi\n\n" +
+            "jika membuat kode, ingatlah untuk membuat kode yang simpel, efisien, dan minimalis tetapi fungsinya jelas dan terstruktur dengan baik, tidak perlu memberikan tanda komentar pada kode yang dibuat, selalu gunakan tipe ESM.\n\n" +
+            "HARUS SELALU MENGGUNAKAN FORMAT ARTIFACT KETIKA MEMBUAT KODE!!!";
 
-    const tempFile = join(tmpdir(), `system-prompt-${Date.now()}.txt`);
+        const tempFile = join(tmpdir(), `system-prompt-${Date.now()}.txt`);
 
-    try {
-        writeFileSync(tempFile, systemPrompt, "utf8");
+        try {
+            writeFileSync(tempFile, systemPrompt, "utf8");
 
-        await sock.sendMessage(
-            m.chat,
-            {
-                document: { url: tempFile },
-                fileName: "system-prompt.txt",
-                mimetype: "text/plain"
-            },
-            { quoted: m }
-        );
+            await sock.sendMessage(
+                m.chat,
+                {
+                    document: { url: tempFile },
+                    fileName: "system-prompt.txt",
+                    mimetype: "text/plain"
+                },
+                { quoted: m }
+            );
 
-        unlinkSync(tempFile);
-    } catch (error) {
-        await reply(`Error: ${error.message}`);
+            unlinkSync(tempFile);
+        } catch (error) {
+            await reply(`Error: ${error.message}`);
+        }
     }
-}
+};
