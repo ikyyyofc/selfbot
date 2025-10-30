@@ -311,6 +311,7 @@ async function addPrompt() {
     });
 }
 export default {
+  desc: "bertanya ke bot ai seputar program bot",
     rules: {
         owner: true
     },
