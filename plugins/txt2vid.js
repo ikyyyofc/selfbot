@@ -45,7 +45,7 @@ export default async ({ m, text, reply }) => {
             attempts++;
 
             if (attempts % 12 === 0) {
-                await reply(`⏳ Masih diproses... (${attempts * 5}s)`);
+                await reply(`⏳ Masih diproses... (${attempts * 20}s)`);
             }
         }
 
