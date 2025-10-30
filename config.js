@@ -1,4 +1,4 @@
-import dotenv from "dotenv/config"
+import dotenv from "dotenv/config";
 import { format } from "util";
 
 const jsonFormat = obj => {
