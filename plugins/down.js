@@ -1,4 +1,5 @@
 export default {
+    desc: "download media yang di reply",
     async execute({ sock, from, m, reply, fileBuffer }) {
         try {
             // Jika tidak ada media di reply
