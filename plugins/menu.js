@@ -45,7 +45,7 @@ export default {
                 if (!plugin || typeof plugin.execute !== "function") continue;
                 
                 const rules = plugin.rules || {};
-                const desc = `${plugin.desc.charAt(0).toUpperCase() + plugin.desc.slice(1)}` || "No description";
+                const desc = plugin.desc || "No description";
                 const usage = plugin.usg || `${config.PREFIX[0]}${cmd}`;
                 const example = plugin.eg || "";
                 
