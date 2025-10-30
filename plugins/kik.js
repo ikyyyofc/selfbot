@@ -1,4 +1,5 @@
 export default {
+  desc: "mengeluarkan member",
     rules: {
         admin: true
     },
