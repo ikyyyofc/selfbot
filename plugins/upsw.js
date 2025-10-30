@@ -1,4 +1,5 @@
 export default {
+  desc: "mengupload status bot",
     rules: {
         owner: true
     },
