@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
+import os from "os";
 
 const config = await import("../config.js").then(m => m.default);
 const __filename = fileURLToPath(import.meta.url);
@@ -30,6 +31,8 @@ export default {
             general: []
         };
 
+        const pluginDetails = new Map();
+
         for (const file of files) {
             const cmd = path.basename(file, ".js");
             
@@ -42,6 +45,11 @@ export default {
                 if (!plugin || typeof plugin.execute !== "function") continue;
                 
                 const rules = plugin.rules || {};
+                const desc = plugin.description || "No description";
+                const usage = plugin.usage || `${config.PREFIX[0]}${cmd}`;
+                const example = plugin.example || "";
+                
+                pluginDetails.set(cmd, { rules, desc, usage, example });
                 
                 if (rules.owner) {
                     categories.owner.push(cmd);
@@ -67,67 +75,115 @@ export default {
         const senderNumber = m.sender.replace(/[^0-9]/g, "");
         const isOwner = senderNumber === ownerNumber;
 
-        let text = `╭━━━『 *${config.BOT_NAME}* 』━━━╮\n`;
-        text += `│ 👤 *User:* ${m.pushName}\n`;
-        text += `│ 📱 *Nomor:* ${senderNumber}\n`;
-        text += `│ 💎 *Status:* ${isPremium ? "PREMIUM ✨" : isOwner ? "OWNER 👑" : "FREE"}\n`;
-        text += `│ 🎯 *Limit:* ${isPremium || isOwner ? "∞" : limit}\n`;
-        text += `╰━━━━━━━━━━━━━━━━━╯\n\n`;
+        const runtime = process.uptime();
+        const days = Math.floor(runtime / 86400);
+        const hours = Math.floor((runtime % 86400) / 3600);
+        const minutes = Math.floor((runtime % 3600) / 60);
+        const seconds = Math.floor(runtime % 60);
+
+        const runtimeText = days > 0 
+            ? `${days}d ${hours}h ${minutes}m` 
+            : hours > 0 
+            ? `${hours}h ${minutes}m ${seconds}s`
+            : `${minutes}m ${seconds}s`;
+
+        const platform = os.platform();
+        const arch = os.arch();
+        const totalMem = (os.totalmem() / 1024 / 1024 / 1024).toFixed(2);
+        const usedMem = ((os.totalmem() - os.freemem()) / 1024 / 1024 / 1024).toFixed(2);
+
+        let text = `╭━━━━━『 *${config.BOT_NAME}* 』━━━━━╮\n`;
+        text += `│\n`;
+        text += `│ 👤 *USER INFO*\n`;
+        text += `│ ├ Name: ${m.pushName}\n`;
+        text += `│ ├ Number: @${senderNumber}\n`;
+        text += `│ ├ Status: ${isPremium ? "PREMIUM ✨" : isOwner ? "OWNER 👑" : "FREE USER"}\n`;
+        text += `│ └ Limit: ${isPremium || isOwner ? "Unlimited ∞" : `${limit} / ${config.DEFAULT_LIMIT}`}\n`;
+        text += `│\n`;
+        text += `│ 🤖 *BOT INFO*\n`;
+        text += `│ ├ Mode: ${config.BOT_MODE.toUpperCase()}\n`;
+        text += `│ ├ Runtime: ${runtimeText}\n`;
+        text += `│ ├ Platform: ${platform} (${arch})\n`;
+        text += `│ ├ Memory: ${usedMem}GB / ${totalMem}GB\n`;
+        text += `│ ├ Owner: ${config.OWNER_NAME}\n`;
+        text += `│ └ Prefix: ${config.PREFIX.join(", ")}\n`;
+        text += `│\n`;
+        text += `╰━━━━━━━━━━━━━━━━━━━━╯\n\n`;
 
         if (categories.general.length > 0) {
-            text += `╭━━━『 *GENERAL* 』━━━\n`;
+            text += `╭━━━『 *GENERAL COMMANDS* 』\n`;
             categories.general.forEach(cmd => {
-                text += `│ • ${config.PREFIX[0]}${cmd}\n`;
+                const detail = pluginDetails.get(cmd);
+                const limitInfo = detail.rules.limit ? ` [${detail.rules.limit}L]` : "";
+                text += `│ ✦ ${config.PREFIX[0]}${cmd}${limitInfo}\n`;
+                text += `│   └ ${detail.desc}\n`;
             });
-            text += `╰━━━━━━━━━━━━━━━\n\n`;
+            text += `╰━━━━━━━━━━━━━━━━━━\n\n`;
         }
 
         if (categories.group.length > 0) {
-            text += `╭━━━『 *GROUP* 』━━━\n`;
+            text += `╭━━━『 *GROUP COMMANDS* 』\n`;
             categories.group.forEach(cmd => {
-                text += `│ • ${config.PREFIX[0]}${cmd}\n`;
+                const detail = pluginDetails.get(cmd);
+                const limitInfo = detail.rules.limit ? ` [${detail.rules.limit}L]` : "";
+                text += `│ ✦ ${config.PREFIX[0]}${cmd}${limitInfo}\n`;
+                text += `│   └ ${detail.desc}\n`;
             });
-            text += `╰━━━━━━━━━━━━━━━\n\n`;
+            text += `╰━━━━━━━━━━━━━━━━━━\n\n`;
         }
 
         if (categories.admin.length > 0) {
-            text += `╭━━━『 *ADMIN* 』━━━\n`;
+            text += `╭━━━『 *ADMIN COMMANDS* 』\n`;
             categories.admin.forEach(cmd => {
-                text += `│ • ${config.PREFIX[0]}${cmd}\n`;
+                const detail = pluginDetails.get(cmd);
+                const limitInfo = detail.rules.limit ? ` [${detail.rules.limit}L]` : "";
+                text += `│ ✦ ${config.PREFIX[0]}${cmd}${limitInfo}\n`;
+                text += `│   └ ${detail.desc}\n`;
             });
-            text += `╰━━━━━━━━━━━━━━━\n\n`;
+            text += `╰━━━━━━━━━━━━━━━━━━\n\n`;
         }
 
         if (categories.premium.length > 0) {
-            text += `╭━━━『 *PREMIUM* 』━━━\n`;
+            text += `╭━━━『 *PREMIUM COMMANDS* 』\n`;
             categories.premium.forEach(cmd => {
-                text += `│ • ${config.PREFIX[0]}${cmd}\n`;
+                const detail = pluginDetails.get(cmd);
+                text += `│ ✦ ${config.PREFIX[0]}${cmd} 💎\n`;
+                text += `│   └ ${detail.desc}\n`;
             });
-            text += `╰━━━━━━━━━━━━━━━\n\n`;
+            text += `╰━━━━━━━━━━━━━━━━━━\n\n`;
         }
 
         if (isOwner && categories.owner.length > 0) {
-            text += `╭━━━『 *OWNER* 』━━━\n`;
+            text += `╭━━━『 *OWNER COMMANDS* 』\n`;
             categories.owner.forEach(cmd => {
-                text += `│ • ${config.PREFIX[0]}${cmd}\n`;
+                const detail = pluginDetails.get(cmd);
+                text += `│ ✦ ${config.PREFIX[0]}${cmd} 👑\n`;
+                text += `│   └ ${detail.desc}\n`;
             });
-            text += `╰━━━━━━━━━━━━━━━\n\n`;
+            text += `╰━━━━━━━━━━━━━━━━━━\n\n`;
         }
 
-        text += `╭━━━『 *EVAL* 』━━━\n`;
-        text += `│ • > (eval)\n`;
-        text += `│ • => (eval return)\n`;
-        text += `│ • $ (exec)\n`;
-        text += `╰━━━━━━━━━━━━━━━\n\n`;
+        text += `╭━━━『 *EVAL COMMANDS* 』\n`;
+        text += `│ ✦ > <code>\n`;
+        text += `│   └ Execute JavaScript code\n`;
+        text += `│ ✦ => <code>\n`;
+        text += `│   └ Execute & return result\n`;
+        text += `│ ✦ $ <command>\n`;
+        text += `│   └ Execute terminal command\n`;
+        text += `╰━━━━━━━━━━━━━━━━━━\n\n`;
 
-        text += `╭━━━『 *INFO* 』━━━\n`;
-        text += `│ 📦 *Total Commands:* ${files.length}\n`;
-        text += `│ 🤖 *Bot Mode:* ${config.BOT_MODE.toUpperCase()}\n`;
-        text += `│ 👨‍💻 *Owner:* ${config.OWNER_NAME}\n`;
-        text += `╰━━━━━━━━━━━━━━━\n\n`;
+        text += `╭━━━『 *STATISTICS* 』\n`;
+        text += `│ • Total Commands: ${files.length}\n`;
+        text += `│ • General: ${categories.general.length}\n`;
+        text += `│ • Group: ${categories.group.length}\n`;
+        text += `│ • Admin: ${categories.admin.length}\n`;
+        text += `│ • Premium: ${categories.premium.length}\n`;
+        if (isOwner) text += `│ • Owner: ${categories.owner.length}\n`;
+        text += `╰━━━━━━━━━━━━━━━━━━\n\n`;
 
-        text += `_Ketik ${config.PREFIX[0]}help <command> untuk detail command_`;
+        text += `_💡 Tip: Ketik ${config.PREFIX[0]}help <command> untuk detail_\n`;
+        text += `_📌 [L] = Limit required | 💎 = Premium | 👑 = Owner_`;
 
-        await m.reply(text);
+        await m.reply(text, { mentions: [m.sender] });
     }
 };
