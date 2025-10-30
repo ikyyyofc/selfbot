@@ -1,6 +1,7 @@
 import axios from "axios";
 
 export default {
+  desc: "membuat video dengan ai",
     rules: {
         premium: true
     },
