@@ -123,6 +123,7 @@ const getUserInfo = () => {
 };
 
 export default {
+  desc: "menampilkan kecepatan respon",
     async execute({ m, sock }) {
         const startTime = performance.now();
 
