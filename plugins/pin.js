@@ -2,6 +2,7 @@
 import axios from "axios";
 
 export default {
+  desc: "mencari gambar pinterest",
     rules: {
         limit: 2
     },
