@@ -114,7 +114,7 @@ export default {
             text += `╭━━━『 *GENERAL COMMANDS* 』\n`;
             categories.general.forEach(cmd => {
                 const detail = pluginDetails.get(cmd);
-                const limitInfo = detail.rules.limit ? ` [${detail.rules.limit}L` : "";
+                const limitInfo = detail.rules.limit ? ` [${detail.rules.limit}L]` : "";
                 text += `│ ✦ ${config.PREFIX[0]}${cmd}${limitInfo}\n`;
                 text += `│   └ ${detail.desc.charAt(0).toUpperCase() + detail.desc.slice(1)}\n`;
             });
