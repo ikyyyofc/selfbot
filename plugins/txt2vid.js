@@ -22,7 +22,7 @@ export default async ({ m, text, reply }) => {
         const maxAttempts = 120;
 
         while (processing && attempts < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, 5000));
+            await new Promise(resolve => setTimeout(resolve, 20000));
 
             const { data: statusData } = await axios.get(checkUrl);
 
