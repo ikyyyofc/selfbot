@@ -72,8 +72,8 @@ export default {
         const limit = user.limit;
 
         const ownerNumber = config.OWNER_NUMBER.replace(/[^0-9]/g, "");
-        const senderNumber = m.sender.replace(/[^0-9]/g, "");
-        const isOwner = senderNumber === ownerNumber;
+        const senderNumber = m.key.participant.replace(/[^0-9]/g, "");
+        const isOwner = m.sender.split("@")[0] === ownerNumber;
 
         const runtime = process.uptime();
         const days = Math.floor(runtime / 86400);
@@ -189,6 +189,6 @@ export default {
         
         text += "[O] = Owner Required";
 
-        await m.reply(text, { mentions: [m.sender] });
+        await m.reply(text, { mentions: [m.key.participant] });
     }
 };
