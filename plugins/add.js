@@ -1,4 +1,5 @@
 export default {
+  desc: "masukin member",
     rules: {
         admin: true
     },
