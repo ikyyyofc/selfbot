@@ -2,7 +2,7 @@ export default {
     rules: {
         owner: true
     },
-    async function({ reply }) {
+    async execute({ reply }) {
         try {
             await reply("🔄 Restarting bot...");
             process.exit(0);
