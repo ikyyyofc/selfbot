@@ -22,6 +22,7 @@ async function tiktoksearch(query) {
  * Plugin utama TikTok Search (kirim 5 video tanpa link)
  */
 export default {
+  desc: "Mencari video tiktok",
     rules: {
         limit: 5
     },
