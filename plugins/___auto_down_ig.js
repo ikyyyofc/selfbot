@@ -1,18 +1,22 @@
 // plugins/___autodown.js
 import axios from "axios";
+import db from "../lib/Database.js";
 
 export default {
     rules: {
+      group: true,
         limit: 1
     },
     async execute({ sock, m, reply }) {
         const text = m.text;
+        const setting = await db.getGroupSettings(m.chat)
 
         const igRegex =
             /(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)\/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/i;
         const match = text.match(igRegex);
 
         if (!match) return true;
+        if (!setting.autodownload) return true
 
         const url = match[0];
 
