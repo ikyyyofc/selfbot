@@ -1,5 +1,6 @@
 import db from "../lib/Database.js";
 import groupCache from "../lib/groupCache.js";
+import time from "../lib/TimeHelper.js";
 
 export default {
     rules: {
@@ -19,12 +20,12 @@ export default {
                     return reply("❌ Format salah!\n\nContoh:\n.approvegc 30 (30 hari)\n.approvegc (permanent)");
                 }
                 
-                expiresAt = Date.now() + (days * 24 * 60 * 60 * 1000);
+                expiresAt = time.addDays(time.now(), days);
             }
 
             await db.updateGroup(chat, {
                 approved: true,
-                approvedAt: Date.now(),
+                approvedAt: time.now(),
                 subject: metadata.subject || "Unknown",
                 expiresAt,
                 rentDays: days
@@ -35,13 +36,9 @@ export default {
             message += `🆔 ID: ${chat}\n`;
             
             if (days) {
-                const expireDate = new Date(expiresAt).toLocaleDateString("id-ID", {
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric"
-                });
+                const expireDate = time.getWIBDateTime(expiresAt);
                 message += `⏰ Durasi: ${days} hari\n`;
-                message += `📅 Expired: ${expireDate}\n`;
+                message += `📅 Expired: ${expireDate} WIB\n`;
             } else {
                 message += `⏰ Durasi: Permanent\n`;
             }
