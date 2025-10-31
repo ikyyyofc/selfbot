@@ -1,12 +1,13 @@
 import db from "../lib/Database.js";
+import time from "../lib/TimeHelper.js";
 
 export default {
-  desc: "menampilkan profile",
     async execute({ sender, reply }) {
         const user = await db.getOrCreateUser(sender);
 
         const limitText = user.premium ? "∞ (Unlimited)" : user.limit;
         const statusText = user.premium ? "⭐ Premium" : "🆓 Free";
+        const regDate = time.getWIBDateOnly(user.registered);
 
         const message = `
 ╭─「 👤 PROFILE 」
@@ -14,7 +15,7 @@ export default {
 │ 📱 Nomor: ${sender.split("@")[0]}
 │ 🎖️ Status: ${statusText}
 │ 📊 Limit: ${limitText}
-│ 📅 Terdaftar: ${new Date(user.registered).toLocaleDateString("id-ID")}
+│ 📅 Terdaftar: ${regDate}
 │
 ╰─────────────
 
