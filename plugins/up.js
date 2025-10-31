@@ -1,28 +1,27 @@
-import uploadFile from "../lib/upload.js";
+import upload from "../lib/upload.js";
 
 export default {
-  desc: "mengupload media ke cloud",
-    async execute({ sock, from, args, text, m, fileBuffer, reply }) {
-        try {
-            // Cek apakah ada file
-            if (!fileBuffer) {
-                return reply(
-                    "❌ Tidak ada media yang ditemukan untuk diupload.\nKirim atau reply media dengan caption .upload"
-                );
-            }
-
-            // Jalankan fungsi upload dari lib/upload.js
-            const url = await uploadFile(fileBuffer);
-
-            if (!url) {
-                return reply("❌ Gagal mengupload media.");
-            }
-
-            // Kirim hasil URL upload
-            await reply(url);
-        } catch (err) {
-            console.error("Upload error:", err);
-            reply("⚠️ Terjadi kesalahan saat upload media.");
+    desc: "Upload media ke server",
+    execute: async ({ m, reply, getFile }) => {
+        const fileBuffer = await getFile();
+        
+        if (!fileBuffer) {
+            return await reply("❌ Reply atau kirim media (gambar/video/audio/dokumen)");
         }
+
+        await m.react("⏳");
+
+        const url = await upload(fileBuffer);
+        
+        if (!url) {
+            await m.react("❌");
+            return await reply("❌ Upload gagal, coba lagi");
+        }
+
+        await m.react("✅");
+        await reply(`✅ *Upload Berhasil*\n\n🔗 URL:\n${url}`);
+    },
+    rules: {
+        limit: 1
     }
 };
