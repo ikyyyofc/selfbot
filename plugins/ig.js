@@ -1,6 +1,6 @@
 // plugins/instagram.js
 export default {
-  desc: "download media instagram",
+    desc: "download media instagram",
     rules: {
         limit: 3
     },
@@ -30,10 +30,14 @@ export default {
 
             // Kirim semua file yang ada
             for (const file of files) {
-                await sock.sendMessage(from, {
-                    [meta.isVideo ? "video" : "image"]: { url: file },
-                    caption
-                });
+                await sock.sendMessage(
+                    from,
+                    {
+                        [meta.isVideo ? "video" : "image"]: { url: file },
+                        caption
+                    },
+                    { quoted: m }
+                );
             }
         } catch (err) {
             console.error("❌ Error:", err);
