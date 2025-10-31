@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import db from "../lib/Database.js";
 async function getTiktokData(url) {
     const response = await fetch("https://tikwm.com/api/", {
         method: "POST",
@@ -18,15 +19,17 @@ async function getTiktokData(url) {
 
 export default {
     rules: {
-      group: true,
+        group: true,
         limit: 1
     },
     async execute({ m, sock }) {
         const tiktokRegex =
             /(?:https?:\/\/)?(?:www\.|vt\.|vm\.)?tiktok\.com\/[^\s]+/gi;
         const urls = m.text.match(tiktokRegex);
+        const setting = await db.getGroupSettings(m.chat);
 
-        if (!urls || urls.length === 0) return;
+        if (!urls || urls.length === 0) return true;
+        if (!setting.autodownload) return true;
 
         await m.react("⏳");
 
@@ -36,7 +39,7 @@ export default {
 
             if (result.code !== 0) {
                 await m.reply("❌ Gagal mengambil data TikTok");
-                return;
+                return false;
             }
 
             const { data } = result;
@@ -96,10 +99,12 @@ export default {
             }
 
             await m.react("✅");
+            return false;
         } catch (error) {
             console.error("TikTok download error:", error);
             await m.reply(`❌ Error: ${error.message}`);
             await m.react("❌");
+            return false;
         }
     }
 };
