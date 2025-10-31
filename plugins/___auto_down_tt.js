@@ -18,6 +18,7 @@ async function getTiktokData(url) {
 
 export default {
     rules: {
+      group: true,
         limit: 1
     },
     async execute({ m, sock }) {
