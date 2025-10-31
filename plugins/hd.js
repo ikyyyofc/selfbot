@@ -1,36 +1,53 @@
-// plugins/hdin.js
 import axios from "axios";
 import upload from "../lib/upload.js";
 
 export default {
-  desc: "menjernihkan foto",
+    desc: "Menjernihkan foto (HD Enhance)",
     rules: {
         limit: 3
     },
-    async execute({ sock, from, fileBuffer, reply }) {
+    async execute({ sock, m, reply, getFile }) {
         try {
-            if (!fileBuffer)
-                return reply("❌ Kirim atau reply foto yang mau di-HD-in!");
+            await m.react("⏳");
 
-            // Upload foto ke ikyy
+            const fileBuffer = await getFile();
+            if (!fileBuffer) {
+                await m.react("❌");
+                return reply("❌ Kirim/reply gambar yang mau di-HD-in!");
+            }
+
+            await reply("🔄 Mengupload gambar...");
             const imageUrl = await upload(fileBuffer);
-            if (!imageUrl) return reply("❌ Gagal upload gambar ke server!");
+            
+            if (!imageUrl) {
+                await m.react("❌");
+                return reply("❌ Upload gagal, coba lagi!");
+            }
 
-            // Panggil API enhance
-            const apiUrl = `https://api.nekolabs.my.id/tools/pxpic/enhance?imageUrl=${encodeURIComponent(
-                imageUrl
-            )}`;
-            const res = await axios.get(apiUrl);
-            if (!res.data.success) return reply("❌ Gagal memproses gambar!");
+            await reply("⚙️ Memproses gambar...");
+            const { data } = await axios.get(
+                `https://api.nekolabs.my.id/tools/pxpic/enhance?imageUrl=${encodeURIComponent(imageUrl)}`,
+                { timeout: 60000 }
+            );
 
-            // Kirim hasilnya
-            await sock.sendMessage(from, {
-                image: { url: res.data.result },
+            if (!data?.success || !data?.result) {
+                await m.react("❌");
+                return reply("❌ API gagal proses gambar!");
+            }
+
+            await sock.sendMessage(m.chat, {
+                image: { url: data.result },
                 caption: "✨ Foto berhasil di-HD-in!"
-            });
-        } catch (e) {
-            console.error("HD Plugin Error:", e);
-            reply("❌ Terjadi kesalahan saat memproses gambar!");
+            }, { quoted: m });
+
+            await m.react("✅");
+
+        } catch (error) {
+            await m.react("❌");
+            const msg = error.code === "ECONNABORTED" 
+                ? "⏱️ Timeout! Gambar terlalu besar/lama"
+                : "❌ Error: " + error.message;
+            reply(msg);
         }
     }
 };
