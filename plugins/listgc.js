@@ -1,4 +1,5 @@
 import db from "../lib/Database.js";
+import time from "../lib/TimeHelper.js";
 
 export default {
     rules: {
@@ -21,18 +22,18 @@ export default {
                 message += `✅ *APPROVED (${approved.length})*\n`;
                 approved.forEach((g, i) => {
                     const name = g.subject || "Unknown";
-                    const date = new Date(g.approvedAt || 0).toLocaleDateString("id-ID");
+                    const date = time.getWIBDateOnly(g.approvedAt || 0);
                     
                     message += `${i + 1}. ${name}\n`;
                     message += `   ID: ${g.groupId.split("@")[0]}\n`;
                     message += `   Date: ${date}\n`;
                     
                     if (g.expiresAt) {
-                        const now = Date.now();
+                        const now = time.now();
                         const timeLeft = g.expiresAt - now;
                         
                         if (timeLeft > 0) {
-                            const daysLeft = Math.ceil(timeLeft / (1000 * 60 * 60 * 24));
+                            const daysLeft = time.getDaysLeft(g.expiresAt);
                             message += `   ⏰ Sisa: ${daysLeft} hari\n`;
                         } else {
                             message += `   ⏰ Status: EXPIRED\n`;
