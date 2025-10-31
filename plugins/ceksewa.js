@@ -1,4 +1,5 @@
 import db from "../lib/Database.js";
+import time from "../lib/TimeHelper.js";
 
 export default {
     rules: {
@@ -17,24 +18,17 @@ export default {
             message += `🆔 ID: ${chat.split("@")[0]}\n\n`;
             
             if (groupData.expiresAt) {
-                const now = Date.now();
+                const now = time.now();
                 const timeLeft = groupData.expiresAt - now;
                 
                 if (timeLeft > 0) {
-                    const daysLeft = Math.ceil(timeLeft / (1000 * 60 * 60 * 24));
-                    const hoursLeft = Math.ceil((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                    
-                    const expireDate = new Date(groupData.expiresAt).toLocaleDateString("id-ID", {
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit"
-                    });
+                    const daysLeft = time.getDaysLeft(groupData.expiresAt);
+                    const duration = time.formatDuration(timeLeft);
+                    const expireDate = time.getWIBDateTime(groupData.expiresAt);
                     
                     message += `⏰ Status: Aktif\n`;
-                    message += `📅 Expired: ${expireDate}\n`;
-                    message += `⏳ Sisa waktu: ${daysLeft} hari ${hoursLeft} jam\n`;
+                    message += `📅 Expired: ${expireDate} WIB\n`;
+                    message += `⏳ Sisa waktu: ${duration}\n`;
                     
                     if (daysLeft <= 3) {
                         message += `\n⚠️ *PERINGATAN*\nSewa akan segera habis!`;
