@@ -1,59 +1,46 @@
-import { exec } from "child_process";
-import { promisify } from "util";
+import { exec as execSync } from 'child_process';
+import util from 'util';
 
-const execAsync = promisify(exec);
+// Bikin 'exec' jadi promise-based biar bisa pake async/await
+const exec = util.promisify(execSync);
 
 export default {
-  desc: "mengupdate bot",
+    desc: 'Mengupdate bot ke commit terbaru dari repository.',
     rules: {
-        owner: true
+        owner: true, // Cuma owner yang bisa pake
     },
-    async execute({ sock, m, reply }) {
+    async execute({ reply }) {
         try {
-            await reply("🔍 Checking for updates...");
+            await reply('⏳ Lagi narik update dari repo, sabar...');
 
-            await execAsync("git fetch origin");
+            // Jalankan 'git pull'
+            const { stdout, stderr } = await exec('git pull');
 
-            const { stdout: statusOut } = await execAsync(
-                "git rev-list HEAD...origin/main --count"
-            );
-
-            const updateCount = parseInt(statusOut.trim());
-
-            if (updateCount === 0) {
-                await reply("✅ Bot is already up to date. No restart needed.");
+            // Kalo ada error di stderr tapi ga ada output sukses, kirim error
+            if (stderr && !stdout) {
+                await reply(`❌ Anjir, error:\n\n\`\`\`${stderr}\`\`\``);
                 return;
             }
 
-            const { stdout: logOut } = await execAsync(
-                "git log HEAD..origin/main --oneline --pretty=format:'%h - %s'"
-            );
-
-            const updateList = logOut.trim().split("\n").join("\n");
-
-            await reply(
-                `📦 Found ${updateCount} update(s):\n\n${updateList}\n\nPulling changes...`
-            );
-
-            const { stdout: pullOut } = await execAsync("git pull origin main");
-
-            await reply("✅ Update completed. Restarting bot...");
-
-            process.exit(0);
-        } catch (error) {
-            console.error("Update error:", error);
-
-            if (error.message.includes("CONFLICT")) {
-                await reply(
-                    "❌ Update failed: Git conflict detected. Please resolve manually."
-                );
-            } else if (error.message.includes("not a git repository")) {
-                await reply(
-                    "❌ Update failed: Not a git repository. Please initialize git first."
-                );
-            } else {
-                await reply(`❌ Update failed: ${error.message}`);
+            // Kalo udah up-to-date
+            if (stdout.includes('Already up to date.')) {
+                await reply('✅ Udah paling baru, ga ada yang perlu di-update.');
+                return;
             }
+            
+            // Kalo sukses update
+            let response = `✅ Update kelar!\n\n*Log:*\n\`\`\`${stdout}\`\`\``;
+            
+            // Beri tahu user soal hot-reload dan kemungkinan restart manual
+            response += `\n\n🔄 Bot bakal nge-reload file yang berubah secara otomatis. ` +
+                        `Kalo ada update di \`package.json\`, mungkin perlu install dependencies ` +
+                        `dan restart manual (\`npm install && pm2 restart bot\`).`;
+            
+            await reply(response);
+
+        } catch (e) {
+            // Tangkep error kalo 'git pull' gagal total
+            await reply(`❌ Gagal total pas update:\n\n\`\`\`${e.stderr || e.message}\`\`\``);
         }
     }
 };
