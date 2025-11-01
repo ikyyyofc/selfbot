@@ -8,7 +8,7 @@ export default {
         const { m, reply, sock } = context;
 
         // Cek kalo ini bukan command, ada quoted message, dari bot, dan ada history chatnya
-        const isCommand = (sock.prefix || ".").some(p => m.text.startsWith(p));
+        const isCommand = config.PREFIX.some(p => m.text.startsWith(p));
         if (isCommand || !m.quoted || !m.quoted.fromMe) {
             return true; // Lanjutin, ini bukan urusan kita
         }
