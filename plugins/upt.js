@@ -13,7 +13,6 @@ export default {
         try {
             await reply('⏳ Lagi narik update dari repo, sabar...');
 
-            // Jalankan 'git pull'
             const { stdout, stderr } = await exec('git pull');
 
             // Kalo ada error di stderr tapi ga ada output sukses, kirim error
