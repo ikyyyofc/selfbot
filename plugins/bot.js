@@ -229,7 +229,7 @@ class ClaudeAPI {
         model = "claude-3-opus-20240229",
         prompt,
         messages,
-        max_tokens = 1024,
+        max_tokens,
         system,
         temperature,
         top_p,
