@@ -427,9 +427,9 @@ export default {
                 "\n\njika membuat kode, ingatlah untuk membuat kode yang simpel, efisien, dan minimalis tetapi fungsinya jelas dan terstruktur dengan baik, tidak perlu memberikan tanda komentar pada kode yang dibuat, selalu gunakan tipe ESM."
         };
 
-        /*const fileBuffer = q.isMedia ? await getFile() : null*/
+        const fileBuffer = q.isMedia ? await getFile() : null;
 
-        /*if (q.type.includes("image") && fileBuffer) {
+        /* if (q.type.includes("image") && fileBuffer) {
             let img = await upload(fileBuffer);
             payload.imageUrl = img;
         }*/
@@ -441,15 +441,15 @@ export default {
                     payload
                 )
             ).data.result;*/
-            /* const response = await gmn(
-            [
-                { role: "system", content: payload.systemPrompt },
-                { role: "user", content: payload.text }
-            ],
-            fileBuffer
-        );*/
+            const response = await gmn(
+                [
+                    { role: "system", content: payload.systemPrompt },
+                    { role: "user", content: payload.text }
+                ],
+                fileBuffer
+            );
             /*const response = (await (new ChatAPI()).chat({messages: [{role: "system", content: payload.systemPrompt},{role:"user", content:payload.text}]})).resAi*/
-            const response = (
+            /* const response = (
                 await new ClaudeAPI().chat({
                     model: "claude-opus-4-1",
                     messages: [{ role: "user", content: payload.text }],
@@ -458,7 +458,7 @@ export default {
             ).content
                 .filter(a => a.type == "text")
                 .map(o => o.text)
-                .join("");
+                .join("");*/
 
             if (response) {
                 let check_code = extractCodeFromMarkdown(response);
