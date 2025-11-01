@@ -1,3 +1,12 @@
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const PLUGIN_DIR = path.join(__dirname, "..", "plugins");
+
 const config = await import("../config.js").then(m => m.default);
 
 function levenshteinDistance(a, b) {
@@ -26,6 +35,11 @@ function getSimilarity(str1, str2) {
     return 1 - distance / maxLength;
 }
 
+function getAvailableCommands() {
+    const files = fs.readdirSync(PLUGIN_DIR).filter(f => f.endsWith(".js") && !f.startsWith("___"));
+    return files.map(f => path.basename(f, ".js"));
+}
+
 export default {
     execute: async (context) => {
         const { m, text } = context;
@@ -40,7 +54,7 @@ export default {
         
         if (!command) return true;
         
-        const plugins = Array.from(context.sock.state?.plugins?.keys() || []);
+        const plugins = getAvailableCommands();
         
         if (plugins.includes(command)) return true;
         
