@@ -451,6 +451,7 @@ export default {
             /*const response = (await (new ChatAPI()).chat({messages: [{role: "system", content: payload.systemPrompt},{role:"user", content:payload.text}]})).resAi*/
             const response = (
                 await new ClaudeAPI().chat({
+                    model: "claude-opus-4-1",
                     messages: [{ role: "user", content: payload.text }],
                     system: payload.systemPrompt
                 })
