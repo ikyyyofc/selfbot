@@ -353,8 +353,7 @@ export default {
                 { role: "system", content: payload.systemPrompt },
                 { role: "user", content: payload.text }
             ],
-            fileBuffer,
-            false
+            fileBuffer
         );
             /*const response = (await (new ChatAPI()).chat({messages: [{role: "system", content: payload.systemPrompt},{role:"user", content:payload.text}]})).resAi*/
 
