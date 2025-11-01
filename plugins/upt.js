@@ -7,7 +7,7 @@ const exec = util.promisify(execSync);
 export default {
     desc: 'Mengupdate bot ke commit terbaru dari repository.',
     rules: {
-        owner: true, // Cuma owner yang bisa pake
+        owner: true, 
     },
     async execute({ reply }) {
         try {
