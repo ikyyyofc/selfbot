@@ -129,7 +129,7 @@ export default {
 
         // Header dengan box style yang lebih rapi
         let text = `╭──────────────────╮\n`;
-        text += `│              *${config.BOT_NAME}*\n`;
+        text += `│                         *${config.BOT_NAME}*\n`;
         text += `╰──────────────────╯\n\n`;
 
         // User Info Section
