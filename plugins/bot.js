@@ -437,7 +437,7 @@ export default {
             fileBuffer
         );*/
             /*const response = (await (new ChatAPI()).chat({messages: [{role: "system", content: payload.systemPrompt},{role:"user", content:payload.text}]})).resAi*/
-            const response = (await (new ClaudeAPI()).chat({messages: [{role: "system", content: payload.systemPrompt},{role:"user", content:payload.text}]})).resAi
+            const response = (await (new ClaudeAPI()).chat({[{role:"user", content:payload.text}],system: payload.systemPrompt})).content.filter(a => a.type == "text").map(o => o.text).join("")
 
             if (response) {
                 let check_code = extractCodeFromMarkdown(response);
