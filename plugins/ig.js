@@ -4,7 +4,7 @@ export default {
     rules: {
         limit: 3
     },
-    async execute({ sock, from, args, reply }) {
+    async execute({ sock, from, args, reply, m }) {
         if (!args[0])
             return reply("❌ Kirim link Instagram yang ingin diunduh.");
 
