@@ -74,7 +74,7 @@ export default {
                 await reply(part);
             }
         } catch (err) {
-            console.error("Plugin ai error:", err);
+            console.error("Plugin ai error:", err.response.dat);
             await reply(`❌ Terjadi kesalahan: ${err.message || err}`);
         }
     }
