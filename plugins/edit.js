@@ -2,32 +2,35 @@ import axios from "axios";
 import upload from "../lib/upload.js";
 
 export default {
-  desc: "edit gambar dengan ai",
+    desc: "edit gambar dengan ai",
     rules: {
         limit: 5
     },
-    async execute({ sock, m, args, text, fileBuffer }) {
+    async execute({ sock, m, args, text, getFile }) {
         try {
             if (!text) {
                 return await m.reply(
                     "❌ *Penggunaan:*\n" +
-                        ".editimg <prompt>\n\n" +
-                        "*Contoh:*\n" +
-                        ".editimg tambahkan gadis cantik\n\n" +
-                        "⚠️ Pastikan reply/kirim gambar dengan caption"
+                    ".edit <prompt>\n\n" +
+                    "*Contoh:*\n" +
+                    ".edit tambahkan gadis cantik\n\n" +
+                    "⚠️ Kirim/reply gambar dengan caption"
                 );
             }
 
+            const fileBuffer = await getFile();
             if (!fileBuffer) {
                 return await m.reply(
                     "❌ Kirim/reply gambar dengan caption:\n" +
-                        ".editimg <prompt>"
+                    ".edit <prompt>"
                 );
             }
 
+            await m.reply("⏳ Sedang mengedit gambar...");
+
             const imageUrl = await upload(fileBuffer);
             if (!imageUrl) {
-                return await m.reply("❌ Gagal mengupload gambar");
+                return await m.reply("❌ Gagal upload gambar");
             }
 
             const response = await axios.get(
@@ -43,16 +46,14 @@ export default {
 
             const data = response.data;
 
-            if (data.code !== 0 || !data.data || !data.data.url) {
-                return await m.reply("❌ Gagal mengedit gambar");
+            if (data.code !== 0 || !data.data?.url) {
+                return await m.reply("❌ Gagal edit gambar");
             }
-
-            const resultUrl = data.data.url;
 
             await sock.sendMessage(
                 m.chat,
                 {
-                    image: { url: resultUrl },
+                    image: { url: data.data.url },
                     caption:
                         `✨ *Edit Gambar AI*\n\n` +
                         `📝 Prompt: ${text}\n` +
@@ -61,9 +62,9 @@ export default {
                 { quoted: m }
             );
         } catch (error) {
-            console.error("Error editimg:", error);
+            console.error("Error edit:", error);
             await m.reply(
-                `❌ Terjadi kesalahan:\n${error.message || "Unknown error"}`
+                `❌ Error:\n${error.message || "Unknown error"}`
             );
         }
     }
