@@ -31,11 +31,6 @@ export default {
             // Kalo sukses update
             let response = `✅ Update kelar!\n\n*Log:*\n\`\`\`${stdout}\`\`\``;
             
-            // Beri tahu user soal hot-reload dan kemungkinan restart manual
-            response += `\n\n🔄 Bot bakal nge-reload file yang berubah secara otomatis. ` +
-                        `Kalo ada update di \`package.json\`, mungkin perlu install dependencies ` +
-                        `dan restart manual (\`npm install && pm2 restart bot\`).`;
-            
             await reply(response);
 
         } catch (e) {
