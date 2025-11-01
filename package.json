@@ -19,6 +19,7 @@
     "axios": "latest",
     "bycf": "latest",
     "cheerio": "latest",
+    "chokidar": "latest",
     "dotenv": "latest",
     "file-type": "latest",
     "fluent-ffmpeg": "latest",
