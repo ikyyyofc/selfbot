@@ -1,56 +1,53 @@
+Oke
 import axios from "axios";
 
 export default {
-    desc: "Download video dari Facebook",
+    desc: "Downloads a video from a Facebook URL.",
     rules: {
-        limit: 1
+        limit: 1,
     },
-    
-    async execute({ args, reply, m, sock }) {
-        const url = args[0];
-        
-        if (!url) {
-            return await reply("❌ Masukkan URL Facebook!\n\nContoh: .fb https://www.facebook.com/...");
+    async execute(context) {
+        const { m, text, reply } = context;
+
+        if (!text) {
+            await reply("Masukin URL video Facebook-nya, dong.");
+            return;
         }
-        
-        if (!url.includes("facebook.com") && !url.includes("fb.watch")) {
-            return await reply("❌ URL tidak valid! Harus dari Facebook.");
+
+        const fbRegex = /^(https?:\/\/)?(www\.|m\.|web\.)?facebook\.com\/.+$/;
+        if (!fbRegex.test(text)) {
+            await reply("URL-nya kayaknya ga valid, coba cek lagi deh.");
+            return;
         }
-        
-        await m.react("🔄");
-        
+
+        await reply("Sabar ya, lagi dicariin videonya...");
+
         try {
-            const apiUrl = `https://wudysoft.xyz/api/download/facebook/v3?url=${encodeURIComponent(url)}`;
-            const { data } = await axios.get(apiUrl);
-            
-            if (!data.hdLink && !data.sdLink) {
-                await m.react("❌");
-                return await reply("❌ Gagal mengambil video. Pastikan URL valid dan video bisa diakses publik.");
+            const apiUrl = `https://wudysoft.xyz/api/download/facebook/v3?url=${encodeURIComponent(text)}`;
+            const response = await axios.get(apiUrl);
+            const data = response.data;
+
+            if (!data || (!data.hdLink && !data.sdLink)) {
+                await reply("Gagal dapetin link downloadnya, mungkin videonya private atau udah dihapus.");
+                return;
             }
-            
+
             const videoUrl = data.hdLink || data.sdLink;
             const quality = data.hdLink ? "HD" : "SD";
-            const title = data.title || "Facebook Video";
-            const desc = data.description || "";
-            
-            const caption = `✅ *${title}*\n\n${desc}\n\n📹 Kualitas: ${quality}`;
-            
-            await sock.sendMessage(m.chat, {
-                video: { url: videoUrl },
-                caption,
-                mimetype: "video/mp4"
-            }, { quoted: m });
-            
-            await m.react("✅");
-            
+
+            const caption = `*${data.title || 'Facebook Video'}* (${quality})\n\n${data.description || ''}`.trim();
+
+            await context.sock.sendMessage(
+                m.chat,
+                {
+                    video: { url: videoUrl },
+                    caption: caption,
+                },
+                { quoted: m }
+            );
         } catch (error) {
-            await m.react("❌");
-            
-            if (error.response?.status === 404) {
-                return await reply("❌ Video tidak ditemukan. Pastikan URL valid.");
-            }
-            
-            return await reply(`❌ Error: ${error.message}`);
+            console.error(error);
+            await reply("Waduh, API-nya lagi error nih. Coba lagi nanti, ya.");
         }
-    }
+    },
 };
