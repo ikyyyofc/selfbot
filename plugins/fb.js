@@ -6,7 +6,7 @@ export default {
         limit: 1
     },
     
-    async execute({ args, reply, m }) {
+    async execute({ args, reply, m, sock }) {
         const url = args[0];
         
         if (!url) {
