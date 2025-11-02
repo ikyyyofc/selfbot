@@ -58,7 +58,7 @@ async function hackai(messages, webSearch = false) {
   );
 
   let fullResponse = "";
-  return response.data
+  return response
  /* return new Promise((resolve, reject) => {
     response.data.on("data", chunk => {
       const lines = chunk.toString().split("\n");
