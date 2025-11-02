@@ -56,10 +56,10 @@ export default {
         };
 
         const getModuleStats = async () => {
-            const db = await import("./Database.js").then(m => m.default);
-            const groupCache = await import("./groupCache.js").then(m => m.default);
-            const cooldown = await import("./CooldownManager.js").then(m => m.default);
-            const sessionCleaner = await import("./SessionCleaner.js").then(m => m.default);
+            const db = await import("../lib/Database.js").then(m => m.default);
+            const groupCache = await import("../lib/groupCache.js").then(m => m.default);
+            const cooldown = await import("../lib/CooldownManager.js").then(m => m.default);
+            const sessionCleaner = await import("../lib/SessionCleaner.js").then(m => m.default);
 
             return {
                 database: {
