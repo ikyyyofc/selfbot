@@ -35,7 +35,7 @@ export default {
             
             const caption = `✅ *${title}*\n\n${desc}\n\n📹 Kualitas: ${quality}`;
             
-            await m.sock.sendMessage(m.chat, {
+            await sock.sendMessage(m.chat, {
                 video: { url: videoUrl },
                 caption,
                 mimetype: "video/mp4"
