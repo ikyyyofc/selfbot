@@ -576,7 +576,7 @@ export default {
                 fileBuffer
             );*/
             /*const response = (await (new ChatAPI()).chat({messages: [{role: "system", content: payload.systemPrompt},{role:"user", content:payload.text}]})).resAi*/
-            const response = (await (new DeepseekChat()).chat({messages: [{role: "system", content: payload.systemPrompt},{role:"user", content:payload.text}]})).resAi
+            const response = (await (new DeepseekChat()).chat({messages: [{role: "system", content: payload.systemPrompt},{role:"user", content:payload.text}]})).result
             /* const response = (
                 await new ClaudeAPI().chat({
                     model: "claude-opus-4-1",
