@@ -1,3 +1,5 @@
+const groupCache = => (await import("../lib/groupCache.js")).default;
+
 export default {
     desc: "Check bot response speed and resource usage",
     rules: {
