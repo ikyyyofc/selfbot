@@ -1,7 +1,7 @@
 // Nama file: plugins/___ai-context.js
 
 import chat from "../lib/gemini.js"; // pastiin path ini bener
-import { aiConversations } from "../lib/aiStore.js"; // tempat kita nyimpen history
+const aiConversations = (await import("../lib/aiStore.js")).aiConversations;
 
 export default {
     async execute(context) {
@@ -17,25 +17,29 @@ export default {
 
         // Kalo ada history DAN user nge-reply pesan AI yang terakhir
         if (conversation && m.quoted.id === conversation.lastMessageId) {
-            
             try {
                 await m.react("🤔");
 
                 const currentHistory = conversation.history;
-                const newHistory = [...currentHistory, { role: "user", content: m.text }];
+                const newHistory = [
+                    ...currentHistory,
+                    { role: "user", content: m.text }
+                ];
 
                 const responseText = await chat(newHistory);
-                
+
                 const sentMessage = await reply(responseText);
-                
+
                 // Update history dengan chat terbaru
                 aiConversations.set(m.sender, {
-                    history: [...newHistory, { role: "assistant", content: responseText }],
+                    history: [
+                        ...newHistory,
+                        { role: "assistant", content: responseText }
+                    ],
                     lastMessageId: sentMessage.key.id
                 });
-                
-                await m.react("");
 
+                await m.react("");
             } catch (e) {
                 await m.react("❌");
                 console.error("AI Context Error:", e);
