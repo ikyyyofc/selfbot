@@ -306,7 +306,7 @@ class ClaudeAPI {
 
 class DeepseekChat {
     async chat({
-        model = "deepseek-coder",
+        model = "deepseek-reasoner",
         prompt = "",
         messages = [],
         stream = false,
