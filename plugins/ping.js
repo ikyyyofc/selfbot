@@ -1,275 +1,164 @@
-const groupCache = (await import("../lib/groupCache.js")).default;
 
 export default {
-    desc: "Check bot response speed and resource usage",
     rules: {
         owner: true
     },
-    execute: async ({ sock, m }) => {
-        const startTime = Date.now();
+    desc: "Check bot performance and resource usage",
+    async execute({ sock, m }) {
+        const start = Date.now();
         
-        await m.react("⏱️");
-
         const formatBytes = (bytes) => {
-            if (bytes === 0) return '0 B';
+            if (bytes === 0) return "0 B";
             const k = 1024;
-            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const sizes = ["B", "KB", "MB", "GB"];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
         };
 
-        const formatUptime = (seconds) => {
-            const days = Math.floor(seconds / 86400);
-            const hours = Math.floor((seconds % 86400) / 3600);
-            const minutes = Math.floor((seconds % 3600) / 60);
-            const secs = Math.floor(seconds % 60);
+        const formatUptime = (ms) => {
+            const seconds = Math.floor(ms / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const hours = Math.floor(minutes / 60);
+            const days = Math.floor(hours / 24);
             
-            const parts = [];
-            if (days > 0) parts.push(`${days}d`);
-            if (hours > 0) parts.push(`${hours}h`);
-            if (minutes > 0) parts.push(`${minutes}m`);
-            if (secs > 0) parts.push(`${secs}s`);
-            
-            return parts.join(' ');
+            return `${days}d ${hours % 24}h ${minutes % 60}m ${seconds % 60}s`;
+        };
+
+        const getMemoryDetails = () => {
+            const usage = process.memoryUsage();
+            return {
+                rss: usage.rss,
+                heapTotal: usage.heapTotal,
+                heapUsed: usage.heapUsed,
+                external: usage.external,
+                arrayBuffers: usage.arrayBuffers
+            };
         };
 
         const getCPUUsage = () => {
-            const cpus = os.cpus();
-            let totalIdle = 0;
-            let totalTick = 0;
-            
-            cpus.forEach(cpu => {
-                for (const type in cpu.times) {
-                    totalTick += cpu.times[type];
-                }
-                totalIdle += cpu.times.idle;
-            });
-            
+            const usage = process.cpuUsage();
             return {
-                usage: ((1 - totalIdle / totalTick) * 100).toFixed(2),
-                cores: cpus.length,
-                model: cpus[0].model,
-                speed: cpus[0].speed
+                user: (usage.user / 1000000).toFixed(2),
+                system: (usage.system / 1000000).toFixed(2)
             };
         };
 
-        const getMemoryUsage = () => {
-            const mem = process.memoryUsage();
-            const totalMem = os.totalmem();
-            const freeMem = os.freemem();
-            const usedMem = totalMem - freeMem;
-            
+        const getSystemInfo = async () => {
+            const os = await import("os");
             return {
-                process: {
-                    rss: mem.rss,
-                    heapTotal: mem.heapTotal,
-                    heapUsed: mem.heapUsed,
-                    external: mem.external,
-                    arrayBuffers: mem.arrayBuffers
+                platform: os.platform(),
+                arch: os.arch(),
+                cpus: os.cpus().length,
+                totalMem: os.totalmem(),
+                freeMem: os.freemem(),
+                uptime: os.uptime()
+            };
+        };
+
+        const getModuleStats = async () => {
+            const db = await import("./Database.js").then(m => m.default);
+            const groupCache = await import("./groupCache.js").then(m => m.default);
+            const cooldown = await import("./CooldownManager.js").then(m => m.default);
+            const sessionCleaner = await import("./SessionCleaner.js").then(m => m.default);
+
+            return {
+                database: {
+                    mode: db.mode,
+                    connected: db.isConnected,
+                    userCache: db.userCache.size,
+                    groupCache: db.groupCache.size
                 },
-                system: {
-                    total: totalMem,
-                    free: freeMem,
-                    used: usedMem,
-                    percentage: ((usedMem / totalMem) * 100).toFixed(2)
+                groupCache: groupCache.getStats(),
+                cooldown: cooldown.getStats(),
+                session: sessionCleaner.getStats(),
+                messageStore: {
+                    total: m.sock.state?.messageStore?.size || 0
                 }
             };
         };
 
-        const getDiskUsage = () => {
-            const stats = fs.statfsSync(process.cwd());
-            const total = stats.blocks * stats.bsize;
-            const free = stats.bfree * stats.bsize;
-            const used = total - free;
-            
+        const getPluginStats = () => {
             return {
-                total,
-                free,
-                used,
-                percentage: ((used / total) * 100).toFixed(2)
+                commands: m.sock.state?.plugins?.size || 0,
+                listeners: m.sock.state?.listeners?.size || 0
             };
         };
 
-        const getNetworkStats = () => {
-            const interfaces = os.networkInterfaces();
-            const stats = [];
-            
-            for (const [name, addrs] of Object.entries(interfaces)) {
-                addrs.forEach(addr => {
-                    if (!addr.internal && addr.family === 'IPv4') {
-                        stats.push({
-                            interface: name,
-                            address: addr.address,
-                            netmask: addr.netmask,
-                            mac: addr.mac
-                        });
-                    }
-                });
-            }
-            
-            return stats;
-        };
+        await m.react("⏳");
 
-        const getCacheStats = () => {
-            const groupCacheStats = groupCache.getStats();
-            const cooldownStats = cooldown.getStats();
-            
-            return {
-                groups: {
-                    total: groupCacheStats.total,
-                    initialized: groupCacheStats.initialized
-                },
-                cooldowns: {
-                    total: cooldownStats.total,
-                    active: cooldownStats.active
-                },
-                messages: m.constructor.name === 'Object' ? 'N/A' : 'Active'
-            };
-        };
-
-        const getPluginStats = async () => {
-            const state = await import('../lib/BotState.js').then(m => new m.default());
-            const messageStoreSize = state.messageStore ? state.messageStore.size : 0;
-            const pluginsSize = state.plugins ? state.plugins.size : 0;
-            
-            return {
-                commands: pluginsSize,
-                messageStore: messageStoreSize,
-                isDirty: state.isDirty || false
-            };
-        };
-
-        const getSessionStats = () => {
-            const sessionCleaner = require('../lib/SessionCleaner.js').default;
-            return sessionCleaner.getStats();
-        };
-
-        const getDatabaseStats = async () => {
-            const dbStats = {
-                mode: db.mode,
-                connected: db.isConnected
-            };
-            
-            if (db.mode === 'cloud') {
-                try {
-                    const stats = await db.db.stats();
-                    dbStats.collections = stats.collections;
-                    dbStats.dataSize = stats.dataSize;
-                    dbStats.storageSize = stats.storageSize;
-                    dbStats.indexes = stats.indexes;
-                } catch (e) {
-                    dbStats.error = e.message;
-                }
-            }
-            
-            return dbStats;
-        };
-
-        const import_os = import('os');
-        const import_fs = import('fs');
-        
-        const [os, fs] = await Promise.all([import_os, import_fs]);
-
+        const memory = getMemoryDetails();
         const cpu = getCPUUsage();
-        const memory = getMemoryUsage();
-        const disk = getDiskUsage();
-        const network = getNetworkStats();
-        const cache = getCacheStats();
-        const plugins = await getPluginStats();
-        const sessionStats = getSessionStats();
-        const dbStats = await getDatabaseStats();
-        
-        const responseTime = Date.now() - startTime;
+        const system = await getSystemInfo();
+        const modules = await getModuleStats();
+        const plugins = getPluginStats();
 
-        let report = `⚡ *BOT PERFORMANCE REPORT*\n\n`;
-        
-        report += `📊 *1. RESPONSE METRICS*\n`;
-        report += `   1.1 Response Time: ${responseTime}ms\n`;
-        report += `   1.2 Process Uptime: ${formatUptime(process.uptime())}\n`;
-        report += `   1.3 System Uptime: ${formatUptime(os.uptime())}\n`;
-        report += `   1.4 Platform: ${os.platform()} ${os.release()}\n`;
-        report += `   1.5 Architecture: ${os.arch()}\n\n`;
+        const responseTime = Date.now() - start;
 
-        report += `🖥️ *2. CPU USAGE*\n`;
-        report += `   2.1 Usage: ${cpu.usage}%\n`;
-        report += `   2.2 Cores: ${cpu.cores}\n`;
-        report += `   2.3 Model: ${cpu.model}\n`;
-        report += `   2.4 Speed: ${cpu.speed} MHz\n`;
-        report += `   2.5 Load Average:\n`;
-        const loadAvg = os.loadavg();
-        report += `       2.5.1 1 min: ${loadAvg[0].toFixed(2)}\n`;
-        report += `       2.5.2 5 min: ${loadAvg[1].toFixed(2)}\n`;
-        report += `       2.5.3 15 min: ${loadAvg[2].toFixed(2)}\n\n`;
+        let msg = `╭─────「 *BOT PERFORMANCE* 」\n`;
+        msg += `│\n`;
+        msg += `│ *1. RESPONSE TIME*\n`;
+        msg += `│    1.1 Latency: ${responseTime}ms\n`;
+        msg += `│    1.2 Processing: ${Date.now() - start}ms\n`;
+        msg += `│\n`;
+        msg += `│ *2. MEMORY USAGE*\n`;
+        msg += `│    2.1 RSS: ${formatBytes(memory.rss)}\n`;
+        msg += `│    2.2 Heap Total: ${formatBytes(memory.heapTotal)}\n`;
+        msg += `│    2.3 Heap Used: ${formatBytes(memory.heapUsed)}\n`;
+        msg += `│        • Percentage: ${((memory.heapUsed / memory.heapTotal) * 100).toFixed(2)}%\n`;
+        msg += `│    2.4 External: ${formatBytes(memory.external)}\n`;
+        msg += `│    2.5 Array Buffers: ${formatBytes(memory.arrayBuffers)}\n`;
+        msg += `│\n`;
+        msg += `│ *3. CPU USAGE*\n`;
+        msg += `│    3.1 User: ${cpu.user}ms\n`;
+        msg += `│    3.2 System: ${cpu.system}ms\n`;
+        msg += `│    3.3 Total: ${(parseFloat(cpu.user) + parseFloat(cpu.system)).toFixed(2)}ms\n`;
+        msg += `│\n`;
+        msg += `│ *4. SYSTEM INFO*\n`;
+        msg += `│    4.1 Platform: ${system.platform}\n`;
+        msg += `│    4.2 Architecture: ${system.arch}\n`;
+        msg += `│    4.3 CPU Cores: ${system.cpus}\n`;
+        msg += `│    4.4 Total Memory: ${formatBytes(system.totalMem)}\n`;
+        msg += `│    4.5 Free Memory: ${formatBytes(system.freeMem)}\n`;
+        msg += `│        • Used: ${formatBytes(system.totalMem - system.freeMem)}\n`;
+        msg += `│        • Percentage: ${(((system.totalMem - system.freeMem) / system.totalMem) * 100).toFixed(2)}%\n`;
+        msg += `│    4.6 System Uptime: ${formatUptime(system.uptime * 1000)}\n`;
+        msg += `│\n`;
+        msg += `│ *5. PROCESS INFO*\n`;
+        msg += `│    5.1 PID: ${process.pid}\n`;
+        msg += `│    5.2 Node Version: ${process.version}\n`;
+        msg += `│    5.3 Process Uptime: ${formatUptime(process.uptime() * 1000)}\n`;
+        msg += `│\n`;
+        msg += `│ *6. DATABASE*\n`;
+        msg += `│    6.1 Mode: ${modules.database.mode}\n`;
+        msg += `│    6.2 Connected: ${modules.database.connected ? "Yes" : "No"}\n`;
+        msg += `│    6.3 Cache Status:\n`;
+        msg += `│        • User Cache: ${modules.database.userCache} entries\n`;
+        msg += `│        • Group Cache: ${modules.database.groupCache} entries\n`;
+        msg += `│\n`;
+        msg += `│ *7. GROUP CACHE*\n`;
+        msg += `│    7.1 Total Groups: ${modules.groupCache.total}\n`;
+        msg += `│    7.2 Initialized: ${modules.groupCache.initialized ? "Yes" : "No"}\n`;
+        msg += `│\n`;
+        msg += `│ *8. COOLDOWN MANAGER*\n`;
+        msg += `│    8.1 Total Entries: ${modules.cooldown.total}\n`;
+        msg += `│    8.2 Active: ${modules.cooldown.active}\n`;
+        msg += `│    8.3 Expired: ${modules.cooldown.total - modules.cooldown.active}\n`;
+        msg += `│\n`;
+        msg += `│ *9. SESSION CLEANER*\n`;
+        msg += `│    9.1 Total Files: ${modules.session.total || 0}\n`;
+        msg += `│    9.2 Protected: ${modules.session.protected || 0}\n`;
+        msg += `│    9.3 Cleanable: ${modules.session.cleanable || 0}\n`;
+        msg += `│\n`;
+        msg += `│ *10. MESSAGE STORE*\n`;
+        msg += `│    10.1 Stored Messages: ${modules.messageStore.total}\n`;
+        msg += `│\n`;
+        msg += `│ *11. PLUGINS*\n`;
+        msg += `│    11.1 Commands: ${plugins.commands}\n`;
+        msg += `│    11.2 Listeners: ${plugins.listeners}\n`;
+        msg += `│    11.3 Total: ${plugins.commands + plugins.listeners}\n`;
+        msg += `│\n`;
+        msg += `╰────────────────────────`;
 
-        report += `💾 *3. MEMORY USAGE*\n`;
-        report += `   3.1 Process Memory:\n`;
-        report += `       3.1.1 RSS: ${formatBytes(memory.process.rss)}\n`;
-        report += `       3.1.2 Heap Total: ${formatBytes(memory.process.heapTotal)}\n`;
-        report += `       3.1.3 Heap Used: ${formatBytes(memory.process.heapUsed)}\n`;
-        report += `       3.1.4 External: ${formatBytes(memory.process.external)}\n`;
-        report += `       3.1.5 Array Buffers: ${formatBytes(memory.process.arrayBuffers)}\n`;
-        report += `   3.2 System Memory:\n`;
-        report += `       3.2.1 Total: ${formatBytes(memory.system.total)}\n`;
-        report += `       3.2.2 Free: ${formatBytes(memory.system.free)}\n`;
-        report += `       3.2.3 Used: ${formatBytes(memory.system.used)}\n`;
-        report += `       3.2.4 Usage: ${memory.system.percentage}%\n\n`;
-
-        report += `💿 *4. DISK USAGE*\n`;
-        report += `   4.1 Total: ${formatBytes(disk.total)}\n`;
-        report += `   4.2 Free: ${formatBytes(disk.free)}\n`;
-        report += `   4.3 Used: ${formatBytes(disk.used)}\n`;
-        report += `   4.4 Usage: ${disk.percentage}%\n\n`;
-
-        report += `🌐 *5. NETWORK*\n`;
-        network.forEach((net, i) => {
-            report += `   5.${i + 1} Interface: ${net.interface}\n`;
-            report += `       5.${i + 1}.1 IP: ${net.address}\n`;
-            report += `       5.${i + 1}.2 Netmask: ${net.netmask}\n`;
-            report += `       5.${i + 1}.3 MAC: ${net.mac}\n`;
-        });
-        report += `\n`;
-
-        report += `📦 *6. CACHE STATUS*\n`;
-        report += `   6.1 Groups:\n`;
-        report += `       6.1.1 Total: ${cache.groups.total}\n`;
-        report += `       6.1.2 Initialized: ${cache.groups.initialized}\n`;
-        report += `   6.2 Cooldowns:\n`;
-        report += `       6.2.1 Total: ${cache.cooldowns.total}\n`;
-        report += `       6.2.2 Active: ${cache.cooldowns.active}\n`;
-        report += `   6.3 Messages: ${cache.messages}\n\n`;
-
-        report += `🔌 *7. PLUGINS*\n`;
-        report += `   7.1 Commands: ${plugins.commands}\n`;
-        report += `   7.2 Message Store: ${plugins.messageStore}\n`;
-        report += `   7.3 Store Dirty: ${plugins.isDirty}\n\n`;
-
-        report += `📂 *8. SESSION*\n`;
-        if (sessionStats) {
-            report += `   8.1 Total Size: ${sessionStats.totalSizeMB} MB\n`;
-            report += `   8.2 Cleanable Size: ${sessionStats.cleanableSizeMB} MB\n`;
-            report += `   8.3 Files:\n`;
-            report += `       8.3.1 Total: ${sessionStats.fileCount}\n`;
-            report += `       8.3.2 Protected: ${sessionStats.protectedCount}\n`;
-            report += `       8.3.3 Cleanable: ${sessionStats.unprotectedCount}\n`;
-            report += `   8.4 Limit: ${sessionStats.maxSizeMB} MB\n`;
-            report += `   8.5 Over Limit: ${sessionStats.isOverLimit ? 'Yes' : 'No'}\n`;
-        } else {
-            report += `   8.1 Status: N/A\n`;
-        }
-        report += `\n`;
-
-        report += `🗄️ *9. DATABASE*\n`;
-        report += `   9.1 Mode: ${dbStats.mode}\n`;
-        report += `   9.2 Connected: ${dbStats.connected}\n`;
-        if (dbStats.mode === 'cloud' && !dbStats.error) {
-            report += `   9.3 Collections: ${dbStats.collections}\n`;
-            report += `   9.4 Data Size: ${formatBytes(dbStats.dataSize)}\n`;
-            report += `   9.5 Storage Size: ${formatBytes(dbStats.storageSize)}\n`;
-            report += `   9.6 Indexes: ${dbStats.indexes}\n`;
-        } else if (dbStats.error) {
-            report += `   9.3 Error: ${dbStats.error}\n`;
-        }
-
-        await m.reply(report);
+        await m.reply(msg);
     }
 };
