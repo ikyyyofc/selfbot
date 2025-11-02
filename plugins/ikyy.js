@@ -53,7 +53,7 @@ async function hackai(messages, webSearch = false) {
         referer: "https://chat.hackaigc.com/",
         "accept-language": "id,en-US;q=0.9,en;q=0.8"
       },
-      responseType: "stream"
+     // responseType: "stream"
     }
   );
 
