@@ -58,7 +58,7 @@ async function hackai(messages, webSearch = false) {
   );
 
   let fullResponse = "";
-  return response
+  return response.data
  /* return new Promise((resolve, reject) => {
     response.data.on("data", chunk => {
       const lines = chunk.toString().split("\n");
@@ -103,7 +103,7 @@ export default {
 
     try {
       const result = await hackai(text, true);
-      await m.reply(result);
+      await m.reply(jsonFormat(result));
     } catch (error) {
       await m.reply(`error nih: ${error.message}`);
     }
