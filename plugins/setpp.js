@@ -5,7 +5,9 @@ export default {
     rules: {
         owner: true
     },
-    async execute({ sock, m, fileBuffer }) {
+    async execute({ sock, m, getFile }) {
+      let q = m.quoted ? m.quoted : m
+      let fileBuffer = q.isMedia ? await getFile() : false
         try {
             if (!fileBuffer) {
                 return await m.reply(
