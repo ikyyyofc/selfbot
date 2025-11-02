@@ -1,210 +1,204 @@
-// plugins/ping.js
-import os from "os";
-import { performance } from "perf_hooks";
-import { execSync } from "child_process";
-import v8 from "v8";
-import process from "process";
+const os = require('os');
+const process = require('process');
 
-export default {
-    desc: "Cek kecepatan respons & resource detail",
-    rules: {},
+const plugin = {
+    name: 'ping',
+    desc: 'Cek kecepatan respons & status resource bot',
     
-    async execute({ sock, m, reply }) {
-        const start = performance.now();
-        
-        await m.react("🔄");
-        
-        const getProcessInfo = () => {
-            try {
-                const pid = process.pid;
-                const psResult = execSync(`ps -p ${pid} -o %cpu,%mem,rss,vsz,etime`, { encoding: "utf8" });
-                const lines = psResult.trim().split("\n");
-                if (lines.length > 1) {
-                    const values = lines[1].trim().split(/\s+/);
-                    return {
-                        cpu: values[0] + "%",
-                        memPercent: values[1] + "%",
-                        rss: (parseInt(values[2]) / 1024).toFixed(2) + " MB",
-                        vsz: (parseInt(values[3]) / 1024).toFixed(2) + " MB",
-                        uptime: values[4]
-                    };
-                }
-            } catch (e) {}
-            return null;
-        };
+    rules: {
+        owner: false,
+        group: false,
+        private: false,
+        admin: false,
+        premium: false,
+        limit: 0
+    },
 
-        const getNetworkInfo = () => {
-            try {
-                const netstat = execSync("netstat -i", { encoding: "utf8" });
-                const lines = netstat.trim().split("\n");
-                const data = [];
-                for (let i = 2; i < lines.length; i++) {
-                    const cols = lines[i].trim().split(/\s+/);
-                    if (cols[0] && cols[0] !== "lo") {
-                        data.push({
-                            interface: cols[0],
-                            rx: parseInt(cols[3]) || 0,
-                            tx: parseInt(cols[7]) || 0
-                        });
-                    }
-                }
-                return data;
-            } catch (e) {
-                return [];
-            }
-        };
-
-        const getDiskInfo = () => {
-            try {
-                const df = execSync("df -h /", { encoding: "utf8" });
-                const lines = df.trim().split("\n");
-                if (lines.length > 1) {
-                    const cols = lines[1].trim().split(/\s+/);
-                    return {
-                        total: cols[1],
-                        used: cols[2],
-                        available: cols[3],
-                        usePercent: cols[4]
-                    };
-                }
-            } catch (e) {}
-            return null;
-        };
-
-        const memUsage = process.memoryUsage();
-        const heapStats = v8.getHeapStatistics();
-        const heapSpaces = v8.getHeapSpaceStatistics();
-        const cpus = os.cpus();
-        const processInfo = getProcessInfo();
-        const networkInfo = getNetworkInfo();
-        const diskInfo = getDiskInfo();
+    async execute(context) {
+        const startTime = Date.now();
         
-        const cpuUsage = cpus.map((cpu, i) => {
-            const total = Object.values(cpu.times).reduce((a, b) => a + b, 0);
-            const idle = cpu.times.idle;
-            const usage = ((total - idle) / total * 100).toFixed(1);
-            return `   CPU ${i}: ${usage}% (${cpu.model})`;
-        });
-
-        const heapSpaceDetails = heapSpaces.map(space => {
-            const used = (space.space_used_size / 1024 / 1024).toFixed(2);
-            const available = (space.space_available_size / 1024 / 1024).toFixed(2);
-            const size = (space.space_size / 1024 / 1024).toFixed(2);
-            const physical = (space.physical_space_size / 1024 / 1024).toFixed(2);
-            return `   ${space.space_name}:\n` +
-                   `     Size: ${size} MB | Physical: ${physical} MB\n` +
-                   `     Used: ${used} MB | Available: ${available} MB`;
-        });
-
-        const networkDetails = networkInfo.map(net => {
-            const rxMB = (net.rx / 1024 / 1024).toFixed(2);
-            const txMB = (net.tx / 1024 / 1024).toFixed(2);
-            return `   ${net.interface}: RX ${rxMB} MB | TX ${txMB} MB`;
-        });
-
-        const end = performance.now();
-        const responseTime = (end - start).toFixed(2);
-
-        let msg = `*🚀 SYSTEM PERFORMANCE REPORT*\n\n`;
-        
-        msg += `*⚡ RESPONSE TIME*\n`;
-        msg += `├ Bot Latency: ${responseTime}ms\n`;
-        msg += `└ Status: ${responseTime < 100 ? "Excellent ✨" : responseTime < 300 ? "Good 👍" : responseTime < 500 ? "Normal 😊" : "Slow 🐌"}\n\n`;
-        
-        msg += `*🖥️ SYSTEM INFO*\n`;
-        msg += `├ Platform: ${os.platform()} ${os.arch()}\n`;
-        msg += `├ Node: ${process.version}\n`;
-        msg += `├ Hostname: ${os.hostname()}\n`;
-        msg += `├ Total RAM: ${(os.totalmem() / 1024 / 1024 / 1024).toFixed(2)} GB\n`;
-        msg += `├ Free RAM: ${(os.freemem() / 1024 / 1024 / 1024).toFixed(2)} GB\n`;
-        msg += `└ RAM Usage: ${((1 - os.freemem() / os.totalmem()) * 100).toFixed(1)}%\n\n`;
-        
-        if (processInfo) {
-            msg += `*📊 PROCESS STATS*\n`;
-            msg += `├ PID: ${process.pid}\n`;
-            msg += `├ CPU Usage: ${processInfo.cpu}\n`;
-            msg += `├ Memory: ${processInfo.memPercent}\n`;
-            msg += `├ RSS: ${processInfo.rss}\n`;
-            msg += `├ VSZ: ${processInfo.vsz}\n`;
-            msg += `└ Uptime: ${processInfo.uptime}\n\n`;
-        }
-        
-        msg += `*🧠 MEMORY USAGE*\n`;
-        msg += `├ RSS: ${(memUsage.rss / 1024 / 1024).toFixed(2)} MB\n`;
-        msg += `├ Heap Total: ${(memUsage.heapTotal / 1024 / 1024).toFixed(2)} MB\n`;
-        msg += `├ Heap Used: ${(memUsage.heapUsed / 1024 / 1024).toFixed(2)} MB\n`;
-        msg += `├ External: ${(memUsage.external / 1024 / 1024).toFixed(2)} MB\n`;
-        msg += `└ Array Buffers: ${(memUsage.arrayBuffers / 1024 / 1024).toFixed(2)} MB\n\n`;
-        
-        msg += `*📈 V8 HEAP STATISTICS*\n`;
-        msg += `├ Total Heap Size: ${(heapStats.total_heap_size / 1024 / 1024).toFixed(2)} MB\n`;
-        msg += `├ Executable Size: ${(heapStats.total_heap_size_executable / 1024 / 1024).toFixed(2)} MB\n`;
-        msg += `├ Physical Size: ${(heapStats.total_physical_size / 1024 / 1024).toFixed(2)} MB\n`;
-        msg += `├ Available Size: ${(heapStats.total_available_size / 1024 / 1024).toFixed(2)} MB\n`;
-        msg += `├ Used Heap: ${(heapStats.used_heap_size / 1024 / 1024).toFixed(2)} MB\n`;
-        msg += `├ Heap Limit: ${(heapStats.heap_size_limit / 1024 / 1024).toFixed(2)} MB\n`;
-        msg += `├ Malloced Memory: ${(heapStats.malloced_memory / 1024 / 1024).toFixed(2)} MB\n`;
-        msg += `├ Peak Malloced: ${(heapStats.peak_malloced_memory / 1024 / 1024).toFixed(2)} MB\n`;
-        msg += `└ Native Contexts: ${heapStats.number_of_native_contexts}\n\n`;
-        
-        msg += `*🗂️ HEAP SPACES*\n`;
-        msg += heapSpaceDetails.join("\n") + "\n\n";
-        
-        msg += `*💻 CPU DETAILS*\n`;
-        msg += `├ Cores: ${cpus.length}\n`;
-        msg += cpuUsage.join("\n") + "\n\n";
-        
-        msg += `*🔧 LOAD AVERAGE*\n`;
-        const loadavg = os.loadavg();
-        msg += `├ 1 min: ${loadavg[0].toFixed(2)}\n`;
-        msg += `├ 5 min: ${loadavg[1].toFixed(2)}\n`;
-        msg += `└ 15 min: ${loadavg[2].toFixed(2)}\n\n`;
-        
-        if (diskInfo) {
-            msg += `*💾 DISK USAGE*\n`;
-            msg += `├ Total: ${diskInfo.total}\n`;
-            msg += `├ Used: ${diskInfo.used} (${diskInfo.usePercent})\n`;
-            msg += `└ Available: ${diskInfo.available}\n\n`;
-        }
-        
-        if (networkDetails.length > 0) {
-            msg += `*🌐 NETWORK INTERFACES*\n`;
-            msg += networkDetails.join("\n") + "\n\n";
-        }
-        
-        msg += `*📁 BOT CACHE*\n`;
-        const { default: groupCache } = await import("../lib/groupCache.js");
-        const { default: db } = await import("../lib/Database.js");
-        const { default: cooldown } = await import("../lib/CooldownManager.js");
-        const { default: sessionCleaner } = await import("../lib/SessionCleaner.js");
-        
-        const cacheStats = groupCache.getStats();
-        const cooldownStats = cooldown.getStats();
-        const sessionStats = sessionCleaner.getStats();
-        
-        msg += `├ Group Cache: ${cacheStats.keys} groups\n`;
-        msg += `│  └ Hit Rate: ${(cacheStats.hitRate * 100).toFixed(1)}%\n`;
-        msg += `├ Cooldowns: ${cooldownStats.total} entries (${cooldownStats.active} active)\n`;
-        msg += `├ Message Store: ${this.state?.messageStore?.size || 0} messages\n`;
-        
-        if (sessionStats) {
-            msg += `└ Session Files: ${sessionStats.fileCount} files (${sessionStats.totalSizeMB} MB)\n`;
-            msg += `   └ Cleanable: ${sessionStats.unprotectedCount} files (${sessionStats.cleanableSizeMB} MB)\n\n`;
-        } else {
-            msg += `└ Session: N/A\n\n`;
-        }
-        
-        msg += `*🔌 ACTIVE CONNECTIONS*\n`;
         try {
-            const netConnections = execSync("netstat -an | grep ESTABLISHED | wc -l", { encoding: "utf8" });
-            msg += `└ Established: ${netConnections.trim()} connections\n\n`;
-        } catch (e) {
-            msg += `└ Unable to fetch\n\n`;
+            const stats = await this.getDetailedStats();
+            const endTime = Date.now();
+            const pingTime = endTime - startTime;
+            
+            const message = this.formatStatsMessage(stats, pingTime);
+            await context.reply(message);
+            
+        } catch (error) {
+            await context.reply(`❌ Gagal mengambil stats: ${error.message}`);
         }
+    },
+
+    async getDetailedStats() {
+        return {
+            timestamp: Date.now(),
+            performance: this.getPerformanceStats(),
+            memory: this.getMemoryStats(),
+            system: this.getSystemStats(),
+            process: this.getProcessStats(),
+            network: this.getNetworkStats(),
+            bot: this.getBotStats()
+        };
+    },
+
+    getPerformanceStats() {
+        const uptime = process.uptime();
+        const loadAvg = os.loadavg();
         
-        msg += `_Generated in ${responseTime}ms_`;
+        return {
+            uptime: this.formatUptime(uptime),
+            loadAverage: loadAvg.map(load => load.toFixed(2)),
+            userCPUTime: process.cpuUsage().user / 1000000,
+            systemCPUTime: process.cpuUsage().system / 1000000,
+            eventLoopDelay: this.getEventLoopDelay()
+        };
+    },
+
+    getMemoryStats() {
+        const totalMem = os.totalmem();
+        const freeMem = os.freemem();
+        const usedMem = totalMem - freeMem;
         
-        await reply(msg);
-        await m.react("✅");
+        return {
+            total: this.formatBytes(totalMem),
+            used: this.formatBytes(usedMem),
+            free: this.formatBytes(freeMem),
+            usagePercent: ((usedMem / totalMem) * 100).toFixed(2),
+            processHeap: this.formatBytes(process.memoryUsage().heapUsed),
+            processRSS: this.formatBytes(process.memoryUsage().rss),
+            processExternal: this.formatBytes(process.memoryUsage().external)
+        };
+    },
+
+    getSystemStats() {
+        return {
+            platform: os.platform(),
+            arch: os.arch(),
+            release: os.release(),
+            hostname: os.hostname(),
+            cpus: os.cpus().length,
+            cpuModel: os.cpus()[0]?.model || 'Unknown',
+            cpuSpeed: os.cpus()[0]?.speed || 0
+        };
+    },
+
+    getProcessStats() {
+        return {
+            pid: process.pid,
+            version: process.version,
+            versions: process.versions,
+            argv: process.argv.slice(2).join(' ') || 'None',
+            execPath: process.execPath,
+            cwd: process.cwd(),
+            envKeys: Object.keys(process.env).length
+        };
+    },
+
+    getNetworkStats() {
+        const interfaces = os.networkInterfaces();
+        const networkInfo = {};
+        
+        Object.keys(interfaces).forEach(iface => {
+            networkInfo[iface] = interfaces[iface].map(info => ({
+                family: info.family,
+                address: info.address,
+                internal: info.internal
+            }));
+        });
+        
+        return networkInfo;
+    },
+
+    getBotStats() {
+        const botState = global.state;
+        return {
+            pluginsLoaded: botState?.plugins?.size || 0,
+            messagesStored: botState?.messageStore?.size || 0,
+            activeQueues: botState?.queues?.size || 0,
+            cooldownEntries: global.cooldown?.cooldowns?.size || 0
+        };
+    },
+
+    getEventLoopDelay() {
+        const start = process.hrtime.bigint();
+        const end = process.hrtime.bigint();
+        return Number(end - start) / 1000000;
+    },
+
+    formatUptime(seconds) {
+        const days = Math.floor(seconds / 86400);
+        const hours = Math.floor((seconds % 86400) / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = Math.floor(seconds % 60);
+        
+        return `${days}d ${hours}h ${minutes}m ${secs}s`;
+    },
+
+    formatBytes(bytes) {
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        if (bytes === 0) return '0 B';
+        const i = Math.floor(Math.log(bytes) / Math.log(1024));
+        return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+    },
+
+    formatStatsMessage(stats, pingTime) {
+        const { performance, memory, system, process: proc, network, bot } = stats;
+        
+        let message = `⚡ *BOT STATUS & PERFORMANCE*\n\n`;
+        
+        message += `📊 *RESPONSE TIME*\n`;
+        message += `⏱️ Ping: ${pingTime}ms\n\n`;
+        
+        message += `🚀 *PERFORMANCE*\n`;
+        message += `🕐 Uptime: ${performance.uptime}\n`;
+        message += `📈 Load Avg: ${performance.loadAverage.join(', ')}\n`;
+        message += `💻 CPU User: ${performance.userCPUTime.toFixed(2)}s\n`;
+        message += `💻 CPU System: ${performance.systemCPUTime.toFixed(2)}s\n`;
+        message += `🔄 Event Loop: ${performance.eventLoopDelay.toFixed(2)}ms\n\n`;
+        
+        message += `💾 *MEMORY USAGE*\n`;
+        message += `📦 Total: ${memory.total}\n`;
+        message += `🟢 Used: ${memory.used} (${memory.usagePercent}%)\n`;
+        message += `🔵 Free: ${memory.free}\n`;
+        message += `🧠 Process Heap: ${memory.processHeap}\n`;
+        message += `📱 Process RSS: ${memory.processRSS}\n`;
+        message += `🔗 Process External: ${memory.processExternal}\n\n`;
+        
+        message += `🖥️ *SYSTEM INFO*\n`;
+        message += `⚙️ Platform: ${system.platform}\n`;
+        message += `🏗️ Architecture: ${system.arch}\n`;
+        message += `🔧 Release: ${system.release}\n`;
+        message += `🏠 Hostname: ${system.hostname}\n`;
+        message += `🔢 CPUs: ${system.cpus} cores\n`;
+        message += `🚀 CPU Model: ${system.cpuModel}\n`;
+        message += `💨 CPU Speed: ${system.cpuSpeed}MHz\n\n`;
+        
+        message += `🔧 *PROCESS INFO*\n`;
+        message += `🆔 PID: ${proc.pid}\n`;
+        message += `📋 Node.js: ${proc.version}\n`;
+        message += `🎯 Arguments: ${proc.argv}\n`;
+        message += `📁 Working Dir: ${proc.cwd().split('/').pop()}\n`;
+        message += `🔑 Env Variables: ${proc.envKeys}\n\n`;
+        
+        message += `🤖 *BOT STATS*\n`;
+        message += `🔌 Plugins: ${bot.pluginsLoaded}\n`;
+        message += `💬 Messages: ${bot.messagesStored}\n`;
+        message += `⏳ Queues: ${bot.activeQueues}\n`;
+        message += `⏰ Cooldowns: ${bot.cooldownEntries}\n\n`;
+        
+        message += `🌐 *NETWORK INTERFACES*\n`;
+        Object.keys(network).slice(0, 2).forEach(iface => {
+            message += `📡 ${iface}:\n`;
+            network[iface].slice(0, 2).forEach(addr => {
+                message += `  ${addr.family} ${addr.address} ${addr.internal ? '(internal)' : ''}\n`;
+            });
+        });
+        
+        message += `\n⏰ ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB`;
+        
+        return message;
     }
 };
+
+export default plugin;
