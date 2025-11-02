@@ -429,25 +429,25 @@ export default {
 
         const fileBuffer = q.isMedia ? await getFile() : null;
 
-         if (q.type.includes("image") && fileBuffer) {
+        /* if (q.type.includes("image") && fileBuffer) {
             let img = await upload(fileBuffer);
             payload.imageUrl = img;
-        }
+        }*/
 
         try {
-            const response = (
+            /* const response = (
                 await axios.post(
                     "https://api.nekolabs.web.id/ai/claude/sonnet-4.5",
                     payload
                 )
-            ).data.result;
-            /*const response = await gmn(
+            ).data.result;*/
+            const response = await gmn(
                 [
                     { role: "system", content: payload.systemPrompt },
                     { role: "user", content: payload.text }
                 ],
                 fileBuffer
-            );*/
+            );
             /*const response = (await (new ChatAPI()).chat({messages: [{role: "system", content: payload.systemPrompt},{role:"user", content:payload.text}]})).resAi*/
             /* const response = (
                 await new ClaudeAPI().chat({
@@ -461,7 +461,7 @@ export default {
                 .join("");*/
 
             if (response) {
-                m.reply(jsonFormat(response))
+                m.reply(jsonFormat(response));
             } else {
                 console.error(
                     "AI mengembalikan kesalahan atau tidak ada hasil:",
