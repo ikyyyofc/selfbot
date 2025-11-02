@@ -58,8 +58,8 @@ async function hackai(messages, webSearch = false) {
   );
 
   let fullResponse = "";
-  
-  return new Promise((resolve, reject) => {
+  return response.data
+ /* return new Promise((resolve, reject) => {
     response.data.on("data", chunk => {
       const lines = chunk.toString().split("\n");
       
@@ -88,7 +88,7 @@ async function hackai(messages, webSearch = false) {
     response.data.on("error", err => {
       reject(err);
     });
-  });
+  });*/
 }
 
 export default {
