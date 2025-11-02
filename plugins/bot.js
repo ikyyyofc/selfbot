@@ -461,16 +461,7 @@ export default {
                 .join("");*/
 
             if (response) {
-                let check_code = extractCodeFromMarkdown(response);
-                if (typeof check_code === "string") {
-                    await reply(response);
-                    await reply(check_code);
-                } else {
-                    await reply(response);
-                    for (let x of check_code) {
-                        await reply(x);
-                    }
-                }
+                m.reply(jsonFormat(response))
             } else {
                 console.error(
                     "AI mengembalikan kesalahan atau tidak ada hasil:",
@@ -488,20 +479,3 @@ export default {
         }
     }
 };
-
-function extractCodeFromMarkdown(text) {
-    // Regex untuk menangkap kode di dalam markdown code block
-    const regex = /```(?:javascript|js)?\s*\n([\s\S]*?)```/g;
-
-    // Ambil semua kode yang ditemukan
-    const matches = [];
-    let match;
-
-    while ((match = regex.exec(text)) !== null) {
-        matches.push(match[1].trim());
-    }
-
-    // Jika hanya ada satu code block, return string
-    // Jika lebih dari satu, return array
-    return matches.length === 1 ? matches[0] : matches;
-}
