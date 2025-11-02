@@ -570,7 +570,7 @@ export default {
                 "\n\njika membuat kode, ingatlah untuk membuat kode yang simpel, efisien, dan minimalis tetapi fungsinya jelas dan terstruktur dengan baik, tidak perlu memberikan tanda komentar pada kode yang dibuat, selalu gunakan tipe ESM."
         };
 
-        const fileBuffer = q.isMedia ? await getFile() : null;
+        //const fileBuffer = q.isMedia ? await getFile() : null;
 
         /* if (q.type.includes("image") && fileBuffer) {
             let img = await upload(fileBuffer);
