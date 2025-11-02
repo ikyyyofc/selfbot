@@ -1,6 +1,7 @@
 export default {
     desc: "download media yang di reply",
-    async execute({ sock, from, m, reply, fileBuffer }) {
+    async execute({ sock, from, m, reply, getFile }) {
+      let fileBuffer = m.quoted.isMedia ? await getFile() : false
         try {
             // Jika tidak ada media di reply
             if (!fileBuffer) {
