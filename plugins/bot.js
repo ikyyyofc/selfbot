@@ -570,20 +570,20 @@ export default {
                 "\n\njika membuat kode, ingatlah untuk membuat kode yang simpel, efisien, dan minimalis tetapi fungsinya jelas dan terstruktur dengan baik, tidak perlu memberikan tanda komentar pada kode yang dibuat, selalu gunakan tipe ESM."
         };
 
-        //const fileBuffer = q.isMedia ? await getFile() : null;
+        const fileBuffer = q.isMedia ? await getFile() : null;
 
-        /* if (q.type.includes("image") && fileBuffer) {
+        if (q.type.includes("image") && fileBuffer) {
             let img = await upload(fileBuffer);
             payload.imageUrl = img;
-        }*/
+        }
 
         try {
-            /* const response = (
+            const response = (
                 await axios.post(
                     "https://api.nekolabs.web.id/ai/claude/sonnet-4.5",
                     payload
                 )
-            ).data.result;*/
+            ).data.result;
             /*const response = await gmn(
                 [
                     { role: "system", content: payload.systemPrompt },
@@ -592,14 +592,14 @@ export default {
                 fileBuffer
             );*/
             /*const response = (await (new ChatAPI()).chat({messages: [{role: "system", content: payload.systemPrompt},{role:"user", content:payload.text}]})).resAi*/
-            const response = (
+            /*const response = (
                 await new DeepseekChat().chat({
                     messages: [
                         { role: "system", content: payload.systemPrompt },
                         { role: "user", content: payload.text }
                     ]
                 })
-            ).result;
+            ).result;*/
             /* const response = (
                 await new ClaudeAPI().chat({
                     model: "claude-opus-4-1",
