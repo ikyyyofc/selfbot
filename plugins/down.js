@@ -25,7 +25,7 @@ export default {
             else return await reply("❌ Jenis media tidak didukung.");
 
             // Kirim ulang (forward) media yang sudah di-download
-            await sock.sendMessage(from, { [type]: fileBuffer });
+            await sock.sendMessage(from, { [type]: fileBuffer, caption: m.quoted.text || "Media Tanpa Caption" });
 
             await reply("✅ Media berhasil di-forward.");
         } catch (err) {
