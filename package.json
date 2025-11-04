@@ -23,6 +23,8 @@
     "dotenv": "latest",
     "file-type": "latest",
     "fluent-ffmpeg": "latest",
+    "form-data": "latest",
+    "got-scraping": "latest",
     "mongodb": "latest",
     "node-cache": "latest",
     "pm2": "latest",
