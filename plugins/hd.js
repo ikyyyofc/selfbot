@@ -1,53 +1,65 @@
+
 import axios from "axios";
 import upload from "../lib/upload.js";
 
 export default {
-    desc: "Menjernihkan foto (HD Enhance)",
+    desc: "Meningkatkan kualitas gambar melalui 3 tahap.",
     rules: {
-        limit: 3
+        limit: 1,
+        premium: true
     },
-    async execute({ sock, m, reply, getFile }) {
+    execute: async ({ m, reply, getFile }) => {
         try {
-            await m.react("⏳");
-
-            const fileBuffer = await getFile();
-            if (!fileBuffer) {
-                await m.react("❌");
-                return reply("❌ Kirim/reply gambar yang mau di-HD-in!");
+            const file = await getFile();
+            if (!file) {
+                return await reply(
+                    "Mana gambarnya? Reply atau kirim gambar dengan caption .hd"
+                );
             }
 
-            await reply("🔄 Mengupload gambar...");
-            const imageUrl = await upload(fileBuffer);
-            
-            if (!imageUrl) {
-                await m.react("❌");
-                return reply("❌ Upload gagal, coba lagi!");
+            await reply("Sabar ya, lagi proses upscale gambar kamu...");
+
+            const initialUrl = await upload(file);
+            if (!initialUrl) {
+                return await reply("Gagal upload gambar, coba lagi nanti.");
             }
 
-            await reply("⚙️ Memproses gambar...");
-            const { data } = await axios.get(
-                `https://api.nekolabs.my.id/tools/pxpic/enhance?imageUrl=${encodeURIComponent(imageUrl)}`,
-                { timeout: 60000 }
-            );
+            const API_BASE = "https://api.nekolabs.web.id/tools/pxpic";
+            const steps = [
+                {
+                    name: "restore",
+                    message: "Tahap 1 dari 3: Memulihkan detail gambar..."
+                },
+                {
+                    name: "upscale",
+                    message: "Tahap 2 dari 3: Meningkatkan resolusi..."
+                },
+                { name: "enhance", message: "Tahap 3 dari 3: Finishing..." }
+            ];
 
-            if (!data?.success || !data?.result) {
-                await m.react("❌");
-                return reply("❌ API gagal proses gambar!");
+            let currentUrl = initialUrl;
+
+            for (const step of steps) {
+                await reply(step.message);
+                const response = await axios.get(
+                    `${API_BASE}/${step.name}?imageUrl=${encodeURIComponent(
+                        currentUrl
+                    )}`
+                );
+
+                if (!response.data || !response.data.success) {
+                    throw new Error(`Gagal pada tahap ${step.name}.`);
+                }
+                currentUrl = response.data.result;
             }
 
-            await sock.sendMessage(m.chat, {
-                image: { url: data.result },
-                caption: "✨ Foto berhasil di-HD-in!"
-            }, { quoted: m });
-
-            await m.react("✅");
-
+            await m.reply({
+                image: { url: currentUrl },
+                caption: "Nih hasilnya, udah HD kan? ✨"
+            });
         } catch (error) {
-            await m.react("❌");
-            const msg = error.code === "ECONNABORTED" 
-                ? "⏱️ Timeout! Gambar terlalu besar/lama"
-                : "❌ Error: " + error.message;
-            reply(msg);
+            console.error("HD plugin error:", error);
+            await reply(`Waduh, ada error nih: ${error.message}. Coba lagi bentar ya.`);
         }
     }
 };
