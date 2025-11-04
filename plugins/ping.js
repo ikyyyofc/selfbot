@@ -1,111 +1,152 @@
+
+import os from "os";
+import util from "util";
+import { exec } from "child_process";
+import db from "../lib/Database.js";
+import groupCache from "../lib/groupCache.js";
+import sessionCleaner from "../lib/SessionCleaner.js";
+
+const execPromise = util.promisify(exec);
+
+const formatBytes = (bytes, decimals = 2) => {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
+};
+
+const formatUptime = seconds => {
+    const d = Math.floor(seconds / (3600 * 24));
+    const h = Math.floor((seconds % (3600 * 24)) / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    return `${d}h ${h}j ${m}m ${s}d`;
+};
+
+const getCpuUsage = () => {
+    return new Promise(resolve => {
+        const start = os.cpus().map(c => c.times);
+        setTimeout(() => {
+            const end = os.cpus().map(c => c.times);
+            const usage = end.map((e, i) => {
+                const s = start[i];
+                const total =
+                    e.user - s.user + e.nice - s.nice + e.sys - s.sys + e.idle - s.idle + e.irq - s.irq;
+                if (total === 0) return 0;
+                return 100 - (100 * (e.idle - s.idle)) / total;
+            });
+            resolve(usage);
+        }, 500);
+    });
+};
+
+const getDiskUsage = async () => {
+    const platform = os.platform();
+    try {
+        if (platform === "win32") {
+            const { stdout } = await execPromise(
+                'wmic logicaldisk get Caption,Size,FreeSpace /format:csv'
+            );
+            return stdout
+                .trim()
+                .split("\n")
+                .slice(1)
+                .map(line => {
+                    const [node, caption, freeSpace, size] = line.split(",").map(s => s.trim());
+                    if (!caption) return null;
+                    const used = size - freeSpace;
+                    return `  - ${caption}  [${formatBytes(used)} / ${formatBytes(size)}]`;
+                })
+                .filter(Boolean)
+                .join("\n");
+        } else {
+            const { stdout } = await execPromise("df -h");
+            return stdout
+                .trim()
+                .split("\n")
+                .slice(1)
+                .map(line => {
+                    const parts = line.split(/\s+/);
+                    return `  - ${parts[0]} (${parts[5]}): [${parts[2]} / ${parts[1]}] (${parts[4]})`;
+                })
+                .join("\n");
+        }
+    } catch (e) {
+        return `  Gagal mengambil info disk: ${e.message}`;
+    }
+};
+
 export default {
     name: "status",
-    desc: "Cek status bot & resource usage detail",
+    desc: "Menampilkan status bot dan resource server secara detail.",
     rules: {
-        private: false,
-        group: false,
-        owner: false
+        owner: true,
+        premium: false,
+        limit: 0
     },
-    async execute(context) {
-        const { sock, m, reply } = context;
+    execute: async ({ m, reply }) => {
+        const startTime = Date.now();
+        await m.react("🔍");
+
+        const [cpuUsage, diskUsage, users, groups] = await Promise.all([
+            getCpuUsage(),
+            getDiskUsage(),
+            db.getAllUsers(),
+            db.getAllGroups()
+        ]);
+
+        const cpus = os.cpus();
+        const ram = process.memoryUsage();
+        const sessionStats = sessionCleaner.getStats();
+
+        const responseTime = startTime - m.timestamp * 1000;
+        const execTime = Date.now() - startTime;
+
+        let text = `*🤖 STATS BOT & SERVER* \n\n`;
+
+        text += `*📊 Performa:*\n`;
+        text += `  - Kecepatan Respon: *${responseTime.toFixed(2)} ms*\n`;
+        text += `  - Waktu Eksekusi: *${execTime} ms*\n\n`;
+
+        text += `*💻 CPU:*\n`;
+        text += `  - Model: *${cpus[0].model}*\n`;
+        text += `  - Cores: *${cpus.length} Core*\n`;
+        text += `  - Kecepatan: *${(cpus[0].speed / 1000).toFixed(2)} GHz*\n`;
+        text += `  - Penggunaan per Core:\n`;
+        cpus.forEach((core, i) => {
+            text += `    - Core ${i + 1}: *${cpuUsage[i].toFixed(2)}%*\n`;
+        });
+        text += `\n`;
+
+        text += `*🧠 Memori (RAM):*\n`;
+        text += `  - Total Sistem: *${formatBytes(os.totalmem())}*\n`;
+        text += `  - Sisa Sistem: *${formatBytes(os.freemem())}*\n`;
+        text += `  - Terpakai Sistem: *${formatBytes(os.totalmem() - os.freemem())}*\n`;
+        text += `  - Penggunaan Bot:\n`;
+        text += `    - RSS: *${formatBytes(ram.rss)}*\n`;
+        text += `    - Heap Total: *${formatBytes(ram.heapTotal)}*\n`;
+        text += `    - Heap Terpakai: *${formatBytes(ram.heapUsed)}*\n\n`;
+
+        text += `*💾 Penyimpanan:*\n${diskUsage}\n\n`;
+
+        text += `*⚙️ Sistem & Bot:*\n`;
+        text += `  - Platform: *${os.platform()} (${os.arch()})*\n`;
+        text += `  - Uptime Server: *${formatUptime(os.uptime())}*\n`;
+        text += `  - Uptime Bot: *${formatUptime(process.uptime())}*\n`;
+        text += `  - Versi Node.js: *${process.version}*\n\n`;
         
-        try {
-            await m.react("📊");
-            
-            const startTime = Date.now();
-            const memUsage = process.memoryUsage();
-            const os = await import('os');
-            
-            // Calculate ping
-            const endTime = Date.now();
-            const ping = endTime - startTime;
-            
-            // System info
-            const uptime = process.uptime();
-            const sysUptime = os.uptime();
-            const cpuInfo = os.cpus();
-            const totalMem = os.totalmem();
-            const freeMem = os.freemem();
-            const loadAvg = os.loadavg();
-            
-            // Format time
-            const formatUptime = (seconds) => {
-                const days = Math.floor(seconds / 86400);
-                const hours = Math.floor((seconds % 86400) / 3600);
-                const minutes = Math.floor((seconds % 3600) / 60);
-                return `${days}d ${hours}h ${minutes}m`;
-            };
-            
-            // Format bytes
-            const formatBytes = (bytes) => {
-                if (bytes === 0) return '0 B';
-                const k = 1024;
-                const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-                const i = Math.floor(Math.log(bytes) / Math.log(k));
-                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-            };
-            
-            // Calculate percentages
-            const memUsed = totalMem - freeMem;
-            const memPercent = ((memUsed / totalMem) * 100).toFixed(2);
-            const rssPercent = ((memUsage.rss / totalMem) * 100).toFixed(2);
-            const heapPercent = ((memUsage.heapUsed / memUsage.heapTotal) * 100).toFixed(2);
-            
-            // Platform info
-            const platform = os.platform();
-            const arch = os.arch();
-            const release = os.release();
-            
-            // CPU details
-            const cpuModel = cpuInfo[0]?.model || 'Unknown';
-            const cpuSpeed = cpuInfo[0]?.speed || 0;
-            const cpuCores = cpuInfo.length;
-            
-            // Build status message
-            let statusMsg = `🤖 *BOT STATUS DETAIL*\n\n`;
-            
-            statusMsg += `⚡ *PERFORMANCE*\n`;
-            statusMsg += `📶 Ping: ${ping}ms\n`;
-            statusMsg += `⏰ Bot Uptime: ${formatUptime(uptime)}\n`;
-            statusMsg += `🖥️ System Uptime: ${formatUptime(sysUptime)}\n\n`;
-            
-            statusMsg += `💾 *MEMORY USAGE*\n`;
-            statusMsg += `📊 System: ${formatBytes(memUsed)} / ${formatBytes(totalMem)} (${memPercent}%)\n`;
-            statusMsg += `🔴 RSS: ${formatBytes(memUsage.rss)} (${rssPercent}%)\n`;
-            statusMsg += `🔵 Heap Used: ${formatBytes(memUsage.heapUsed)}\n`;
-            statusMsg += `🟢 Heap Total: ${formatBytes(memUsage.heapTotal)}\n`;
-            statusMsg += `🟡 Heap %: ${heapPercent}%\n`;
-            statusMsg += `🟣 External: ${formatBytes(memUsage.external)}\n`;
-            statusMsg += `⚪ Array Buffers: ${formatBytes(memUsage.arrayBuffers)}\n\n`;
-            
-            statusMsg += `🖥️ *CPU & SYSTEM*\n`;
-            statusMsg += `🧠 CPU: ${cpuModel}\n`;
-            statusMsg += `🚀 Cores: ${cpuCores} cores @ ${cpuSpeed}MHz\n`;
-            statusMsg += `📈 Load Avg: ${loadAvg[0].toFixed(2)}, ${loadAvg[1].toFixed(2)}, ${loadAvg[2].toFixed(2)}\n`;
-            statusMsg += `💻 Platform: ${platform} ${arch}\n`;
-            statusMsg += `🔧 Kernel: ${release}\n\n`;
-            
-            statusMsg += `📦 *PROCESS INFO*\n`;
-            statusMsg += `🆔 PID: ${process.pid}\n`;
-            statusMsg += `📚 Node.js: ${process.version}\n`;
-            statusMsg += `📁 CWD: ${process.cwd()}\n`;
-            
-            // Add some emoji flair based on performance
-            if (ping < 100) {
-                statusMsg += `\n🎯 Status: Excellent! Bot running smoothly`;
-            } else if (ping < 500) {
-                statusMsg += `\n✅ Status: Good performance`;
-            } else {
-                statusMsg += `\n⚠️ Status: Slow response detected`;
-            }
-            
-            await reply(statusMsg);
-            await m.react("✅");
-            
-        } catch (error) {
-            console.error("Status plugin error:", error);
-            await reply("❌ Gagal mengambil status system");
-            await m.react("❌");
-        }
+        text += `*🗃️ Database:*\n`;
+        text += `  - Mode: *${db.mode}*\n`;
+        text += `  - Total User: *${users.length}*\n`;
+        text += `  - Total Grup: *${groups.length}*\n\n`;
+
+        text += `*📦 Cache & Sesi:*\n`;
+        text += `  - Grup di Cache: *${groupCache.getStats().total}*\n`;
+        text += `  - Ukuran Sesi: *${sessionStats.totalSizeMB} MB*\n`;
+        text += `  - File Sesi (Cleanable): *${sessionStats.unprotectedCount} file (${sessionStats.cleanableSizeMB} MB)*\n`;
+
+        await reply(text);
     }
 };
