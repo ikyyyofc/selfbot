@@ -6,11 +6,13 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default {
-  desc: "mengubah video ke audio",
+    desc: "mengubah video ke audio",
     rules: {
         limit: 1
     },
-    async execute({ m, sock, fileBuffer, reply }) {
+    async execute({ m, sock, getFile, reply }) {
+        let q = m.quoted ? m.quoted : m;
+        let fileBuffer = q.isMedia ? await getFile() : false;
         if (!fileBuffer) {
             await reply(
                 "Kirim/reply video yang mau dikonversi ke audio (MP3)!"
