@@ -4,7 +4,6 @@ import BotState from "./lib/BotState.js";
 import PluginManager from "./lib/PluginManager.js";
 import ConnectionManager from "./lib/ConnectionManager.js";
 
-// ===== MAIN =====
 const main = async () => {
     console.log(colors.cyan("🤖 Starting bot...\n"));
 
