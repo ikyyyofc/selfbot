@@ -1,6 +1,6 @@
 import http from "http";
 
-const PORT = 8000;
+const PORT = process.env.PORT || process.env.SERVER_PORT || 8000;
 
 const generateRandomString = (length = 16) => {
     return Math.random().toString(36).substring(2, length + 2) + 
