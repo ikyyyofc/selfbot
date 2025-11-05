@@ -24,7 +24,7 @@ async function postData(input) {
 }
 
 export default {
-  desc: "download media atau konten dari tiktok mau video atapun foto",
+    desc: "download media atau konten dari tiktok mau video atapun foto",
     rules: {
         limit: 2
     },
@@ -54,12 +54,12 @@ export default {
                 let allImg = [];
                 for (const img of data.images) {
                     allImg.push({
-                      image: {
-                        url: img
-                      }
-                    })
+                        image: {
+                            url: img
+                        }
+                    });
                 }
-                await sock.sendAlbumMessage(m.chat, allImg, m)
+                await sock.sendAlbumMessage(m.chat, allImg, m);
                 await sock.sendMessage(from, {
                     audio: { url: data.play },
                     mimetype: "audio/mpeg",
@@ -77,7 +77,10 @@ export default {
             }
         } catch (error) {
             console.error(error);
-            reply("🚨 Terjadi kesalahan saat memproses permintaan.\n\n" + jsonFormat(error));
+            reply(
+                "🚨 Terjadi kesalahan saat memproses permintaan.\n\n" +
+                    jsonFormat(error)
+            );
         }
     }
 };
