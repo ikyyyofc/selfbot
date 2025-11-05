@@ -36,6 +36,8 @@ export default {
 
             const limit = Math.min(results.length, 5);
             await reply(`🔍 *Mencari video TikTok...*\nKata kunci: *${text}*`);
+            
+            let allVid = [];
 
             for (let i = 0; i < limit; i++) {
                 const v = results[i];
@@ -45,12 +47,15 @@ export default {
                     `❤️ ${v.digg_count} | 💬 ${v.comment_count} | 🔁 ${v.share_count}`,
                     `▶️ ${v.play_count} views`
                 ].join("\n");
-
-                await sock.sendMessage(from, {
-                    video: { url: v.play },
-                    caption
-                });
+                allVid.push({
+                  video: {
+                    url: v.play
+                  },
+                  caption
+                })
             }
+            
+            await sock.sendAlbumMessage(m.chat, allVid, m);
 
             await reply(`✅ Selesai! ${limit} video dikirim.`);
         } catch (err) {
