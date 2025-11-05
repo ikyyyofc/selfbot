@@ -613,6 +613,12 @@ export default {
 
             if (response) {
                 m.reply(jsonFormat(response));
+                let code = extractAllCodeBlocks(response);
+                if (code.length) {
+                    for (let x of code) {
+                        await m.reply(jsonFormat(x));
+                    }
+                }
             } else {
                 console.error(
                     "AI mengembalikan kesalahan atau tidak ada hasil:",
@@ -631,21 +637,20 @@ export default {
     }
 };
 
-
 /**
  * Fungsi buat nge-extract SEMUA blok kode dari dalem backtick (```).
  * @param {string} text - Teks lengkap yang mengandung satu atau lebih blok kode.
  * @returns {string[]} - Mengembalikan array berisi string kode. Kalo ga ada, array-nya kosong.
  */
 function extractAllCodeBlocks(text) {
-  // Regex-nya sama, tapi kita tambahin flag 'g' (global) buat nyari semua match
-  const regex = /```(.*?)```/sg;
+    // Regex-nya sama, tapi kita tambahin flag 'g' (global) buat nyari semua match
+    const regex = /```(.*?)```/gs;
 
-  // pake matchAll biar dapet semua, hasilnya itu iterator
-  const matches = text.matchAll(regex);
+    // pake matchAll biar dapet semua, hasilnya itu iterator
+    const matches = text.matchAll(regex);
 
-  // Ubah iterator jadi array, terus kita ambil bagian dalemnya aja (grup ke-1)
-  const allCode = [...matches].map(match => match[1].trim());
+    // Ubah iterator jadi array, terus kita ambil bagian dalemnya aja (grup ke-1)
+    const allCode = [...matches].map(match => match[1].trim());
 
-  return allCode;
+    return allCode;
 }
