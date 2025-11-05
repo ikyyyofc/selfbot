@@ -28,7 +28,7 @@ export default {
     rules: {
         limit: 2
     },
-    async execute({ sock, from, args, reply }) {
+    async execute({ sock, from, args, reply, m }) {
         if (!args[0]) return reply("⚠️ Kirim link TikTok yang mau diunduh.");
 
         try {
