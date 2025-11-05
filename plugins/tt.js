@@ -56,8 +56,7 @@ export default {
                     allImg.push({
                         image: {
                             url: img
-                        },
-                        caption: "tes"
+                        }
                     });
                 }
                 await sock.sendAlbumMessage(m.chat, allImg, m);
