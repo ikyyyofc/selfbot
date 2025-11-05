@@ -612,7 +612,7 @@ export default {
                 .join("");*/
 
             if (response) {
-                m.reply(jsonFormat(response));
+                await m.reply(jsonFormat(response));
                 let code = extractAllCodeBlocks(response);
                 if (code.length) {
                     for (let x of code) {
