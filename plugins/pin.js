@@ -29,16 +29,22 @@ export default {
             const selected = shuffled.slice(0, 5); // kirim 5 hasil acak
 
             await reply(`🔍 Hasil acak Pinterest untuk *${text}*:`);
+            
+            let allImg = [];
 
             for (const pin of selected) {
                 const caption = `🖼️ *${pin.title || "Tanpa Judul"}*\n👤 ${
                     pin.uploader.full_name
                 } (@${pin.uploader.username})\n🔗 ${pin.pin_url}`;
-                await sock.sendMessage(from, {
-                    image: { url: pin.media.images.large.url },
-                    caption
-                });
+                allImg.push({
+                  image: {
+                    url: pin.media.images.large.url
+                  },
+                  caption
+                })
             }
+            
+            await sock.sendAlbumMessage(m.chat, allImg, m);
         } catch (err) {
             console.error(err);
             reply("⚠️ Terjadi kesalahan saat mencari di Pinterest.");
