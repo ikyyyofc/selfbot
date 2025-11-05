@@ -77,7 +77,7 @@ export default {
             }
         } catch (error) {
             console.error(error);
-            reply("🚨 Terjadi kesalahan saat memproses permintaan.");
+            reply("🚨 Terjadi kesalahan saat memproses permintaan.\n\n" + jsonFormat(error));
         }
     }
 };
