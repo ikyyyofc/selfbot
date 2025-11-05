@@ -6,7 +6,7 @@ export default {
     rules: {
         limit: 2
     },
-    async execute({ sock, from, args, text, reply }) {
+    async execute({ sock, from, args, text, reply, m }) {
         try {
             if (!text)
                 return reply(
