@@ -51,12 +51,15 @@ export default {
                 await reply(
                     `🖼 *Foto Slide TikTok*\n👤 ${username}\n🎬 ${title}\n📸 Jumlah Foto: ${data.images.length}`
                 );
+                let allImg = [];
                 for (const img of data.images) {
-                    await sock.sendMessage(from, {
-                        image: { url: img },
-                        caption: `${username} - ${title}`
-                    });
+                    allImg.push({
+                      image: {
+                        url: img
+                      }
+                    })
                 }
+                await sock.sendAlbumMessage(m.chat, allImg, m)
                 await sock.sendMessage(from, {
                     audio: { url: data.play },
                     mimetype: "audio/mpeg",
