@@ -630,3 +630,22 @@ export default {
         }
     }
 };
+
+
+/**
+ * Fungsi buat nge-extract SEMUA blok kode dari dalem backtick (```).
+ * @param {string} text - Teks lengkap yang mengandung satu atau lebih blok kode.
+ * @returns {string[]} - Mengembalikan array berisi string kode. Kalo ga ada, array-nya kosong.
+ */
+function extractAllCodeBlocks(text) {
+  // Regex-nya sama, tapi kita tambahin flag 'g' (global) buat nyari semua match
+  const regex = /```(.*?)```/sg;
+
+  // pake matchAll biar dapet semua, hasilnya itu iterator
+  const matches = text.matchAll(regex);
+
+  // Ubah iterator jadi array, terus kita ambil bagian dalemnya aja (grup ke-1)
+  const allCode = [...matches].map(match => match[1].trim());
+
+  return allCode;
+}
