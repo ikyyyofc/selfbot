@@ -26,7 +26,7 @@ export default {
     OWNER_NUMBER: "6287866255637",
     
     SESSION_CLEANUP_INTERVAL: 2,
-    SESSION_MAX_SIZE_MB: 1,
+    SESSION_MAX_SIZE_MB: 10,
     
     GROUP_CACHE_TTL: 300,
     
