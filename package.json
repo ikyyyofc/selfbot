@@ -28,6 +28,7 @@
     "mongodb": "latest",
     "node-cache": "latest",
     "pm2": "latest",
-    "wa-sticker-formatter": "latest"
+    "wa-sticker-formatter": "latest",
+    "ws": "latest",
   }
 }
