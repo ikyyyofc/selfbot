@@ -20,7 +20,7 @@ global.jsonFormat = jsonFormat;
 export default {
     SESSION: "session",
     PAIRING_CODE: "IKYYSELF",
-    PREFIX: [".", "!", "/", "-"],
+    PREFIX: [".", "!", "/", "-", "😹"],
     BOT_NAME: "IKYY",
     OWNER_NAME: "IKYYOFC",
     OWNER_NUMBER: "6287866255637",
