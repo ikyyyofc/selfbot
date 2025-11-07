@@ -4,6 +4,30 @@ import { EventEmitter } from "events";
 
 const PORT = process.env.PORT || process.env.SERVER_PORT || 8000;
 
+const isPortAvailable = async (port) => {
+    return new Promise((resolve) => {
+        const testServer = http.createServer();
+        testServer.once('error', (err) => {
+            if (err.code === 'EADDRINUSE') {
+                resolve(false);
+            }
+        });
+        testServer.once('listening', () => {
+            testServer.close();
+            resolve(true);
+        });
+        testServer.listen(port);
+    });
+};
+
+const findAvailablePort = async (startPort) => {
+    let port = startPort;
+    while (!(await isPortAvailable(port))) {
+        port++;
+    }
+    return port;
+};
+
 export const monitorEmitter = new EventEmitter();
 
 const stats = {
@@ -507,11 +531,17 @@ function broadcast(data) {
     });
 }
 
-server.listen(PORT, () => {
-    console.log(`🏥 Monitor server running on port ${PORT}`);
-    console.log(`🔗 Dashboard: http://localhost:${PORT}/monitor`);
-    console.log(`🔗 API: http://localhost:${PORT}/api/stats`);
-});
+const startServer = async () => {
+    const availablePort = await findAvailablePort(PORT);
+    
+    server.listen(availablePort, () => {
+        console.log(`🏥 Monitor server running on port ${availablePort}`);
+        console.log(`🔗 Dashboard: http://localhost:${availablePort}/monitor`);
+        console.log(`🔗 API: http://localhost:${availablePort}/api/stats`);
+    });
+};
+
+startServer();
 
 process.on("SIGINT", () => {
     console.log("\n⏹️  Monitor server stopped");
