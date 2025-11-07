@@ -3,7 +3,6 @@ import { join, dirname } from 'path';
 import { createInterface } from 'readline';
 import { setupMaster, fork } from 'cluster';
 import { watchFile, unwatchFile, readFileSync } from 'fs';
-import "./server.js";
 
 const rl = createInterface(process.stdin, process.stdout);
 const __dirname = dirname(fileURLToPath(import.meta.url));
