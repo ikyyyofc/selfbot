@@ -36,7 +36,7 @@ export default {
             const genPayload = {
                 videoPrompt: prompt,
                 videoAspectRatio: "16:9",
-                videoDuration: 10,
+                videoDuration: 8,
                 videoQuality: "540p",
                 videoModel: "v4.5",
                 videoImageUrl: imageUrl,
