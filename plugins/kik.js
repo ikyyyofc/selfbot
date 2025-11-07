@@ -1,62 +1,41 @@
+
 export default {
-  desc: "mengeluarkan member",
     rules: {
-        admin: true
+        group: true,
+        admin: true,
     },
-    async execute({ sock, from, args, text, m, reply }) {
+    desc: "Mengeluarkan anggota dari grup.",
+    execute: async (context) => {
+        const { sock, m, chat, reply } = context;
+
         try {
-            // pastikan dijalankan di grup
-            if (!from.endsWith("@g.us")) {
-                return reply("❌ Perintah ini hanya bisa digunakan di grup.");
+            const botIsAdmin = await sock.isGroupAdmin(chat, sock.user.id);
+            if (!botIsAdmin) {
+                return await reply("Bot harus menjadi admin untuk menggunakan perintah ini.");
             }
 
-            // ambil target (mention > reply > argumen nomor)
-            const ctxInfo = m.message?.extendedTextMessage?.contextInfo || {};
-            const mentioned = ctxInfo.mentionedJid || [];
-            const quotedParticipant = ctxInfo.participant;
-            let targetJid = null;
-
-            if (mentioned.length > 0) {
-                targetJid = mentioned[0];
-            } else if (quotedParticipant) {
-                targetJid = quotedParticipant;
-            } else if (args.length > 0) {
-                let num = args[0].replace(/[^0-9]/g, "");
-                if (!num)
-                    return reply("❌ Harap sebutkan target yang ingin dikick.");
-                targetJid = `${num}@s.whatsapp.net`;
-            } else {
-                return reply(
-                    "❌ Harap sebutkan target yang ingin dikick (mention / reply / nomor)."
-                );
+            let users = m.mentions;
+            if (users.length === 0 && m.quoted) {
+                users = [m.quoted.sender];
             }
 
-            // ambil metadata grup
-            const metadata = await sock.groupMetadata(from);
+            if (users.length === 0) {
+                return await reply("Tag atau balas pesan anggota yang ingin dikeluarkan.");
+            }
+            
+            const usersToKick = users.filter(jid => jid !== sock.user.id);
 
-            // cek apakah bot admin
-            const botId = sock.user.id.split(":")[0] + "@s.whatsapp.net";
-            const botData = metadata.participants.find(p => p.jid === botId);
-            const botIsAdmin =
-                botData?.admin === "admin" || botData?.admin === "superadmin";
+            if (usersToKick.length === 0) {
+                return await reply("Tidak bisa mengeluarkan diri sendiri.");
+            }
 
-            if (!botIsAdmin) return reply("❌ Bot bukan admin di grup ini.");
-
-            // cek apakah target ada di grup
-            const targetExists = metadata.participants.some(
-                p => p.id === targetJid
-            );
-            if (!targetExists)
-                return reply("❌ Target tidak ditemukan di grup.");
-
-            // lakukan kick
-            await sock.groupParticipantsUpdate(from, [targetJid], "remove");
-            reply(`✅ Berhasil mengeluarkan: @${targetJid.split("@")[0]}`, {
-                mentions: [targetJid]
-            });
-        } catch (e) {
-            console.error("Kick error:", e);
-            reply("❌ Terjadi kesalahan saat mencoba mengeluarkan member.");
+            await sock.groupRemove(chat, usersToKick);
+            
+            // Nggak perlu reply karena udah ada notif default dari WhatsApp
+            
+        } catch (error) {
+            console.error(error);
+            await reply("Gagal mengeluarkan anggota. Mungkin dia adalah admin/owner grup.");
         }
-    }
+    },
 };
