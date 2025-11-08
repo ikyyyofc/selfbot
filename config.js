@@ -8,12 +8,12 @@ export default {
     BOT_NAME: "IKYY",
     OWNER_NAME: "IKYYOFC",
     OWNER_NUMBER: "6287866255637",
-    
+
     SESSION_CLEANUP_INTERVAL: 2,
     SESSION_MAX_SIZE_MB: 10,
-    
+
     GROUP_CACHE_TTL: 300,
-    
+
     COOLDOWN_CLEANUP_INTERVAL: 60,
 
     BOT_MODE: process.env.mode || "self",
@@ -26,11 +26,11 @@ export default {
     LIMIT_RESET_HOUR: 0,
 
     PREMIUM_GROUPS: [],
-    
+
     RENT_REMINDER_DAYS: 3
 };
 
-global.delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+global.delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 global.jsonFormat = obj => {
     try {
