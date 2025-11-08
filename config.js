@@ -30,7 +30,7 @@ export default {
     RENT_REMINDER_DAYS: 3
 };
 
-global.delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+global.delay = ms => new Promise(resolve => setTimeout(resolve, ms * 1000));
 
 global.jsonFormat = obj => {
     try {
