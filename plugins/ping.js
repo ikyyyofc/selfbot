@@ -1,4 +1,4 @@
-javascript
+
 export default {
     desc: "Mengecek kecepatan respon bot.",
     rules: {
