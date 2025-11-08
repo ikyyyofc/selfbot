@@ -1,22 +1,6 @@
 import dotenv from "dotenv/config";
 import { format } from "util";
 
-const jsonFormat = obj => {
-    try {
-        let print =
-            obj &&
-            (obj.constructor.name === "Object" ||
-                obj.constructor.name === "Array")
-                ? format(JSON.stringify(obj, null, 2))
-                : format(obj);
-        return print;
-    } catch {
-        return format(obj);
-    }
-};
-
-global.jsonFormat = jsonFormat;
-
 export default {
     SESSION: "session",
     PAIRING_CODE: "IKYYSELF",
@@ -44,4 +28,20 @@ export default {
     PREMIUM_GROUPS: [],
     
     RENT_REMINDER_DAYS: 3
+};
+
+global.delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+global.jsonFormat = obj => {
+    try {
+        let print =
+            obj &&
+            (obj.constructor.name === "Object" ||
+                obj.constructor.name === "Array")
+                ? format(JSON.stringify(obj, null, 2))
+                : format(obj);
+        return print;
+    } catch {
+        return format(obj);
+    }
 };
