@@ -534,9 +534,10 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
     </div>
 
     <script>
-        const ws = new WebSocket(\`ws://\${window.location.host}\`);
+        const ws = new WebSocket('ws://' + window.location.host);
         
         const activityData = Array(20).fill(0);
+        window.lastUptime = 0;
         
         ws.onopen = () => {
             document.getElementById('status-text').textContent = 'Connected';
@@ -553,9 +554,6 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
             
             if (msg.type === 'stats') {
                 updateStats(msg.data);
-                if (msg.data.uptime) {
-                    window.lastUptime = msg.data.uptime;
-                }
             } else if (msg.type === 'message') {
                 addMessage(msg.data);
                 updateChart();
@@ -592,16 +590,14 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
             
             const time = new Date().toLocaleTimeString('id-ID');
             const type = data.isGroup ? '👥 Group' : '💬 Private';
-            const text = data.text?.substring(0, 100) || '[Media/Sticker]';
+            const text = data.text ? data.text.substring(0, 100) : '[Media/Sticker]';
             
-            item.innerHTML = \`
-                <div class="message-header">
-                    <span class="message-sender">\${data.sender}</span>
-                    <span class="message-type">\${type}</span>
-                </div>
-                <div class="message-text">\${text}</div>
-                <div class="message-time">\${time}</div>
-            \`;
+            item.innerHTML = '<div class="message-header">' +
+                '<span class="message-sender">' + (data.sender || 'Unknown') + '</span>' +
+                '<span class="message-type">' + type + '</span>' +
+                '</div>' +
+                '<div class="message-text">' + text + '</div>' +
+                '<div class="message-time">' + time + '</div>';
             
             container.insertBefore(item, container.firstChild);
             
@@ -617,9 +613,10 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
             const chart = document.getElementById('chart');
             const max = Math.max(...activityData, 1);
             
-            chart.innerHTML = activityData.map(value => 
-                \`<div class="chart-bar" style="height: \${(value / max) * 100}%"></div>\`
-            ).join('');
+            chart.innerHTML = activityData.map(value => {
+                const height = (value / max) * 100;
+                return '<div class="chart-bar" style="height: ' + height + '%"></div>';
+            }).join('');
         }
 
         setInterval(() => {
@@ -629,29 +626,8 @@ const HTML_DASHBOARD = `<!DOCTYPE html>
         }, 5000);
 
         setInterval(() => {
-            const currentStats = {
-                uptime: window.lastUptime || 0
-            };
-            currentStats.uptime++;
-            window.lastUptime = currentStats.uptime;
-            
-            const days = Math.floor(currentStats.uptime / 86400);
-            const hours = Math.floor((currentStats.uptime % 86400) / 3600);
-            const minutes = Math.floor((currentStats.uptime % 3600) / 60);
-            const seconds = currentStats.uptime % 60;
-            
-            let uptimeText = '';
-            if (days > 0) {
-                uptimeText = `${days}d ${hours}h`;
-            } else if (hours > 0) {
-                uptimeText = `${hours}h ${minutes}m`;
-            } else if (minutes > 0) {
-                uptimeText = `${minutes}m ${seconds}s`;
-            } else {
-                uptimeText = `${seconds}s`;
-            }
-            
-            document.getElementById('uptime').textContent = uptimeText;
+            window.lastUptime++;
+            document.getElementById('uptime').textContent = formatUptime(window.lastUptime);
         }, 1000);
     </script>
 </body>
@@ -706,7 +682,26 @@ wss.on("connection", ws => {
         clients.delete(ws);
         console.log("🔌 Monitor client disconnected");
     });
+    
+    ws.on("message", msg => {
+        try {
+            const data = JSON.parse(msg);
+            if (data.type === "ping") {
+                ws.send(JSON.stringify({
+                    type: "pong",
+                    timestamp: Date.now()
+                }));
+            }
+        } catch (e) {}
+    });
 });
+
+setInterval(() => {
+    broadcast({
+        type: "stats",
+        data: getStats()
+    });
+}, 2000);
 
 function broadcast(data) {
     const message = JSON.stringify(data);
