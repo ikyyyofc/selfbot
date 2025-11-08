@@ -616,6 +616,7 @@ export default {
                 let code = extractAllCodeBlocks(response);
                 if (code.length) {
                     for (let x of code) {
+                      delay(1)
                         await m.reply(jsonFormat(x));
                     }
                 }
