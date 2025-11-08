@@ -1,62 +1,65 @@
+javascript
 import { jidNormalizedUser } from "@whiskeysockets/baileys";
 
 export default {
-    name: 'add',
-    desc: 'Menambahkan anggota ke grup, baik via reply atau nomor.',
+    desc: "Menambahkan seseorang ke dalam grup.",
     rules: {
         group: true,
         admin: true,
+        botAdmin: true,
     },
-    execute: async ({ sock, m, chat, args, reply }) => {
+    execute: async context => {
+        const { sock, m, args } = context;
+
+        let users;
+        if (m.quoted) {
+            users = [m.quoted.sender];
+        } else if (args.length > 0) {
+            users = args.map(v => v.replace(/[^0-9]/g, "") + "@s.whatsapp.net");
+        } else {
+            return m.reply(
+                "❌ Siapa yang mau di-add?\n\nReply pesannya atau ketik nomornya."
+            );
+        }
+
+        if (users.length === 0) {
+            return m.reply("❌ Nomor tidak valid.");
+        }
+
         try {
-            const groupMeta = await sock.getGroupMetadata(chat);
-            const botId = jidNormalizedUser(sock.user.lid);
-            const botIsAdmin = groupMeta.participants.find(p => p.id === botId)?.admin;
+            const results = await sock.groupAdd(m.chat, users);
+            const success = [];
+            const failed = [];
+            let mentionedJid = [];
 
-            if (!botIsAdmin) {
-                return reply("Gagal, bot bukan admin di grup ini.");
-            }
+            for (const res of results) {
+                const userJid = Object.keys(res)[0];
+                const status = res[userJid].code.toString();
+                mentionedJid.push(userJid)
 
-            const users = m.quoted ?
-                [m.quoted.sender] :
-                args.map(v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net');
-
-            if (users.length === 0) {
-                return reply('Cara penggunaan:\n.add [nomor] atau reply pesan anggota yang sudah keluar.');
-            }
-
-            const response = await sock.groupAdd(chat, users);
-            
-            let success_add = [];
-            let cant_add = [];
-
-            for (const res of response) {
-                if (res.status == 200) {
-                    success_add.push(res.jid);
-                } else if (res.status == 403) {
-                    cant_add.push(res.jid);
+                if (status === "200") {
+                    success.push(`@${userJid.split("@")[0]}`);
+                } else {
+                    failed.push(`@${userJid.split("@")[0]}`);
                 }
             }
 
-            if (success_add.length > 0) {
-                await reply(`Berhasil menambahkan ${success_add.map(jid => `@${jid.split('@')[0]}`).join(' ')}`, success_add);
+            let responseText = "";
+            if (success.length > 0) {
+                responseText += `✅ Berhasil menambahkan ${success.join(", ")}.`;
+            }
+            if (failed.length > 0) {
+                responseText += `\n⚠️ Gagal menambahkan ${failed.join(
+                    ", "
+                )}, mungkin karena nomor tidak valid, private, atau sudah ada di grup.`;
             }
 
-            if (cant_add.length > 0) {
-                const code = await sock.groupInviteCode(chat);
-                const link = `https://chat.whatsapp.com/${code}`;
-                const groupName = groupMeta.subject;
-                
-                for (const jid of cant_add) {
-                    const inviteMsg = `Halo! Kamu diundang untuk bergabung ke grup "${groupName}".\n\nKlik link di bawah ini:\n${link}`;
-                    
-                    await sock.sendMessage(jid, { text: inviteMsg });
-                    await reply(`Gagal menambahkan @${jid.split('@')[0]} karena pengaturan privasi. Undangan grup telah dikirim via private chat.`, [jid]);
-                }
-            }
-        } catch (error) {
-            console.error("Error in 'add' plugin:", error);
-            reply(`Terjadi kesalahan: ${error.message}`);
+            await m.reply(responseText, mentionedJid);
+        } catch (e) {
+            console.log(e)
+            await m.reply(
+                "❌ Gagal menambahkan, pastiin bot udah jadi admin."
+            );
         }
     }
 };
