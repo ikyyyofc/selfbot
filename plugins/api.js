@@ -1,95 +1,122 @@
 import axios from "axios";
-import util from "util";
+import { URLSearchParams } from "url";
 
 export default {
+    desc: "Request ke Wudysoft API",
     rules: {
-        owner: true, // Cuma owner yang bisa pake command ini
+        owner: true,
+        limit: false,
     },
-    help: "Gunakan format: <prefix>api <endpoint> [parameter1=nilai1] [parameter2=nilai2]...",
-    desc: "Menguji endpoint API dari wudysoft.xyz.",
-
     execute: async (context) => {
-        const { sock, chat, args, reply } = context;
+        const { m, text, reply, sock } = context;
 
-        if (args.length < 1) {
-            return await reply("Endpointnya mana, bro? Contoh: /api /fakedata/user");
+        if (!text) {
+            return reply(
+                "Format salah.\n\nContoh:\n/api /endpoint\nparam1=value1\nparam2=value2"
+            );
         }
 
-        const endpoint = args[0];
-        const params = args.slice(1);
-        const baseUrl = "https://wudysoft.xyz/api";
+        const lines = text.trim().split("\n");
+        const endpoint = lines.shift().trim();
+        const bodyLines = lines;
 
-        // Ubah array parameter jadi object
-        const queryParams = params.reduce((acc, param) => {
-            const [key, ...valueParts] = param.split("=");
-            const value = valueParts.join("="); // Biar value yang ada '=' tetep aman
-            if (key && value) {
-                acc[key] = value;
+        if (!endpoint.startsWith("/")) {
+            return reply("Endpoint harus diawali dengan '/'.");
+        }
+
+        const url = `https://wudysoft.xyz/api${endpoint}`;
+        const params = new URLSearchParams();
+        let hasBody = bodyLines.length > 0;
+
+        if (hasBody) {
+            for (const line of bodyLines) {
+                const parts = line.split("=");
+                if (parts.length >= 2) {
+                    const key = parts.shift().trim();
+                    const value = parts.join("=").trim();
+                    params.append(key, value);
+                }
             }
-            return acc;
-        }, {});
-
-        const url = `${baseUrl}/${endpoint.startsWith("/") ? endpoint.substring(1) : endpoint}`;
+        }
 
         try {
-            await reply(`Menguji endpoint...\nURL: ${url}`);
+            await m.react("🚀");
 
-            const response = await axios.get(url, {
-                params: queryParams,
-                responseType: "arraybuffer", // Minta data mentah (buffer) biar bisa handle semua tipe file
+            const method = hasBody ? "POST" : "GET";
+
+            const response = await axios({
+                method,
+                url,
+                data: hasBody ? params : null,
+                headers: {
+                    "Content-Type": hasBody
+                        ? "application/x-www-form-urlencoded"
+                        : undefined,
+                },
+                responseType: "arraybuffer",
             });
 
-            const contentType = response.headers["content-type"];
+            const contentType = response.headers["content-type"] || "";
+            const buffer = Buffer.from(response.data);
 
             if (contentType.includes("application/json")) {
-                const data = JSON.parse(Buffer.from(response.data).toString("utf-8"));
-                const formattedJson = util.inspect(data, { depth: null, colors: false });
-                await reply(`\`\`\`json\n${formattedJson}\`\`\``);
-
-            } else if (contentType.startsWith("image/")) {
-                await sock.sendMessage(chat, {
-                    image: response.data,
-                    caption: `✅ Nih hasil gambarnya dari endpoint: ${endpoint}`
-                });
-
-            } else if (contentType.startsWith("video/")) {
-                 await sock.sendMessage(chat, {
-                    video: response.data,
-                    caption: `✅ Nih hasil videonya dari endpoint: ${endpoint}`
-                });
-
-            } else if (contentType.startsWith("text/")) {
-                const textData = Buffer.from(response.data).toString("utf-8");
-                await reply(textData);
-
+                const jsonResponse = JSON.parse(buffer.toString("utf-8"));
+                const formattedJson = JSON.stringify(jsonResponse, null, 2);
+                await reply(`*Response JSON:*\n\n\`\`\`${formattedJson}\`\`\``);
+            } else if (contentType.includes("text/")) {
+                await reply(`*Response Text:*\n\n${buffer.toString("utf-8")}`);
+            } else if (
+                contentType.includes("image/") ||
+                contentType.includes("video/")
+            ) {
+                const messageType = contentType.includes("image/")
+                    ? "image"
+                    : "video";
+                await sock.sendMessage(
+                    m.chat,
+                    {
+                        [messageType]: buffer,
+                        caption: `*Response Media*\n*Type:* ${contentType}`,
+                    },
+                    { quoted: m }
+                );
             } else {
-                // Fallback buat tipe lain, coba kirim sebagai dokumen
-                await reply(`Tipe konten tidak dikenal (${contentType}), coba kirim sebagai file.`);
-                await sock.sendMessage(chat, {
-                    document: response.data,
-                    mimetype: contentType,
-                    fileName: "response.bin"
-                });
+                await sock.sendMessage(
+                    m.chat,
+                    {
+                        document: buffer,
+                        mimetype: contentType,
+                        fileName: `response${endpoint.replace(/\//g, "_")}`,
+                        caption: `*Response File*\n*Type:* ${contentType}`,
+                    },
+                    { quoted: m }
+                );
             }
 
+            await m.react("✅");
         } catch (error) {
-            let errorMsg = "Anjir, error:\n";
+            await m.react("❌");
             if (error.response) {
-                // Kalo server ngasih respons error (4xx, 5xx)
-                const errorData = Buffer.from(error.response.data).toString("utf-8");
-                errorMsg += `Status: ${error.response.status} - ${error.response.statusText}\n\n`;
+                const errorData = Buffer.from(error.response.data).toString(
+                    "utf-8"
+                );
+                let errorMessage = `*Status:* ${error.response.status}\n`;
                 try {
-                    // Coba format kalo errornya JSON
-                    const jsonData = JSON.parse(errorData);
-                    errorMsg += `Data:\n\`\`\`json\n${util.inspect(jsonData, { depth: null })}\`\`\``;
+                    const jsonError = JSON.parse(errorData);
+                    errorMessage += `\`\`\`${JSON.stringify(
+                        jsonError,
+                        null,
+                        2
+                    )}\`\`\``;
                 } catch {
-                    errorMsg += `Data:\n${errorData}`;
+                    errorMessage += errorData;
                 }
+                await reply(`*API Error:*\n\n${errorMessage}`);
+            } else if (error.request) {
+                await reply("Gagal, nggak ada respons dari server API.");
             } else {
-                // Kalo error jaringan dll
-                errorMsg += error.message;
+                await reply(`Error pas setup request:\n\n${error.message}`);
             }
-            await reply(errorMsg);
         }
     },
 };
