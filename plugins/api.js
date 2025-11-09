@@ -12,7 +12,7 @@ export default {
         }
 
         const endpoint = args[0];
-        const baseUrl = "https://wudysoft.xyz";
+        const baseUrl = "https://wudysoft.xyz/api";
         const fullUrl = baseUrl + (endpoint.startsWith("/") ? endpoint : `/${endpoint}`);
 
         const params = args.slice(1).reduce((acc, current) => {
