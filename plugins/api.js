@@ -1,67 +1,51 @@
-import axios from "axios";
 
-const baseURL = "https://wudysoft.xyz";
+import axios from "axios";
+import util from "util";
 
 export default {
-    desc: "Melakukan tes ke API wudysoft.xyz",
+    desc: "Tes endpoint API wudysoft.xyz",
     rules: {
         owner: true,
+        limit: false,
     },
-    async execute({ args, reply }) {
-        const [endpoint, ...params] = args;
+    execute: async ({ args, reply, m }) => {
+        const baseURL = "https://wudysoft.xyz";
 
-        if (!endpoint) {
+        if (args.length < 1) {
             return reply(
-                "Kasih endpointnya, bro.\nContoh: `/api /mails/v22 action=create`"
+                `Cara pakenya:\n/api <endpoint> [params...]\n\nContoh:\n/api /mails/v22 action=create id=123`
             );
         }
 
-        const data = params.reduce((acc, param) => {
-            const i = param.indexOf("=");
-            if (i === -1) {
-                acc[param] = true; // Handle parameter tanpa value, cth: /api /endpoint?active
-                return acc;
+        const endpoint = args[0];
+        const params = args.slice(1);
+        const url = baseURL + endpoint;
+
+        const payload = {};
+        params.forEach(param => {
+            const [key, ...valueParts] = param.split("=");
+            if (key) {
+                payload[key] = valueParts.join("=");
             }
-            const key = param.slice(0, i);
-            const value = param.slice(i + 1);
-            acc[key] = value;
-            return acc;
-        }, {});
+        });
 
-        const url = baseURL + (endpoint.startsWith("/") ? endpoint : `/${endpoint}`);
-        const method = Object.keys(data).length > 0 ? "POST" : "GET";
-
-        await reply(`Calling API...\nMethod: ${method}\nURL: ${url}`);
+        const method = params.length > 0 ? "post" : "get";
 
         try {
-            const config = {
-                method: method.toLowerCase(),
-                url: url,
-            };
+            await m.react("⏳");
 
-            // Untuk method POST, data dikirim sebagai body
-            if (method === "POST") {
-                config.data = data;
-                config.headers = { "Content-Type": "application/json" };
-            }
-            // Untuk GET, data bisa dikirim sebagai query params (opsional, tergantung API)
-            // Tapi untuk case ini kita asumsikan GET tidak membawa body/params
-            
-            const response = await axios(config);
+            const response = await axios({
+                method,
+                url,
+                [method === "post" ? "data" : "params"]: payload,
+            });
 
-            const responseText = `Success! | Status: ${response.status}\n\n\`\`\`json\n${jsonFormat(response.data)}\n\`\`\``;
-            await reply(responseText);
+            const formattedResponse = util.inspect(response.data, {
+                depth: null,
+                colors: false
+            });
 
-        } catch (error) {
-            let errorText;
-            if (error.response) {
-                // Error dari server API (cth: 404, 500)
-                errorText = `API Error! | Status: ${error.response.status}\n\n\`\`\`json\n${jsonFormat(error.response.data || { message: "No response data" })}\n\`\`\``;
-            } else {
-                // Error jaringan atau lainnya
-                errorText = `Request Failed!\n\n${error.message}`;
-            }
-            await reply(errorText);
-        }
-    },
-};
+            let responseText = `✅ SUCCESS [${response.status}]\n`;
+            responseText += `Method: ${method.toUpperCase()}\n\n`;
+            responseText += "Response:\n";
+            responseText += "
