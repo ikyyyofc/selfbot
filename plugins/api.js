@@ -1,70 +1,47 @@
+javascript
 import axios from "axios";
 import util from "util";
 
 export default {
-    desc: "Tes endpoint API wudysoft.xyz",
+    desc: "Melakukan test ke API wudysoft.xyz",
     rules: {
         owner: true,
-        limit: false,
     },
-    execute: async ({ args, reply, m }) => {
-        const baseURL = "https://wudysoft.xyz";
-
+    execute: async ({ args, reply }) => {
         if (args.length < 1) {
-            return reply(
-                `Cara pakenya:\n/api <endpoint> [params...]\n\nContoh:\n/api /mails/v22 action=create id=123`
-            );
+            return await reply("Gagal! Formatnya: .api <endpoint> <param1=value1> <param2=value2>");
         }
 
         const endpoint = args[0];
-        const params = args.slice(1);
-        const url = baseURL + endpoint;
+        const baseUrl = "https://wudysoft.xyz";
+        const fullUrl = baseUrl + (endpoint.startsWith("/") ? endpoint : `/${endpoint}`);
 
-        const payload = {};
-        params.forEach(param => {
-            const [key, ...valueParts] = param.split("=");
-            if (key) {
-                payload[key] = valueParts.join("=");
+        const params = args.slice(1).reduce((acc, current) => {
+            const [key, value] = current.split("=");
+            if (key && value) {
+                acc[key] = value;
             }
-        });
-
-        const method = params.length > 0 ? "post" : "get";
+            return acc;
+        }, {});
 
         try {
-            await m.react("⏳");
-
-            const response = await axios({
-                method,
-                url,
-                [method === "post" ? "data" : "params"]: payload,
-            });
-
-            const formattedResponse = util.inspect(response.data, {
+            await reply(`Mengirim request ke ${fullUrl}...`);
+            const response = await axios.get(fullUrl, { params });
+            const output = util.inspect(response.data, {
                 depth: null,
                 colors: false
             });
-
-            let responseText = `✅ SUCCESS [${response.status}]\n`;
-            responseText += `Method: ${method.toUpperCase()}\n\n`;
-            responseText += "Response:\n";
-            responseText += "```" + formattedResponse + "```";
-
-            await reply(responseText);
-
+            await reply(`SUKSES\n\n\`\`\`json\n${output}\n\`\`\``);
         } catch (error) {
-            let errorText = `❌ ERROR\n`;
+            let errorMsg = `GAGAL\n\n${error.message}`;
             if (error.response) {
-                const formattedError = util.inspect(error.response.data, {
+                const errorData = util.inspect(error.response.data, {
                     depth: null,
                     colors: false
                 });
-                errorText += `Status: ${error.response.status}\n\n`;
-                errorText += "Response:\n";
-                errorText += "```" + formattedError + "```";
-            } else {
-                errorText += `Message: ${error.message}`;
+                errorMsg += `\nStatus: ${error.response.status}\nData: \`\`\`json\n${errorData}\n\`\`\``;
             }
-            await reply(errorText);
+            await reply(errorMsg);
         }
     },
 };
