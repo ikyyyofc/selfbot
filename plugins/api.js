@@ -47,4 +47,24 @@ export default {
             let responseText = `✅ SUCCESS [${response.status}]\n`;
             responseText += `Method: ${method.toUpperCase()}\n\n`;
             responseText += "Response:\n";
-            responseText += "
+            responseText += "```" + formattedResponse + "```";
+
+            await reply(responseText);
+
+        } catch (error) {
+            let errorText = `❌ ERROR\n`;
+            if (error.response) {
+                const formattedError = util.inspect(error.response.data, {
+                    depth: null,
+                    colors: false
+                });
+                errorText += `Status: ${error.response.status}\n\n`;
+                errorText += "Response:\n";
+                errorText += "```" + formattedError + "```";
+            } else {
+                errorText += `Message: ${error.message}`;
+            }
+            await reply(errorText);
+        }
+    },
+};
