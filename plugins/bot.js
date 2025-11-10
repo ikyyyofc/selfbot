@@ -578,9 +578,15 @@ export default {
         }
 
         try {
-             const response = (
+             /*const response = (
                 await axios.post(
                     "https://api.nekolabs.web.id/ai/claude/sonnet-4.5",
+                    payload
+                )
+            ).data.result;*/
+             const response = (
+                await axios.post(
+                    "https://api.nekolabs.web.id/ai/gpt/4o-search",
                     payload
                 )
             ).data.result;
