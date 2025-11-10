@@ -572,19 +572,19 @@ export default {
 
         const fileBuffer = q.isMedia ? await getFile() : null;
 
-         if (q.type.includes("image") && fileBuffer) {
+        if (q.type.includes("image") && fileBuffer) {
             let img = await upload(fileBuffer);
             payload.imageUrl = img;
         }
 
         try {
-             /*const response = (
+            /*const response = (
                 await axios.post(
                     "https://api.nekolabs.web.id/ai/claude/sonnet-4.5",
                     payload
                 )
             ).data.result;*/
-             const response = (
+            const response = (
                 await axios.post(
                     "https://api.nekolabs.web.id/ai/gpt/5",
                     payload
