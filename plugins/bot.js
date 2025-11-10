@@ -586,7 +586,7 @@ export default {
             ).data.result;*/
              const response = (
                 await axios.post(
-                    "https://api.nekolabs.web.id/ai/gpt/4o-search",
+                    "https://api.nekolabs.web.id/ai/gpt/5",
                     payload
                 )
             ).data.result;
