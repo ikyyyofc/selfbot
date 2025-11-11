@@ -1,143 +1,136 @@
-import os from 'os';
-import util from 'util';
-import { exec } from 'child_process';
+javascript
+import si from 'systeminformation';
 
-const execPromise = util.promisify(exec);
-
-/**
- * Konversi byte ke format yang lebih mudah dibaca (KB, MB, GB, etc.)
- * @param {number} bytes - Ukuran dalam byte
- * @returns {string}
- */
-function formatBytes(bytes) {
-    if (bytes === 0) return '0 Bytes';
+const formatBytes = (bytes, decimals = 2) => {
+    if (!+bytes) return '0 Bytes';
     const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-/**
- * Konversi detik ke format durasi (hari, jam, menit, detik)
- * @param {number} seconds - Durasi dalam detik
- * @returns {string}
- */
-function formatUptime(seconds) {
-    function pad(s) {
-        return (s < 10 ? '0' : '') + s;
-    }
-    const d = Math.floor(seconds / (3600 * 24));
-    const h = Math.floor(seconds % (3600 * 24) / 3600);
-    const m = Math.floor(seconds % 3600 / 60);
-    const s = Math.floor(seconds % 60);
-
-    let result = '';
-    if (d > 0) result += d + ' hari, ';
-    if (h > 0) result += h + ' jam, ';
-    if (m > 0) result += m + ' menit, ';
-    result += s + ' detik';
-    return result;
-}
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+};
 
 export default {
-    desc: 'Mengecek spesifikasi lengkap server dan penggunaan resource.',
+    desc: 'Mengecek spesifikasi detail server.',
     rules: {
         owner: true,
-        private: false,
-        group: false
     },
-    execute: async (context) => {
-        await context.m.react("⚙️");
-        
+    execute: async ({ reply }) => {
         try {
-            // --- OS & System Info ---
-            const platform = os.platform();
-            const release = os.release();
-            const arch = os.arch();
-            const hostname = os.hostname();
-            const systemUptime = os.uptime();
-            let osName = os.type();
+            await reply('Mengambil data spesifikasi server, mohon tunggu...');
 
-            if (platform === 'linux') {
-                try {
-                    const { stdout } = await execPromise('cat /etc/os-release');
-                    const prettyName = stdout.match(/PRETTY_NAME="([^"]+)"/);
-                    if (prettyName && prettyName[1]) {
-                        osName = prettyName[1];
-                    }
-                } catch (e) {
-                    // Biarin, pake os.type() aja kalo gagal
-                }
+            const [
+                cpuData,
+                memData,
+                osData,
+                systemData,
+                diskLayoutData,
+                fsSizeData,
+                networkData,
+                graphicsData
+            ] = await Promise.all([
+                si.cpu(),
+                si.mem(),
+                si.osInfo(),
+                si.system(),
+                si.diskLayout(),
+                si.fsSize(),
+                si.networkInterfaces(),
+                si.graphics()
+            ]);
+
+            let response = '💻 *Spesifikasi Server Detail*\n\n';
+
+            response += '┌─❐ *SISTEM*\n';
+            response += `│ • Manufaktur: ${systemData.manufacturer}\n`;
+            response += `│ • Model: ${systemData.model}\n`;
+            response += `└ • Versi: ${systemData.version}\n\n`;
+
+            response += '┌─❐ *SISTEM OPERASI*\n';
+            response += `│ • Platform: ${osData.platform}\n`;
+            response += `│ • Distro: ${osData.distro}\n`;
+            response += `│ • Rilis: ${osData.release}\n`;
+            response += `│ • Kernel: ${osData.kernel}\n`;
+            response += `└ • Arsitektur: ${osData.arch}\n\n`;
+            
+            response += '┌─❐ *CPU*\n';
+            response += `│ • Manufaktur: ${cpuData.manufacturer}\n`;
+            response += `│ • Brand: ${cpuData.brand}\n`;
+            response += `│ • Kecepatan: ${cpuData.speed} GHz\n`;
+            response += `│ • Total Core: ${cpuData.cores}\n`;
+            response += '│\n';
+            response += '│ ❉ *Detail Core:*\n';
+            cpuData.cores.forEach((core, index) => {
+                response += `│  ➪ Core ${index + 1}: ${core.speed} GHz\n`;
+            });
+            response += `└ • Governor: ${cpuData.governor || 'N/A'}\n\n`;
+
+            response += '┌─❐ *MEMORI (RAM)*\n';
+            response += `│ • Total: ${formatBytes(memData.total)}\n`;
+            response += `│ • Free: ${formatBytes(memData.free)}\n`;
+            response += `│ • Used: ${formatBytes(memData.used)} (${((memData.used / memData.total) * 100).toFixed(2)}%)\n`;
+            response += '│\n';
+            response += `│ • Swap Total: ${formatBytes(memData.swaptotal)}\n`;
+            response += `└ • Swap Used: ${formatBytes(memData.swapused)} (${((memData.swapused / memData.swaptotal) * 100 || 0).toFixed(2)}%)\n\n`;
+
+            if (graphicsData.controllers.length > 0) {
+                response += '┌─❐ *GRAFIS (GPU)*\n';
+                graphicsData.controllers.forEach((gpu, index) => {
+                    response += `│ ❉ *Kontroler ${index + 1}*\n`;
+                    response += `│  • Vendor: ${gpu.vendor}\n`;
+                    response += `│  • Model: ${gpu.model}\n`;
+                    if (gpu.vram) response += `│  • VRAM: ${formatBytes(gpu.vram * 1024 * 1024)}\n`;
+                    if (index < graphicsData.controllers.length - 1) response += '│\n';
+                });
+                response += '└─────────────────\n\n';
             }
-            
-            // --- CPU Info ---
-            const cpus = os.cpus();
-            const cpuModel = cpus[0].model;
-            const cpuCores = cpus.length;
-            const cpuSpeed = (cpus[0].speed / 1000).toFixed(2);
-            const loadAvg = os.loadavg().map(load => load.toFixed(2)).join(', ');
 
-            // --- Memory Info ---
-            const totalMem = os.totalmem();
-            const freeMem = os.freemem();
-            const usedMem = totalMem - freeMem;
-            const memoryUsage = (usedMem / totalMem * 100).toFixed(2);
-
-            // --- Disk Info ---
-            let diskInfo = 'N/A';
-            try {
-                const { stdout } = await execPromise('df -h /');
-                const lines = stdout.trim().split('\n');
-                if (lines.length > 1) {
-                    const parts = lines[1].split(/\s+/);
-                    diskInfo = `Total: ${parts[1]}, Used: ${parts[2]} (${parts[4]}), Free: ${parts[3]}`;
-                }
-            } catch (e) {
-                diskInfo = 'Gagal mendapatkan info disk';
+            response += '┌─❐ *PENYIMPANAN*\n';
+            if (diskLayoutData.length > 0) {
+                response += '│ ❉ *Disk Fisik:*\n';
+                diskLayoutData.forEach((disk, index) => {
+                    response += `│  ➪ Disk ${index + 1}:\n`;
+                    response += `│     • Tipe: ${disk.type}\n`;
+                    response += `│     • Nama: ${disk.name}\n`;
+                    response += `│     • Vendor: ${disk.vendor}\n`;
+                    response += `│     • Ukuran: ${formatBytes(disk.size)}\n`;
+                });
+                response += '│\n';
             }
+            if (fsSizeData.length > 0) {
+                response += '│ ❉ *Partisi Sistem:*\n';
+                fsSizeData.forEach((fs, index) => {
+                    response += `│  ➪ Partisi ${index + 1}:\n`;
+                    response += `│     • Mount: ${fs.mount}\n`;
+                    response += `│     • Tipe FS: ${fs.type}\n`;
+                    response += `│     • Ukuran: ${formatBytes(fs.size)}\n`;
+                    response += `│     • Digunakan: ${formatBytes(fs.used)} (${fs.use}%)\n`;
+                });
+            }
+            response += '└─────────────────\n\n';
 
-            // --- Node.js & Bot Process Info ---
-            const nodeVersion = process.version;
-            const botUptime = process.uptime();
-            const botMemory = process.memoryUsage();
-            
-            let response = `*🤖 Spesifikasi & Status Server Lengkap ⚙️*\n\n`;
-            
-            response += `*💻 SYSTEM & OS*\n`;
-            response += `› Hostname: ${hostname}\n`;
-            response += `› OS: ${osName}\n`;
-            response += `› Platform: ${platform}\n`;
-            response += `› Kernel: ${release}\n`;
-            response += `› Arsitektur: ${arch}\n`;
-            response += `› Uptime: ${formatUptime(systemUptime)}\n\n`;
+            response += '┌─❐ *JARINGAN*\n';
+            const activeInterfaces = networkData.filter(iface => iface.ip4);
+            if (activeInterfaces.length > 0) {
+                activeInterfaces.forEach((iface, index) => {
+                    response += `│ ❉ *Interface ${index + 1}*\n`;
+                    response += `│  • Nama: ${iface.ifaceName}\n`;
+                    response += `│  • IP v4: ${iface.ip4}\n`;
+                    if (iface.ip6) response += `│  • IP v6: ${iface.ip6}\n`;
+                    response += `│  • MAC: ${iface.mac}\n`;
+                    response += `│  • Tipe: ${iface.type}\n`;
+                    if (index < activeInterfaces.length - 1) response += '│\n';
+                });
+            } else {
+                response += '│ • Tidak ada interface jaringan aktif.\n';
+            }
+            response += '└─────────────────\n';
 
-            response += `*🧠 CPU (Central Processing Unit)*\n`;
-            response += `› Model: ${cpuModel}\n`;
-            response += `› Cores: ${cpuCores} Core\n`;
-            response += `› Speed: ${cpuSpeed} GHz\n`;
-            response += `› Load Avg (1, 5, 15m): ${loadAvg}\n\n`;
+            await reply(response.trim());
 
-            response += `*💾 MEMORY (RAM)*\n`;
-            response += `› Total: ${formatBytes(totalMem)}\n`;
-            response += `› Used: ${formatBytes(usedMem)} (${memoryUsage}%)\n`;
-            response += `› Free: ${formatBytes(freeMem)}\n\n`;
-            
-            response += `*💽 STORAGE (Disk)*\n`;
-            response += `› Filesystem (/): ${diskInfo}\n\n`;
-            
-            response += `*▶️ NODE.JS & BOT PROCESS*\n`;
-            response += `› Node.js Version: ${nodeVersion}\n`;
-            response += `› Bot Uptime: ${formatUptime(botUptime)}\n`;
-            response += `› Memory Usage (Bot):\n`;
-            response += `  ├─ RSS: ${formatBytes(botMemory.rss)} _(Resident Set Size)_\n`;
-            response += `  ├─ Heap Total: ${formatBytes(botMemory.heapTotal)} _(V8 Engine)_\n`;
-            response += `  └─ Heap Used: ${formatBytes(botMemory.heapUsed)} _(V8 Engine)_\n`;
-            
-            await context.reply(response.trim());
-            
         } catch (error) {
-            console.error('Error saat mengambil spek server:', error);
-            await context.reply(`❌ Gagal mengambil data server. Coba cek console log, bro.`);
+            console.error('Error fetching server specs:', error);
+            await reply(`Gagal mengambil data server: ${error.message}`);
         }
     }
 };
