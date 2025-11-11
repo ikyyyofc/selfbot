@@ -1,93 +1,83 @@
 import axios from "axios";
 
 async function ytdlp(type, videoUrl) {
-  let command;
-  if (type === "audio") command = `-x --audio-format mp3 ${videoUrl}`;
-  else if (type === "video") command = `-f 136+140 ${videoUrl}`;
-  else throw new Error("Invalid type: use 'audio' or 'video'");
+    let command;
 
-  const encoded = encodeURIComponent(command);
-  const res = await axios.get(
-    `https://ytdlp.online/stream?command=${encoded}`,
-    { responseType: "stream" }
-  );
+    if (type === "audio") {
+        command = `-x --audio-format mp3 ${videoUrl}`;
+    } else if (type === "video") {
+        command = `-f "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]" ${videoUrl}`;
+    } else {
+        throw new Error("Invalid type: use 'audio' or 'video'");
+    }
 
-  return new Promise((resolve, reject) => {
-    let downloadUrl = null;
+    const encoded = encodeURIComponent(command);
 
-    res.data.on("data", chunk => {
-      const text = chunk.toString();
-      const match = text.match(/href="([^"]+\.(mp3|mp4|m4a|webm))"/i);
-      if (match && !downloadUrl) {
-        downloadUrl = `https://ytdlp.online${match[1]}`;
-        if (res.data.destroy) res.data.destroy();
-      }
+    const res = await axios.get(
+        `https://ytdlp.online/stream?command=${encoded}`,
+        { responseType: "stream" }
+    );
+
+    return new Promise((resolve, reject) => {
+        let downloadUrl = null;
+
+        res.data.on("data", chunk => {
+            const text = chunk.toString();
+            const match = text.match(/href="([^"]+\.(mp3|mp4|m4a|webm))"/);
+            if (match) downloadUrl = `https://ytdlp.online${match[1]}`;
+        });
+
+        res.data.on("end", () => {
+            if (!downloadUrl) reject(new Error("Download URL not found, mungkin videonya private atau kena region lock."));
+            else resolve({ dl: downloadUrl });
+        });
+
+        res.data.on("error", reject);
     });
-
-    res.data.on("end", () => {
-      if (!downloadUrl) reject(new Error("Download URL not found"));
-      else resolve({ dl: downloadUrl });
-    });
-
-    res.data.on("error", reject);
-  });
-}
-
-function parseMode(s = "") {
-  const t = s.toLowerCase();
-  if (["audio", "mp3"].includes(t)) return "audio";
-  if (["video", "mp4"].includes(t)) return "video";
-  return null;
 }
 
 export default {
-  desc: "YouTube downloader (audio/video) via scrape",
-  rules: { limit: 1 },
-  async execute(ctx) {
-    try {
-      const { m, args } = ctx;
-
-      const firstIsMode = parseMode(args[0]);
-      const mode = firstIsMode || "video";
-
-      const url =
-        (firstIsMode ? args[1] : args[0]) ||
-        (m.link && m.link.length ? m.link[0] : null);
-
-      if (!url) {
-        await ctx.reply(
-          "Usage:\n.yt <audio|video> <url>\n\nContoh:\n.yt video https://youtu.be/xxxx\n.yt audio https://youtu.be/xxxx"
-        );
-        return;
-      }
-
-      await ctx.reply("Processing... bentar ya 😼");
-
-      const { dl } = await ytdlp(mode, url);
-
-      if (mode === "audio") {
-        try {
-          await ctx.m.reply({
-            audio: { url: dl },
-            mimetype: "audio/mpeg",
-            fileName: "audio.mp3"
-          });
-        } catch {
-          await ctx.reply(`Gagal kirim audio. Link: ${dl}`);
+    desc: "Download YouTube audio atau video.",
+    rules: {
+        limit: 5,
+        premium: false
+    },
+    async execute({ m, args, reply, sock, chat }) {
+        if (args.length < 2) {
+            return reply("Cara pakenya: .youtube <audio/video> <url>");
         }
-      } else {
-        try {
-          await ctx.m.reply({
-            video: { url: dl },
-            mimetype: "video/mp4",
-            caption: "Done ✅"
-          });
-        } catch {
-          await ctx.reply(`Gagal kirim video. Link: ${dl}`);
+
+        const type = args[0].toLowerCase();
+        const url = args[1];
+
+        if (type !== 'audio' && type !== 'video') {
+            return reply("Tipe salah, pilih 'audio' atau 'video'.");
         }
-      }
-    } catch (e) {
-      await ctx.reply(`❌ ${e.message || e}`);
+
+        if (!url || (!url.includes("youtube.com") && !url.includes("youtu.be"))) {
+            return reply("URL YouTube-nya mana?");
+        }
+
+        try {
+            await reply(`Sabar ya, lagi download ${type}...`);
+
+            const result = await ytdlp(type, url);
+            if (!result || !result.dl) throw new Error("Gagal dapet link download.");
+
+            if (type === 'audio') {
+                await sock.sendMessage(chat, {
+                    audio: { url: result.dl },
+                    mimetype: 'audio/mpeg'
+                }, { quoted: m });
+            } else {
+                await sock.sendMessage(chat, {
+                    video: { url: result.dl },
+                    caption: "Nih videonya, kak."
+                }, { quoted: m });
+            }
+        } catch (error) {
+            console.error(error);
+            await reply(`Gagal download, coba lagi nanti.\nError: ${error.message}`);
+        }
     }
-  }
 };
