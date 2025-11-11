@@ -1,135 +1,121 @@
+
 import si from 'systeminformation';
+import { cpus as _cpus } from 'os';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 const formatBytes = (bytes, decimals = 2) => {
-    if (!+bytes) return '0 Bytes';
+    if (bytes === 0) return '0 Bytes';
     const k = 1024;
     const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+};
+
+const getGpuInfo = async () => {
+    try {
+        if (process.platform === 'win32') {
+            const { stdout } = await execAsync('wmic path win32_videocontroller get name,adapterram');
+            const gpus = stdout.trim().split('\n').slice(1).map(line => {
+                const parts = line.trim().split(/\s{2,}/);
+                return {
+                    name: parts[1] || 'N/A',
+                    vram: parts[0] ? formatBytes(parseInt(parts[0])) : 'N/A'
+                };
+            });
+            return gpus.map(gpu => `• ${gpu.name} (VRAM: ${gpu.vram})`).join('\n');
+        } else if (process.platform === 'linux') {
+            const { stdout } = await execAsync('lspci | grep -i --color=never "vga|3d|display"');
+            return stdout.trim().split('\n').map(line => `• ${line.substring(line.indexOf(':') + 2)}`).join('\n');
+        }
+        return '• Info GPU tidak tersedia di OS ini';
+    } catch (e) {
+        return '• Gagal mengambil info GPU';
+    }
 };
 
 export default {
-    desc: 'Mengecek spesifikasi detail server.',
+    desc: 'Mengecek spesifikasi lengkap server secara mendetail.',
     rules: {
         owner: true,
+        private: true
     },
-    execute: async ({ reply }) => {
+    execute: async (context) => {
+        await context.m.react('🔄');
+        
         try {
-            await reply('Mengambil data spesifikasi server, mohon tunggu...');
-
-            const [
-                cpuData,
-                memData,
-                osData,
-                systemData,
-                diskLayoutData,
-                fsSizeData,
-                networkData,
-                graphicsData
-            ] = await Promise.all([
+            const [system, osInfo, cpu, mem, fsSize, network, versions, graphics] = await Promise.all([
+                si.system(),
+                si.osInfo(),
                 si.cpu(),
                 si.mem(),
-                si.osInfo(),
-                si.system(),
-                si.diskLayout(),
                 si.fsSize(),
                 si.networkInterfaces(),
-                si.graphics()
+                si.versions(),
+                getGpuInfo()
             ]);
 
-            let response = '💻 *Spesifikasi Server Detail*\n\n';
+            let response = `💻 *Spesifikasi Server Detail*\n\n`;
 
-            response += '┌─❐ *SISTEM*\n';
-            response += `│ • Manufaktur: ${systemData.manufacturer}\n`;
-            response += `│ • Model: ${systemData.model}\n`;
-            response += `└ • Versi: ${systemData.version}\n\n`;
+            response += `*🖥️ Sistem & OS*\n`;
+            response += `• Manufaktur: ${system.manufacturer}\n`;
+            response += `• Model: ${system.model}\n`;
+            response += `• Platform: ${osInfo.platform}\n`;
+            response += `• Distro: ${osInfo.distro}\n`;
+            response += `• Kernel: ${osInfo.kernel}\n`;
+            response += `• Arsitektur: ${osInfo.arch}\n\n`;
 
-            response += '┌─❐ *SISTEM OPERASI*\n';
-            response += `│ • Platform: ${osData.platform}\n`;
-            response += `│ • Distro: ${osData.distro}\n`;
-            response += `│ • Rilis: ${osData.release}\n`;
-            response += `│ • Kernel: ${osData.kernel}\n`;
-            response += `└ • Arsitektur: ${osData.arch}\n\n`;
-            
-            response += '┌─❐ *CPU*\n';
-            response += `│ • Manufaktur: ${cpuData.manufacturer}\n`;
-            response += `│ • Brand: ${cpuData.brand}\n`;
-            response += `│ • Kecepatan: ${cpuData.speed} GHz\n`;
-            response += `│ • Total Core: ${cpuData.cores}\n`;
-            response += '│\n';
-            response += '│ ❉ *Detail Core:*\n';
-            cpuData.cores.forEach((core, index) => {
-                response += `│  ➪ Core ${index + 1}: ${core.speed} GHz\n`;
+            response += `*⚙️ CPU (${cpu.manufacturer} ${cpu.brand})*\n`;
+            response += `• Cores: ${cpu.cores} (Fisik: ${cpu.physicalCores})\n`;
+            response += `• Kecepatan: ${cpu.speed} GHz\n`;
+            response += `• L2 Cache: ${formatBytes(cpu.l2)}\n`;
+            response += `• L3 Cache: ${formatBytes(cpu.l3)}\n`;
+            response += `*Detail per Core:*\n`;
+            _cpus().forEach((core, i) => {
+                response += `  • Core ${i + 1}: ${core.speed} MHz\n`;
             });
-            response += `└ • Governor: ${cpuData.governor || 'N/A'}\n\n`;
+            response += `\n`;
 
-            response += '┌─❐ *MEMORI (RAM)*\n';
-            response += `│ • Total: ${formatBytes(memData.total)}\n`;
-            response += `│ • Free: ${formatBytes(memData.free)}\n`;
-            response += `│ • Used: ${formatBytes(memData.used)} (${((memData.used / memData.total) * 100).toFixed(2)}%)\n`;
-            response += '│\n';
-            response += `│ • Swap Total: ${formatBytes(memData.swaptotal)}\n`;
-            response += `└ • Swap Used: ${formatBytes(memData.swapused)} (${((memData.swapused / memData.swaptotal) * 100 || 0).toFixed(2)}%)\n\n`;
+            response += `*💾 Memori (RAM)*\n`;
+            response += `• Total: ${formatBytes(mem.total)}\n`;
+            response += `• Terpakai: ${formatBytes(mem.used)}\n`;
+            response += `• Free: ${formatBytes(mem.free)}\n\n`;
+            
+            response += `*🎨 GPU (Graphics)*\n`;
+            response += `${graphics}\n\n`;
 
-            if (graphicsData.controllers.length > 0) {
-                response += '┌─❐ *GRAFIS (GPU)*\n';
-                graphicsData.controllers.forEach((gpu, index) => {
-                    response += `│ ❉ *Kontroler ${index + 1}*\n`;
-                    response += `│  • Vendor: ${gpu.vendor}\n`;
-                    response += `│  • Model: ${gpu.model}\n`;
-                    if (gpu.vram) response += `│  • VRAM: ${formatBytes(gpu.vram * 1024 * 1024)}\n`;
-                    if (index < graphicsData.controllers.length - 1) response += '│\n';
-                });
-                response += '└─────────────────\n\n';
-            }
+            response += `*💽 Penyimpanan (Disk)*\n`;
+            fsSize.forEach(disk => {
+                response += `• Mount: ${disk.mount}\n`;
+                response += `  - Tipe: ${disk.type}\n`;
+                response += `  - Ukuran: ${formatBytes(disk.size)}\n`;
+                response += `  - Terpakai: ${formatBytes(disk.used)} (${disk.use}%)\n`;
+            });
+            response += `\n`;
 
-            response += '┌─❐ *PENYIMPANAN*\n';
-            if (diskLayoutData.length > 0) {
-                response += '│ ❉ *Disk Fisik:*\n';
-                diskLayoutData.forEach((disk, index) => {
-                    response += `│  ➪ Disk ${index + 1}:\n`;
-                    response += `│     • Tipe: ${disk.type}\n`;
-                    response += `│     • Nama: ${disk.name}\n`;
-                    response += `│     • Vendor: ${disk.vendor}\n`;
-                    response += `│     • Ukuran: ${formatBytes(disk.size)}\n`;
-                });
-                response += '│\n';
-            }
-            if (fsSizeData.length > 0) {
-                response += '│ ❉ *Partisi Sistem:*\n';
-                fsSizeData.forEach((fs, index) => {
-                    response += `│  ➪ Partisi ${index + 1}:\n`;
-                    response += `│     • Mount: ${fs.mount}\n`;
-                    response += `│     • Tipe FS: ${fs.type}\n`;
-                    response += `│     • Ukuran: ${formatBytes(fs.size)}\n`;
-                    response += `│     • Digunakan: ${formatBytes(fs.used)} (${fs.use}%)\n`;
-                });
-            }
-            response += '└─────────────────\n\n';
+            response += `*🌐 Jaringan (Network)*\n`;
+            network.forEach(iface => {
+                if (iface.ip4) {
+                    response += `• Interface: ${iface.ifaceName}\n`;
+                    response += `  - Tipe: ${iface.type}\n`;
+                    response += `  - IPv4: ${iface.ip4}\n`;
+                    response += `  - MAC: ${iface.mac}\n`;
+                }
+            });
+            response += `\n`;
+            
+            response += `*📦 Versi Software*\n`;
+            response += `• Node.js: ${versions.node}\n`;
+            response += `• V8 Engine: ${versions.v8}\n`;
+            response += `• NPM: ${versions.npm}\n`;
 
-            response += '┌─❐ *JARINGAN*\n';
-            const activeInterfaces = networkData.filter(iface => iface.ip4);
-            if (activeInterfaces.length > 0) {
-                activeInterfaces.forEach((iface, index) => {
-                    response += `│ ❉ *Interface ${index + 1}*\n`;
-                    response += `│  • Nama: ${iface.ifaceName}\n`;
-                    response += `│  • IP v4: ${iface.ip4}\n`;
-                    if (iface.ip6) response += `│  • IP v6: ${iface.ip6}\n`;
-                    response += `│  • MAC: ${iface.mac}\n`;
-                    response += `│  • Tipe: ${iface.type}\n`;
-                    if (index < activeInterfaces.length - 1) response += '│\n';
-                });
-            } else {
-                response += '│ • Tidak ada interface jaringan aktif.\n';
-            }
-            response += '└─────────────────\n';
-
-            await reply(response.trim());
-
+            await context.reply(response);
+            
         } catch (error) {
-            console.error('Error fetching server specs:', error);
-            await reply(`Gagal mengambil data server: ${error.message}`);
+            await context.reply(`Gagal mengambil data spesifikasi server: ${error.message}`);
         }
     }
 };
