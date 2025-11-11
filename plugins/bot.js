@@ -584,19 +584,19 @@ export default {
                     payload
                 )
             ).data.result;*/
-            const response = (
+            /*const response = (
                 await axios.post(
                     "https://api.nekolabs.web.id/ai/gpt/5",
                     payload
                 )
-            ).data.result;
-            /*const response = await gmn(
+            ).data.result;*/
+            const response = await gmn(
                 [
                     { role: "system", content: payload.systemPrompt },
                     { role: "user", content: payload.text }
                 ],
                 fileBuffer
-            );*/
+            );
             /*const response = (await (new ChatAPI()).chat({messages: [{role: "system", content: payload.systemPrompt},{role:"user", content:payload.text}]})).resAi*/
             /*const response = (
                 await new DeepseekChat().chat({
