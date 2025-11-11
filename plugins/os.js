@@ -1,4 +1,3 @@
-javascript
 import si from 'systeminformation';
 
 const formatBytes = (bytes, decimals = 2) => {
