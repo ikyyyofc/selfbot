@@ -104,7 +104,7 @@ async function addPrompt() {
 }
 
 export default {
-  desc: "mendapatkan prompt bot",
+    desc: "mendapatkan prompt bot",
     rules: {
         owner: true
     },
