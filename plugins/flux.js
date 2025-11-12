@@ -16,7 +16,7 @@ export default {
         await reply('sabar, lagi dibikinin gambarnya... 🎨');
 
         try {
-            const apiUrl = `https://api.nekolabs.web.id/ai/flux/schnell?prompt=${encodeURIComponent(text)}&ratio=9:16`;
+            const apiUrl = `https://api.nekolabs.web.id/ai/flux/dev?prompt=${encodeURIComponent(text)}&ratio=9:16`;
             const { data } = await axios.get(apiUrl);
 
             if (data.success && data.result) {
