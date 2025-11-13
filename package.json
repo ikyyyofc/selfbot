@@ -25,6 +25,7 @@
         "fluent-ffmpeg": "latest",
         "form-data": "latest",
         "got-scraping": "latest",
+        "link-preview-js": "latest",
         "mongodb": "latest",
         "node-cache": "latest",
         "pm2": "latest",
