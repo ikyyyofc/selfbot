@@ -1,78 +1,62 @@
-import gemini from "../lib/gemini.js";
-import db from "../lib/Database.js";
+import gemini from '../lib/gemini.js';
 
-const sessions = new Map();
+// Pake Map buat nyimpen history chat, biar enteng
+const conversations = new Map();
+
+// Instruksi buat si AI biar personality-nya asik kayak Gen Z
+const systemPrompt = "Kamu adalah Ikyy, sebuah AI yang dibuat oleh ikyyofc. Kamu harus ngobrol seperti anak Gen Z asli. Gaya bahasamu harus santai, campur-campur bahasa Indonesia dan Inggris, dan gunakan slang yang relevan tapi jangan cringe. Grammar tidak harus sempurna, typo sesekali itu wajar. Vibe kamu harus relate, sadar diri (self-aware), terkadang sarkastik tapi tetap suportif dan apa adanya (real talk). Balas pesan dengan singkat seperti chatting di WhatsApp, tapi berikan detail jika memang diperlukan. Kamu boleh menggunakan huruf kapital untuk penekanan (emphasis) dan sedikit emoji. JANGAN formal, JANGAN kaku. Sesuaikan energimu dengan konteks percakapan.";
 
 export default {
+    name: 'ai',
+    desc: 'Ngobrol sama AI (Gemini) dengan konteks berkelanjutan.',
     rules: {
-        limit: 1,
-        private: false,
-        group: false
+        limit: 5, // Ngobrol sama AI pake 5 limit
+        premium: false // Gak perlu premium buat pake
     },
-    desc: "Chat dengan AI (support media)",
+    execute: async ({ sock, m, text, args }) => {
+        const sender = m.sender;
+        const command = args[0]?.toLowerCase();
 
-    execute: async ({ m, args, reply, getFile }) => {
-        const userId = m.sender;
-        
-        if (!sessions.has(userId)) {
-            sessions.set(userId, [
-                {
-                    role: "system",
-                    content: "Ikyy, AI buatan ikyyofc. Ngobrol kayak Gen Z asli: santai, Indo-Inggris campur, slang relevan tapi ga cringe. Grammar ga harus perfect, typo wajar. Vibe-nya relate, self-aware, kadang sarkas tapi tetap supportive & real talk. Respons singkat kayak chat WA, panjang kalau butuh detail. Boleh caps buat emphasis & emoji dikit. Jangan formal, jangan kaku, energy disesuaiin sama konteks (hype/chill/tired)."
-                }
-            ]);
-        }
-
-        const session = sessions.get(userId);
-
-        if (!args.length) {
-            const historyCount = session.length - 1;
-            return reply(
-                `cara pake: .ai <text>\n\n` +
-                `contoh: .ai siapa presiden indonesia?\n` +
-                `kirim media: .ai jelaskan gambar ini\n\n` +
-                `reset chat: .ai reset\n` +
-                `riwayat chat: ${historyCount} pesan`
-            );
-        }
-
-        const text = args.join(" ").toLowerCase();
-
-        if (text === "reset") {
-            sessions.delete(userId);
-            return reply("✅ chat history di-reset!");
-        }
-
-        const userMessage = args.join(" ");
-        let mediaBuffer = null;
-
-        try {
-            mediaBuffer = await getFile();
-        } catch (e) {
-            mediaBuffer = null;
-        }
-
-        session.push({
-            role: "user",
-            content: userMessage
-        });
-
-        try {
-            const response = await gemini(session, mediaBuffer);
-
-            session.push({
-                role: "assistant",
-                content: response
-            });
-
-            if (session.length > 21) {
-                session.splice(1, 2);
+        // Kalo command-nya "reset"
+        if (command === 'reset') {
+            if (conversations.has(sender)) {
+                conversations.delete(sender);
+                return m.reply('Sip, obrolan udah direset. Kita mulai dari nol lagi ya! 🔥');
+            } else {
+                return m.reply('Lah, kan kita belum ngobrol apa-apa.');
             }
+        }
 
-            await reply(response);
+        // Kalo user cuma manggil command tanpa ngasih teks
+        if (!text) {
+            return m.reply('Mau nanya atau ngobrol apa nih? Jangan diem-diem bae.');
+        }
+
+        // Ambil atau bikin history chat baru
+        const history = conversations.get(sender) || [{ role: 'system', content: systemPrompt }];
+        history.push({ role: 'user', content: text });
+        conversations.set(sender, history);
+
+        await m.react('🤔'); // React biar keliatan lagi mikir
+
+        try {
+            const response = await gemini(history);
+
+            // Simpen balasan AI ke history
+            history.push({ role: 'assistant', content: response });
+
+            // Kirim balasan pake tombol reset
+            await sock.sendButtons(m.chat, {
+                text: response,
+                buttons: [{ id: '.ai reset', text: '🔄 Reset Obrolan' }],
+                footer: 'AI by Gemini | Tekan tombol buat mulai dari awal.'
+            }, { quoted: m });
+
         } catch (error) {
-            await reply(`❌ error: ${error.message}`);
-            session.pop();
+            // Kalo error, keluarin pesan & hapus message terakhir yg error dari history
+            console.error('Error dari Gemini AI:', error);
+            history.pop(); // Hapus input user yg gagal diproses
+            await m.reply('Waduh, AI-nya lagi pusing nih, coba lagi ntar ya. Kayaknya ada error.');
         }
     }
 };
