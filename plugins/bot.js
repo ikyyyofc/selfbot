@@ -652,27 +652,29 @@ export default {
 function extractAllCodeBlocks(text) {
     const regex = /```(.*?)```/gs;
     const matches = text.matchAll(regex);
-    
+
     const allCode = [...matches].map(match => {
         let code = match[1].trim();
-        
+
         // Cek baris pertama, kalo cuma 1 kata (biasanya nama bahasa) hapus
-        const lines = code.split('\n');
+        const lines = code.split("\n");
         const firstLine = lines[0].trim();
-        
+
         // Kalo baris pertama cuma 1 kata tanpa spasi dan ga ada simbol kode,
         // anggep itu nama bahasa, hapus
-        if (lines.length > 1 && 
-            firstLine && 
-            !firstLine.includes(' ') && 
-            !firstLine.includes('(') && 
-            !firstLine.includes('{') &&
-            !firstLine.includes('=') &&
-            !firstLine.includes(';')) {
+        if (
+            lines.length > 1 &&
+            firstLine &&
+            !firstLine.includes(" ") &&
+            !firstLine.includes("(") &&
+            !firstLine.includes("{") &&
+            !firstLine.includes("=") &&
+            !firstLine.includes(";")
+        ) {
             // Hapus baris pertama, ambil sisanya
-            return lines.slice(1).join('\n').trim();
+            return lines.slice(1).join("\n").trim();
         }
-        
+
         return code;
     });
 
