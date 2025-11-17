@@ -625,7 +625,7 @@ export default {
                         await copy.push({
                             name: "cta_copy",
                             buttonParamsJson: JSON.stringify({
-                                display_text: "Kode ke-" + parseInt(i) + 1,
+                                display_text: "Kode ke-" + (parseInt(i) + 1),
                                 copy_code: code[i]
                             })
                         });
