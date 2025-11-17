@@ -625,7 +625,7 @@ export default {
                         await copy.push({
                             name: "cta_copy",
                             buttonParamsJson: JSON.stringify({
-                                display_text: "Kode ke-" + i,
+                                display_text: "Kode ke-" + parseInt(i) + 1,
                                 copy_code: code[i]
                             })
                         });
@@ -635,13 +635,18 @@ export default {
                 sock.sendInteractiveMessage(m.chat, {
                     text: jsonFormat(response),
                     footer: "AI ini dibuat khusus untuk pengembangan bot",
-                    interactiveButtons: copy.length ? copy : [{
-                      name: "cta_url",
-                    buttonParamsJson: JSON.stringify({
-                        display_text: "Gada code yang mau di copy",
-                        url: "https://lynk.id/ikyyofc"
-                    })
-                    }]
+                    interactiveButtons: copy.length
+                        ? copy
+                        : [
+                              {
+                                  name: "cta_url",
+                                  buttonParamsJson: JSON.stringify({
+                                      display_text:
+                                          "Gada code yang mau di copy",
+                                      url: "https://lynk.id/ikyyofc"
+                                  })
+                              }
+                          ]
                 });
             } else {
                 console.error(
