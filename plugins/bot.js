@@ -622,7 +622,7 @@ export default {
                 let code = extractAllCodeBlocks(response);
                 if (code.length) {
                     for (let i in code) {
-                        copy.push({
+                        await copy.push({
                             name: "cta_copy",
                             buttonParamsJson: JSON.stringify({
                                 display_text: "Kode ke-" + i,
