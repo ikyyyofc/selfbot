@@ -1,75 +1,68 @@
-import axios from "axios";
+import axios from 'axios';
 
 export default {
-  desc: "membuat video dengan ai",
+    desc: 'Create video from text using AI',
+    usage: '.txt2vid <prompt>',
     rules: {
+        limit: 5,
         premium: true
     },
-    async execute({ m, text, reply }) {
+    async execute({ m, text, sock, reply }) {
         if (!text) {
-            return await reply(
-                "Masukkin prompt dulu buat bikin video!\n\nContoh: .txt2vid gadis cantik berlari ke lapangan"
-            );
+            return await reply(`Provide a prompt to generate the video.\n\nExample: \`${this.usage}\``);
         }
 
         try {
-            await reply("⏳ Lagi proses bikin video... tunggu bentar ya");
+            await reply('⏳ Generating video from your prompt, please wait a moment...');
 
-            const { data: initData } = await axios.get(
-                `https://api-faa.my.id/faa/sora?prompt=${encodeURIComponent(
-                    text
-                )}`
+            const generateUrl = `https://wudysoft.xyz/api/ai/muapi?action=generate&tools=openai-sora-2-pro-text-to-video&prompt=${encodeURIComponent(text)}&aspect_ratio=9:16`;
+            const generateRes = await axios.get(generateUrl);
+
+            if (generateRes.data.status !== 'processing' || !generateRes.data.request_id) {
+                throw new Error(generateRes.data.error || 'Failed to start video generation process.');
+            }
+
+            const taskId = generateRes.data.request_id;
+            const pollUrl = `https://wudysoft.xyz/api/ai/muapi?action=status&task_id=${taskId}`;
+            
+            const startTime = Date.now();
+            const timeout = 15 * 60 * 1000;
+            let videoUrl = null;
+
+            while (Date.now() - startTime < timeout) {
+                await new Promise(resolve => setTimeout(resolve, 10000)); 
+
+                const pollRes = await axios.get(pollUrl);
+                const status = pollRes.data.status;
+
+                if (status === 'completed') {
+                    if (pollRes.data.outputs && pollRes.data.outputs.length > 0) {
+                        videoUrl = pollRes.data.outputs[0];
+                        break;
+                    } else {
+                        throw new Error('Process completed but no video URL was found.');
+                    }
+                } else if (status === 'failed' || pollRes.data.error) {
+                    throw new Error(pollRes.data.error || 'Video generation failed.');
+                }
+            }
+
+            if (!videoUrl) {
+                throw new Error('Video generation timed out after 15 minutes.');
+            }
+
+            await sock.sendMessage(
+                m.chat, 
+                { 
+                    video: { url: videoUrl },
+                    caption: `✅ Video generated!\n\n*Prompt:* ${text}` 
+                }, 
+                { quoted: m }
             );
 
-            if (!initData.status || !initData.check_url) {
-                return await reply("❌ Gagal inisiasi request ke API");
-            }
-
-            const checkUrl = initData.check_url;
-            let processing = true;
-            let attempts = 0;
-            const maxAttempts = 120;
-
-            while (processing && attempts < maxAttempts) {
-                await new Promise(resolve => setTimeout(resolve, 20000));
-
-                const { data: statusData } = await axios.get(checkUrl);
-
-                if (statusData.status && statusData.processing === false) {
-                    if (statusData.result?.download_url) {
-                        const videoUrl = statusData.result.download_url;
-
-                        await m.reply({
-                            video: { url: videoUrl },
-                            caption: `✅ Video berhasil dibuat!\n\n📝 Prompt: ${text}\n🎬 Quality: ${
-                                statusData.result.quality || "HD"
-                            }\n📦 Format: ${statusData.result.format || "mp4"}`
-                        });
-
-                        processing = false;
-                        return;
-                    } else {
-                        return await reply(
-                            "❌ Video berhasil diproses tapi ga ada download link"
-                        );
-                    }
-                }
-
-                attempts++;
-
-                if (attempts % 12 === 0) {
-                    await reply(`⏳ Masih diproses... (${attempts * 20}s)`);
-                }
-            }
-
-            if (attempts >= maxAttempts) {
-                return await reply(
-                    "❌ Timeout! Proses video kelamaan, coba lagi nanti"
-                );
-            }
         } catch (error) {
-            console.error("txt2vid error:", error);
-            await reply(`❌ Error: ${error.message}`);
+            console.error(error);
+            await reply(`❌ An error occurred: ${error.message}`);
         }
     }
 };
