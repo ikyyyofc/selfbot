@@ -572,11 +572,11 @@ export default {
 
         const fileBuffer = q.isMedia ? await getFile() : null;
 
-        if (q.type.includes("image") && fileBuffer) {
+       /* if (q.type.includes("image") && fileBuffer) {
             let img = await upload(fileBuffer);
             payload.imageUrl = img;
-        }
-
+        }*/
+        m.react("💦");
         try {
             /*const response = (
                 await axios.post(
