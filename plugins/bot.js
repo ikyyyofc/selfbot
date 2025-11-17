@@ -572,7 +572,7 @@ export default {
 
         const fileBuffer = q.isMedia ? await getFile() : null;
 
-       /* if (q.type.includes("image") && fileBuffer) {
+        /* if (q.type.includes("image") && fileBuffer) {
             let img = await upload(fileBuffer);
             payload.imageUrl = img;
         }*/
@@ -616,14 +616,19 @@ export default {
                 .filter(a => a.type == "text")
                 .map(o => o.text)
                 .join("");*/
+            let copy = [];
 
             if (response) {
-                await m.reply(jsonFormat(response));
                 let code = extractAllCodeBlocks(response);
                 if (code.length) {
-                    for (let x of code) {
-                        await delay(1000);
-                        await m.reply(jsonFormat(x));
+                    for (let i in code) {
+                        copy.push({
+                            name: "cta_copy",
+                            buttonParamsJson: JSON.stringify({
+                                display_text: "Kode ke-" + i,
+                                copy_code: code[i]
+                            })
+                        });
                     }
                 }
             } else {
