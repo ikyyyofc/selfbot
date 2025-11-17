@@ -635,7 +635,13 @@ export default {
                 sock.sendInteractiveMessage(m.chat, {
                     text: jsonFormat(response),
                     footer: "AI ini dibuat khusus untuk pengembangan bot",
-                    interactiveButtons: copy
+                    interactiveButtons: copy.length ? copy : [{
+                      name: "cta_url",
+                    buttonParamsJson: JSON.stringify({
+                        display_text: "Gada code yang mau di copy",
+                        url: "https://lynk.id/ikyyofc"
+                    })
+                    }]
                 });
             } else {
                 console.error(
