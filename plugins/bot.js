@@ -631,6 +631,12 @@ export default {
                         });
                     }
                 }
+
+                sock.sendInteractiveMessage(m.chat, {
+                    text: jsonFormat(response),
+                    footer: "AI ini dibuat khusus untuk pengembangan bot",
+                    interactiveButtons: copy
+                });
             } else {
                 console.error(
                     "AI mengembalikan kesalahan atau tidak ada hasil:",
