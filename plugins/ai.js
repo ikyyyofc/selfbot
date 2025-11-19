@@ -1,158 +1,120 @@
 import gemini from "../lib/gemini.js";
+import config from "../config.js";
 
-// Menyimpan riwayat percakapan untuk setiap chat (key: chatId, value: array messages)
-const chatHistories = new Map();
-
-// Helper function untuk mengirim balasan dengan tombol reset
-async function sendReplyWithResetButton(sock, chatId, text, quotedMessage) {
-    await sock.sendButtons(chatId, {
-        text: text,
-        buttons: [{
-            id: ".ai reset",
-            text: "🔄 Reset Konteks"
-        }],
-        footer: "Ketik '.ai reset' untuk memulai percakapan baru."
-    }, {
-        quoted: quotedMessage
-    });
-}
-
-// Helper function untuk eksekusi plugin lain
-async function executePlugin(command, args, context) {
-    const {
-        sock,
-        m,
-        state
-    } = context;
-    const plugin = state.plugins.get(command);
-
-    if (!plugin) {
-        return m.reply(`Maaf, perintah '${command}' gak ketemu.`);
-    }
-
-    console.log(`🤖 AI is executing command: '${command}' with args: [${args.join(", ")}]`);
-    await m.reply(`🤖 Oke, aku jalankan perintah *${command}*...`);
-
-    // Membuat konteks baru untuk plugin yang akan dieksekusi
-    const newContext = {
-        ...context,
-        args: args,
-        text: args.join(" "),
-    };
-
-    // Menjalankan plugin
-    try {
-        await plugin.execute(newContext);
-    } catch (error) {
-        console.error(`Error executing plugin '${command}' from AI:`, error);
-        await m.reply(`Duh, gagal ngejalanin perintah *${command}*.\nError: ${error.message}`);
-    }
-}
+// nyimpen riwayat chat buat tiap user, biar bisa ngobrol nyambung
+const chatHistory = new Map();
+const MAX_HISTORY = 10; // Batas riwayat percakapan (5 pasang tanya-jawab)
 
 export default {
     name: "ai",
-    aliases: ["iky"],
+    aliases: ["bot", "ask"],
     desc: "Asisten AI serba guna dengan memori percakapan dan eksekusi plugin.",
     rules: {
-        limit: 5 // Menggunakan 5 limit per pemanggilan
+        limit: 5, // Tiap kali pake, kurangin 5 limit
     },
     execute: async (context) => {
-        const {
-            m,
-            text,
-            sock,
-            state
-        } = context;
-        const chatId = m.chat;
+        const { m, text, reply, sock, state } = context;
+        const sender = m.sender;
 
-        // Perintah untuk mereset histori
-        if (text.toLowerCase() === 'reset') {
-            if (chatHistories.has(chatId)) {
-                chatHistories.delete(chatId);
-                return m.reply("🤖 Konteks percakapan telah di-reset. Kita mulai dari awal, ya!");
-            }
-            return m.reply("🤖 Gak ada percakapan yang perlu di-reset.");
+        // --- Handle reset percakapan ---
+        const isResetRequest = text.toLowerCase() === "reset" || m.msg?.selectedId?.startsWith("reset_ai_context_");
+        if (isResetRequest) {
+            chatHistory.delete(sender);
+            return await reply("Oke, obrolan kita udah di-reset. Mulai dari nol lagi ya! 🚀");
         }
 
         if (!text) {
-            return m.reply("Mau ngobrol apa atau butuh bantuan apa? Kasih tau aja.\n\nContoh:\n`.ai jelaskan tentang black hole`\n`.ai buatkan stiker` (sambil reply gambar)");
+            return await reply(`Halo! Mau ngobrol atau butuh bantuan apa? Tanya aja, contoh: \n\n.ai buatin pantun dong`);
         }
+        
+        // Kasih tau AI kalau lagi proses
+        await m.react("🤔");
 
-        // Ambil daftar plugin yang tersedia, kecuali plugin 'ai' itu sendiri
-        const availablePlugins = Array.from(state.plugins.keys()).filter(p => p !== 'ai');
+        // --- Persiapan buat ngobrol sama AI ---
+        const history = chatHistory.get(sender) || [];
+        
+        // Daftar plugin yang bisa dieksekusi, biar AI-nya tau
+        const availablePlugins = [...state.plugins.keys()].filter(p => p !== 'ai').join(", ");
 
-        // Prompt sistem untuk menginstruksikan AI
-        const systemPrompt = `Kamu adalah Ikyy, asisten AI canggih di dalam WhatsApp yang dibuat oleh ikyyofc. Kamu cerdas, santai, dan bisa mengeksekusi perintah.
-Daftar perintah yang bisa kamu jalankan: ${availablePlugins.join(', ')}.
+        // "contekan" buat si AI
+        const systemPrompt = `Kamu adalah Ikyy, AI assistant di WhatsApp yang santai dan ngomongnya kayak Gen Z. Vibe kamu real talk, supportive, tapi kadang sarkas.
+Tugas utama kamu adalah merespon chat user.
+TAPI, kamu punya kemampuan spesial: kamu bisa mengeksekusi perintah (plugin) yang ada di bot ini.
+Daftar plugin yang tersedia: ${availablePlugins}.
 
-TUGAS UTAMA:
-1.  Jika user memintamu melakukan sesuatu yang cocok dengan salah satu perintah, balas HANYA dengan format JSON seperti ini: {"command": "nama_perintah", "args": ["argumen1", "argumen2"]}.
-    -   Contoh permintaan: "buatkan stiker" -> {"command": "sticker", "args": []}
-    -   Contoh permintaan: "cari gambar anjing corgi" -> {"command": "image", "args": ["anjing", "corgi"]}
-    -   Contoh permintaan: "download video tiktok ini https://vt.tiktok.com/xxxx" -> {"command": "tiktok", "args": ["https://vt.tiktok.com/xxxx"]}
-2.  Jika user hanya bertanya, mengobrol, atau permintaannya tidak cocok dengan perintah mana pun, jawablah pertanyaannya secara natural sebagai asisten AI. JANGAN gunakan format JSON.
-3.  Analisa gambar atau media yang dikirim user jika ada, dan gunakan itu sebagai konteks. Jika user mengirim gambar dan bilang "ini apa?", jelaskan gambar itu. Jika dia bilang "buat stiker", eksekusi perintah stiker.
-4.  Jaga jawabanmu tetap singkat dan relevan seperti sedang chat.`;
+ATURAN SUPER PENTING:
+- Jika permintaan user BISA dipenuhi oleh salah satu plugin di atas, JANGAN dijawab langsung.
+- Kamu HARUS merespon HANYA dengan JSON object dalam format ini: {"plugin": "nama_plugin", "args": ["arg1", "arg2", ...]}
+- Contoh: jika user bilang ".ai buatin stiker dong", kamu harus respon dengan: {"plugin": "sticker", "args": []}
+- Contoh lain: jika user bilang ".ai cariin gambar kucing", kamu harus respon dengan: {"plugin": "image", "args": ["kucing"]}
+- Jika permintaan user GAK BISA dipenuhi oleh plugin, baru kamu jawab seperti biasa sebagai AI assistant.`;
 
-
-        // Ambil atau buat histori baru
-        if (!chatHistories.has(chatId)) {
-            chatHistories.set(chatId, [{
-                role: 'system',
-                content: systemPrompt
-            }]);
-        }
-
-        const history = chatHistories.get(chatId);
-        const userMessage = {
-            role: 'user',
-            content: text
-        };
-
-        // Tambahkan pesan user ke histori
-        history.push(userMessage);
+        const messages = [
+            { role: "system", content: systemPrompt },
+            ...history,
+            { role: "user", content: text },
+        ];
 
         try {
-            await m.react("🤖");
+            const aiResponse = await gemini(messages);
 
-            // Cek apakah ada media yang di-reply atau dikirim
-            const fileBuffer = await context.getFile();
-
-            // Panggil Gemini API dengan histori dan media (jika ada)
-            const aiResponse = await gemini(history, fileBuffer);
-
-            // Simpan balasan AI ke histori
-            history.push({
-                role: 'assistant',
-                content: aiResponse
-            });
-
-            // Coba parse respons AI sebagai JSON
-            let commandData;
-            if (aiResponse.trim().startsWith('{') && aiResponse.trim().endsWith('}')) {
-                try {
-                    commandData = JSON.parse(aiResponse);
-                } catch (e) {
-                    // Abaikan jika bukan JSON valid, anggap sebagai teks biasa
-                }
+            // --- Cek apakah AI mau eksekusi plugin ---
+            let pluginExecution = null;
+            try {
+                pluginExecution = JSON.parse(aiResponse);
+            } catch (e) {
+                // Biarin aja, berarti ini jawaban biasa bukan JSON
             }
+            
+            if (pluginExecution && pluginExecution.plugin && state.plugins.has(pluginExecution.plugin)) {
+                // --- AI-Generated Feedback ---
+                const feedbackPrompt = `Sebagai AI assistant, buat feedback singkat, santai, dan ala Gen Z yang nunjukin kamu mau ngejalanin perintah '${pluginExecution.plugin}' dengan argumen '${pluginExecution.args.join(" ")}'. Contoh: 'Oke, gas! Aku buatin stikernya ya.' atau 'Siaap, lagi nyari gambar ${pluginExecution.args.join(" ")} nih.'`;
+                const feedbackMessage = await gemini([{ role: 'user', content: feedbackPrompt }]);
+                
+                await reply(feedbackMessage);
 
-            // Jika respons adalah JSON perintah yang valid, eksekusi
-            if (commandData && commandData.command && state.plugins.has(commandData.command)) {
-                await executePlugin(commandData.command, commandData.args || [], context);
+                // --- Eksekusi Plugin ---
+                const targetPlugin = state.plugins.get(pluginExecution.plugin);
+                const pluginContext = {
+                    ...context,
+                    args: pluginExecution.args || [],
+                    text: (pluginExecution.args || []).join(" "),
+                };
+                await targetPlugin.execute(pluginContext);
+
+                // Update history dengan info kalo plugin dijalanin
+                history.push(
+                    { role: "user", content: text }, 
+                    { role: "model", content: `(Internal Note: Plugin '${pluginExecution.plugin}' dieksekusi)` }
+                );
+                chatHistory.set(sender, history);
+                
             } else {
-                // Jika tidak, kirim sebagai balasan teks biasa dengan tombol reset
-                await sendReplyWithResetButton(sock, chatId, aiResponse, m);
-            }
+                // --- Jawaban AI Biasa ---
+                history.push(
+                    { role: "user", content: text },
+                    { role: "model", content: aiResponse }
+                );
+                
+                // Jaga-jaga biar history gak kepanjangan
+                if (history.length > MAX_HISTORY) {
+                    history.splice(0, 2); 
+                }
+                chatHistory.set(sender, history);
 
-            await m.react("✅");
+                // Kirim jawaban AI pake tombol reset
+                await sock.sendButtons(m.chat, {
+                    text: aiResponse,
+                    buttons: [{ id: `reset_ai_context_${sender}`, text: "🔄 Reset Obrolan" }],
+                    footer: `AI by ${config.OWNER_NAME}`
+                });
+            }
+             await m.react("✅");
 
         } catch (error) {
-            console.error("AI Plugin Error:", error);
-            await m.reply(`Waduh, AI-nya lagi pusing nih, coba lagi nanti ya.\n\nError: ${error.message}`);
+            console.error("Error dari Gemini:", error);
             await m.react("❌");
-            // Hapus pesan terakhir user dari histori jika terjadi error
-            history.pop();
+            await reply("Waduh, AI-nya lagi pusing nih. Coba lagi nanti ya.");
         }
-    }
+    },
 };
