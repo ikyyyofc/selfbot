@@ -133,7 +133,7 @@ ATURAN SUPER PENTING:
                     text: aiResponse,
                     buttons: [
                         {
-                            id: `reset_ai_context_${sender}`,
+                            id: `.ai reset`,
                             text: "🔄 Reset Obrolan"
                         }
                     ],
