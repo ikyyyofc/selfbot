@@ -2,70 +2,61 @@ import axios from "axios";
 import upload from "../lib/upload.js";
 
 export default {
-    desc: "edit gambar dengan ai",
     rules: {
-        limit: 5
+        limit: 5, // Biaya 5 limit per penggunaan
+        premium: false,
+        owner: false,
+        group: false,
+        private: false,
     },
-    async execute({ sock, m, args, text, getFile }) {
-        try {
-            if (!text) {
-                return await m.reply(
-                    "❌ *Penggunaan:*\n" +
-                    ".edit <prompt>\n\n" +
-                    "*Contoh:*\n" +
-                    ".edit tambahkan gadis cantik\n\n" +
-                    "⚠️ Kirim/reply gambar dengan caption"
-                );
-            }
+    execute: async (context) => {
+        const { m, text, reply, getFile, sock, chat } = context;
 
-            const fileBuffer = await getFile();
-            if (!fileBuffer) {
-                return await m.reply(
-                    "❌ Kirim/reply gambar dengan caption:\n" +
-                    ".edit <prompt>"
-                );
-            }
+        const supportedMedia = ["imageMessage"];
+        const isMedia = m.type === "imageMessage" || m.quoted?.type === "imageMessage";
+        const prompt = text.trim();
 
-            await m.reply("⏳ Sedang mengedit gambar...");
-
-            const imageUrl = await upload(fileBuffer);
-            if (!imageUrl) {
-                return await m.reply("❌ Gagal upload gambar");
-            }
-
-            const response = await axios.get(
-                "https://wudysoft.xyz/api/ai/nano-banana/v15",
-                {
-                    params: {
-                        prompt: text,
-                        imageUrl: imageUrl
-                    },
-                    timeout: 120000
-                }
-            );
-
-            const data = response.data;
-
-            if (data.code !== 0 || !data.data?.url) {
-                return await m.reply("❌ Gagal edit gambar");
-            }
-
-            await sock.sendMessage(
-                m.chat,
-                {
-                    image: { url: data.data.url },
-                    caption:
-                        `✨ *Edit Gambar AI*\n\n` +
-                        `📝 Prompt: ${text}\n` +
-                        `✅ Berhasil diedit`
-                },
-                { quoted: m }
-            );
-        } catch (error) {
-            console.error("Error edit:", error);
-            await m.reply(
-                `❌ Error:\n${error.message || "Unknown error"}`
-            );
+        if (!isMedia) {
+            return await reply("❌ Gambarnya mana? Reply atau kirim gambar dengan caption.");
         }
-    }
+        if (!prompt) {
+            return await reply("❌ Mau diedit jadi apa gambarnya? Kasih prompt dong.\n\nContoh: .aiedit change the background to beach");
+        }
+
+        await reply("⏳ Bentar, AI lagi mikir...");
+
+        try {
+            const imageBuffer = await getFile();
+            if (!imageBuffer) {
+                return await reply("❌ Gagal dapetin gambar, coba lagi.");
+            }
+
+            const imageUrl = await upload(imageBuffer);
+            if (!imageUrl) {
+                return await reply("❌ Gagal upload gambar, servernya lagi down kayaknya.");
+            }
+
+            const { data } = await axios.post("https://api.nekolabs.web.id/ai/gemini/nano-banana", {
+                prompt: prompt,
+                imageUrl: imageUrl,
+            }, {
+                headers: { "Content-Type": "application/json" }
+            });
+
+            if (!data.success || !data.result) {
+                console.error("API Error:", data);
+                return await reply("❌ Gagal ngedit gambar, AI-nya lagi pusing.");
+            }
+
+            await sock.sendMessage(chat, {
+                image: { url: data.result },
+                caption: `✅ Nih hasilnya:\n\n"${prompt}"`
+            }, { quoted: m });
+
+        } catch (error) {
+            console.error("Plugin Error (aiedit):", error);
+            await reply(`❌ Oops, ada error: ${error.message}`);
+        }
+    },
+    help: "Untuk mengedit gambar menggunakan AI. Balas (reply) sebuah gambar atau kirim gambar dengan caption `.aiedit <prompt>`.\nContoh: `.aiedit change clothes to red`."
 };
