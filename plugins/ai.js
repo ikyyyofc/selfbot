@@ -18,8 +18,7 @@ export default {
 
         // --- Handle reset percakapan ---
         const isResetRequest =
-            text.toLowerCase() === "reset" ||
-            m.msg?.selectedId?.startsWith("reset_ai_context_");
+            text.toLowerCase() === "reset";
         if (isResetRequest) {
             chatHistory.delete(sender);
             return await reply(
