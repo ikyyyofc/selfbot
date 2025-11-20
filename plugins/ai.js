@@ -112,11 +112,7 @@ Selalu berikan respons yang kreatif dan jangan kaku. Ingat, kamu adalah Ikyy.`;
                             args: commandArgs,
                             text: commandArgs.join(" "),
                             reply: async (content, options) =>
-                                await sock.sendMessage(
-                                    m.chat,
-                                    { text: content },
-                                    { ...options }
-                                )
+                                await m.reply(content, options)
                         };
 
                         try {
