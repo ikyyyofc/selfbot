@@ -1,182 +1,117 @@
-import gemini from "../lib/gemini.js";
-import config from "../config.js";
+import gemini from '../lib/gemini.js';
+import { sendInteractiveMessage } from '../lib/button.js';
 
-// nyimpen riwayat chat buat tiap user, biar bisa ngobrol nyambung
-const chatHistory = new Map();
-const MAX_HISTORY = 10; // Batas riwayat percakapan (5 pasang tanya-jawab)
+const conversationHistory = new Map();
+const COOLDOWN_SECONDS = 3;
 
 export default {
-    name: "ai",
-    aliases: ["bot", "ask"],
-    desc: "Asisten AI serba guna dengan memori percakapan dan eksekusi plugin.",
     rules: {
-        limit: 5 // Tiap kali pake, kurangin 5 limit
+        limit: 5,
+        premium: false,
     },
-    execute: async context => {
-        const { m, text, reply, sock, state } = context;
-        const sender = m.sender;
+    desc: 'AI serbaguna dengan kemampuan eksekusi plugin dan percakapan berkelanjutan.',
+    execute: async (context) => {
+        const { sock, m, args, text, state, reply } = context;
 
-        // --- Handle reset percakapan ---
-        const isResetRequest = text.toLowerCase() === "reset";
-        if (isResetRequest) {
-            chatHistory.delete(sender);
-            return await reply(
-                "Oke, obrolan kita udah di-reset. Mulai dari nol lagi ya! 🚀"
-            );
+        if (args[0]?.toLowerCase() === 'reset') {
+            conversationHistory.delete(m.sender);
+            await m.reply('Sip, history chat kita udah kereset. Mulai dari nol lagi ya! 😉');
+            return;
         }
 
         if (!text) {
-            return await reply(
-                `Halo! Mau ngobrol atau butuh bantuan apa? Tanya aja, contoh: \n\n.ai buatin pantun dong`
-            );
+            await m.reply('Nanya apa nih? Kosong gitu masa..');
+            return;
         }
+        
+        await m.react('🤖');
 
-        // Kasih tau AI kalau lagi proses
-        await m.react("🤔");
+        const availableCommands = [...state.plugins.keys()].filter(cmd => cmd !== 'ai').join(', ');
+        
+        const systemPrompt = `Kamu adalah Ikyy, AI assistant yang terintegrasi dalam WhatsApp bot, dibuat oleh 'ikyyofc'. Gaya bicaramu harus seperti Gen Z Indonesia: santai, campur-campur Bahasa Indonesia dan Inggris, gunakan slang yang relevan tapi jangan cringe. Jangan formal, jangan kaku. Responsmu harus singkat seperti chat, tapi detail jika diperlukan. Kamu bisa memberikan penekanan dengan huruf kapital atau emoji secukupnya.
 
-        // --- Persiapan buat ngobrol sama AI ---
-        const history = chatHistory.get(sender) || [];
+Tugas utamamu adalah merespons pengguna secara natural dan membantu mereka. Kamu punya kemampuan spesial untuk menjalankan perintah (plugins) yang ada di bot.
 
-        // Daftar plugin yang bisa dieksekusi, biar AI-nya tau
-        const availablePlugins = [...state.plugins]
-            .filter(([command, plugin]) => command !== "ai")
-            .map(([command, plugin]) => {
-                const desc = plugin.desc || "No description"; // Fallback kalo deskripsi ga ada
-                return `- ${command}: ${desc}`;
-            })
-            .join("\n");
+Berikut adalah daftar perintah yang bisa kamu eksekusi: ${availableCommands}.
 
-        // "contekan" buat si AI
-        const systemPrompt = `Kamu adalah Ikyy, AI assistant di WhatsApp yang santai dan ngomongnya kayak Gen Z. Vibe kamu real talk, supportive, tapi kadang sarkas.
-Tugas utama kamu adalah merespon chat user.
-TAPI, kamu punya kemampuan spesial: kamu bisa mengeksekusi perintah (plugin) yang ada di bot ini.
-Daftar plugin yang tersedia: ${availablePlugins}.
+ATURAN PENTING:
+1.  Ketika kamu memutuskan untuk menjalankan satu atau beberapa perintah, kamu HARUS membungkusnya dalam format: [EXECUTE: <nama_perintah> <argumennya>].
+2.  Kamu bisa menjalankan beberapa perintah sekaligus dalam satu respons, masing-masing dalam tag [EXECUTE: ...] sendiri.
+3.  Sebelum tag [EXECUTE: ...], berikan kalimat pengantar yang natural seolah-olah kamu sendiri yang akan melakukannya. Jangan gunakan template. Buat responsmu terasa hidup.
+4.  Setelah memberikan respons yang berisi tag [EXECUTE: ...], bagian teks yang terlihat oleh user tidak akan mengandung tag tersebut. Kamu hanya fokus membuat kalimat pengantar dan tag eksekusinya.
 
-ATURAN SUPER PENTING:
-- Jika permintaan user BISA dipenuhi oleh salah satu plugin di atas, JANGAN dijawab langsung.
-- Kamu HARUS merespon HANYA dengan JSON object dalam format ini: {"plugin": "nama_plugin", "args": ["arg1", "arg2", ...]}
-- Contoh: jika user bilang ".ai buatin stiker dong", kamu harus respon dengan: {"plugin": "sticker", "args": []}
-- Contoh lain: jika user bilang ".ai cariin gambar kucing", kamu harus respon dengan: {"plugin": "image", "args": ["kucing"]}
-- Jika permintaan user GAK BISA dipenuhi oleh plugin, baru kamu jawab seperti biasa sebagai AI assistant.`;
+Contoh Skenario:
+User: "Cariin gambar kucing lucu, terus downloadin video tiktok ini https://vt.tiktok.com/xxxxxx/"
+Respons-mu (yang akan diproses sistem): "Oke, siapp! Aku cariin gambar kucing yang gemes dulu ya, abis itu langsung aku downloadin videonya. Tunggu bentar... [EXECUTE: image kucing lucu] [EXECUTE: tiktok https://vt.tiktok.com/xxxxxx/]"
 
+User: "tolong putarkan lagu lathi"
+Respons-mu (yang akan diproses sistem): "Gaskeun! Lagunya aku puterin sekarang ya. [EXECUTE: play lathi]"
+
+Selalu berikan respons yang kreatif dan jangan kaku. Ingat, kamu adalah Ikyy.`;
+
+        const userHistory = conversationHistory.get(m.sender) || [];
         const messages = [
-            { role: "system", content: systemPrompt },
-            ...history,
-            { role: "user", content: text }
+            { role: 'system', content: systemPrompt },
+            ...userHistory,
+            { role: 'user', content: text }
         ];
 
         try {
-            const aiResponse = await gemini(messages);
+            const fileBuffer = await context.getFile();
+            const aiResponse = await gemini(messages, fileBuffer);
 
-            let plug = extractAllCodeBlocks(aiResponse)[0];
+            userHistory.push({ role: 'user', content: text });
+            userHistory.push({ role: 'assistant', content: aiResponse });
+            conversationHistory.set(m.sender, userHistory);
 
-            // --- Cek apakah AI mau eksekusi plugin ---
-            let pluginExecution = null;
-            try {
-                pluginExecution = JSON.parse(JSON.stringify(plug));
-            } catch (e) {
-                // Biarin aja, berarti ini jawaban biasa bukan JSON
+            const commandRegex = /\[EXECUTE:\s*([^\]]+)\]/g;
+            const commandsToExecute = [...aiResponse.matchAll(commandRegex)].map(match => match[1].trim());
+            const visibleResponse = aiResponse.replace(commandRegex, '').trim();
+
+            if (visibleResponse) {
+                await sendInteractiveMessage(sock, m.chat, {
+                    text: visibleResponse,
+                    footer: 'Ikyy AI',
+                    interactiveButtons: [{
+                        name: 'quick_reply',
+                        buttonParamsJson: JSON.stringify({
+                            display_text: '🔄 Reset Konteks',
+                            id: '.ai reset'
+                        })
+                    }]
+                }, { quoted: m });
             }
 
-            if (
-                pluginExecution &&
-                pluginExecution.plugin &&
-                state.plugins.has(pluginExecution.plugin)
-            ) {
-                // --- AI-Generated Feedback ---
-                const feedbackPrompt = `Sebagai AI assistant, buat feedback singkat, santai, dan ala Gen Z yang nunjukin kamu mau ngejalanin perintah '${
-                    pluginExecution.plugin
-                }' dengan argumen '${pluginExecution.args.join(
-                    " "
-                )}'. Contoh: 'Oke, gas! Aku buatin stikernya ya.' atau 'Siaap, lagi nyari gambar ${pluginExecution.args.join(
-                    " "
-                )} nih.'`;
-                const feedbackMessage = await gemini([
-                    { role: "user", content: feedbackPrompt }
-                ]);
+            if (commandsToExecute.length > 0) {
+                for (const fullCommand of commandsToExecute) {
+                    const commandArgs = fullCommand.split(/ +/);
+                    const commandName = commandArgs.shift()?.toLowerCase();
+                    const plugin = state.plugins.get(commandName);
 
-                await reply(feedbackMessage);
-
-                // --- Eksekusi Plugin ---
-                const targetPlugin = state.plugins.get(pluginExecution.plugin);
-                const pluginContext = {
-                    ...context,
-                    args: pluginExecution.args || [],
-                    text: (pluginExecution.args || []).join(" ")
-                };
-                await targetPlugin.execute(pluginContext);
-
-                // Update history dengan info kalo plugin dijalanin
-                history.push(
-                    { role: "user", content: text },
-                    {
-                        role: "model",
-                        content: `(Internal Note: Plugin '${pluginExecution.plugin}' dieksekusi)`
-                    }
-                );
-                chatHistory.set(sender, history);
-            } else {
-                // --- Jawaban AI Biasa ---
-                history.push(
-                    { role: "user", content: text },
-                    { role: "model", content: aiResponse }
-                );
-
-                // Jaga-jaga biar history gak kepanjangan
-                if (history.length > MAX_HISTORY) {
-                    history.splice(0, 2);
-                }
-                chatHistory.set(sender, history);
-
-                // Kirim jawaban AI pake tombol reset
-                await sock.sendButtons(m.chat, {
-                    text: aiResponse,
-                    buttons: [
-                        {
-                            id: `.ai reset`,
-                            text: "🔄 Reset Obrolan"
+                    if (plugin) {
+                        const newContext = {
+                            ...context,
+                            args: commandArgs,
+                            text: commandArgs.join(' '),
+                            reply: async (content, options) => await sock.sendMessage(m.chat, { text: content }, { ...options }),
+                        };
+                        
+                        try {
+                           await plugin.execute(newContext);
+                        } catch (pluginError) {
+                           await m.reply(`Waduh, command '.${commandName}' error nih: ${pluginError.message}`);
                         }
-                    ],
-                    footer: `AI by ${config.OWNER_NAME}`
-                });
+
+                        if (commandsToExecute.length > 1) {
+                           await new Promise(resolve => setTimeout(resolve, COOLDOWN_SECONDS * 1000));
+                        }
+                    }
+                }
             }
-            await m.react("✅");
-        } catch (error) {
-            console.error("Error dari Gemini:", error);
-            await m.react("❌");
-            await reply("Waduh, AI-nya lagi pusing nih. Coba lagi nanti ya.");
+
+        } catch (e) {
+            console.error(e);
+            await reply(`Sorry, AI-nya lagi pusing nih, coba lagi nanti ya. Error: ${e.message}`);
         }
     }
 };
-
-function extractAllCodeBlocks(text) {
-    const regex = /```(.*?)```/gs;
-    const matches = text.matchAll(regex);
-
-    const allCode = [...matches].map(match => {
-        let code = match[1].trim();
-
-        // Cek baris pertama, kalo cuma 1 kata (biasanya nama bahasa) hapus
-        const lines = code.split("\n");
-        const firstLine = lines[0].trim();
-
-        // Kalo baris pertama cuma 1 kata tanpa spasi dan ga ada simbol kode,
-        // anggep itu nama bahasa, hapus
-        if (
-            lines.length > 1 &&
-            firstLine &&
-            !firstLine.includes(" ") &&
-            !firstLine.includes("(") &&
-            !firstLine.includes("{") &&
-            !firstLine.includes("=") &&
-            !firstLine.includes(";")
-        ) {
-            // Hapus baris pertama, ambil sisanya
-            return lines.slice(1).join("\n").trim();
-        }
-
-        return code;
-    });
-
-    return allCode;
-}
