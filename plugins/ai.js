@@ -68,7 +68,7 @@ ATURAN SUPER PENTING:
         try {
             const aiResponse = await gemini(messages);
 
-            let plug = extractAllCodeBlocks(aiResponse);
+            let plug = extractAllCodeBlocks(aiResponse)[0];
 
             // --- Cek apakah AI mau eksekusi plugin ---
             let pluginExecution = null;
