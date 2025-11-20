@@ -73,7 +73,7 @@ ATURAN SUPER PENTING:
             // --- Cek apakah AI mau eksekusi plugin ---
             let pluginExecution = null;
             try {
-                pluginExecution = JSON.parse(plug);
+                pluginExecution = JSON.parse(JSON.stringify(plug));
             } catch (e) {
                 // Biarin aja, berarti ini jawaban biasa bukan JSON
             }
