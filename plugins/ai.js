@@ -66,12 +66,14 @@ ATURAN SUPER PENTING:
         ];
 
         try {
-            const aiResponse = extractAllCodeBlocks(await gemini(messages));
+            const aiResponse = await gemini(messages);
+
+            let plug = extractAllCodeBlocks(aiResponse);
 
             // --- Cek apakah AI mau eksekusi plugin ---
             let pluginExecution = null;
             try {
-                pluginExecution = JSON.parse(aiResponse);
+                pluginExecution = JSON.parse(plug);
             } catch (e) {
                 // Biarin aja, berarti ini jawaban biasa bukan JSON
             }
