@@ -17,8 +17,7 @@ export default {
         const sender = m.sender;
 
         // --- Handle reset percakapan ---
-        const isResetRequest =
-            text.toLowerCase() === "reset";
+        const isResetRequest = text.toLowerCase() === "reset";
         if (isResetRequest) {
             chatHistory.delete(sender);
             return await reply(
