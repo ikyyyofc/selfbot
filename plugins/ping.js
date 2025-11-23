@@ -82,7 +82,7 @@ export default {
 - *Uptime:* ${formatUptime(uptime)}
 
 *📊 Statistik Aplikasi:*
-- *Versi Baileys:* v${baileysVersion}
+- *Versi Wa Web:* v${baileysVersion}
 - *Database:* ${users.length} Users | ${groups.length} Groups
 - *Cache Grup:* ${groupCacheStats.total} groups cached
 - *Cache DB:* ${db.userCache.size} users | ${db.groupCache.size} groups
