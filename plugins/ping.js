@@ -4,7 +4,7 @@ import os from "os";
 import db from "../lib/Database.js";
 import groupCache from "../lib/groupCache.js";
 import sessionCleaner from "../lib/SessionCleaner.js";
-import cooldown from "../libcooldownManager.js";
+import cooldown from "../lib/CooldownManager.js";
 import { readFileSync } from "fs";
 
 /**
