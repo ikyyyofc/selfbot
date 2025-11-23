@@ -6,6 +6,7 @@ import groupCache from "../lib/groupCache.js";
 import sessionCleaner from "../lib/SessionCleaner.js";
 import cooldown from "../lib/CooldownManager.js";
 import { readFileSync } from "fs";
+import { fetchLatestWaWebVersion } from "@whiskeysockets/baileys";
 
 /**
  * Formats uptime from seconds to a readable string (d, h, m, s).
@@ -26,7 +27,7 @@ function formatUptime(seconds) {
     if (h > 0) result += h + "h ";
     if (m > 0) result += m + "m ";
     if (s > 0) result += s + "s";
-    
+
     return result.trim() || "0s";
 }
 
@@ -45,23 +46,22 @@ export default {
         const memoryUsage = process.memoryUsage();
         const cpus = os.cpus();
         const uptime = process.uptime();
-        
+
         const [users, groups] = await Promise.all([
             db.getAllUsers(),
             db.getAllGroups()
         ]);
-        
+
         const groupCacheStats = groupCache.getStats();
         const sessionStats = sessionCleaner.getStats();
         const cooldownStats = cooldown.getStats();
-        
-        const pkg = JSON.parse(readFileSync("./package.json", "utf-8"));
-        const baileysVersion = pkg.dependencies["@whiskeysockets/baileys"]?.replace("^", "") || "unknown";
+
+        const baileysVersion = (await fetchLatestWaWebVersion()).version;
 
         // --- Latency & Processing Time ---
         const endTime = Date.now();
         const processingTime = endTime - startTime;
-        const latency = endTime - (m.timestamp * 1000);
+        const latency = endTime - m.timestamp * 1000;
 
         // --- Build Response ---
         const responseText = `
@@ -74,7 +74,11 @@ export default {
 *💻 Sumber Daya Sistem:*
 - *Platform:* ${os.platform()}
 - *CPU:* ${cpus[0].model} (${cpus.length} cores)
-- *Memori (Heap):* ${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB / ${(memoryUsage.heapTotal / 1024 / 1024).toFixed(2)} MB
+- *Memori (Heap):* ${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB / ${(
+            memoryUsage.heapTotal /
+            1024 /
+            1024
+        ).toFixed(2)} MB
 - *Uptime:* ${formatUptime(uptime)}
 
 *📊 Statistik Aplikasi:*
@@ -82,7 +86,9 @@ export default {
 - *Database:* ${users.length} Users | ${groups.length} Groups
 - *Cache Grup:* ${groupCacheStats.total} groups cached
 - *Cache DB:* ${db.userCache.size} users | ${db.groupCache.size} groups
-- *File Session:* ${sessionStats.fileCount} files (${sessionStats.cleanableSizeMB} MB cleanable)
+- *File Session:* ${sessionStats.fileCount} files (${
+            sessionStats.cleanableSizeMB
+        } MB cleanable)
 - *Cooldown Aktif:* ${cooldownStats.active} users
 
 Dibuat oleh *ikyyofc*
