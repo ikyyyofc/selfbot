@@ -10,6 +10,6 @@ export default {
         const start = performance.now();
 
         // Kirim pesan awal untuk diukur & mendapatkan message key
-        const sentMsg = await sock.sendMessage(m.chat, { text: `Pong! \n\n${(performance.now() - start).toFixed(10)} ms` });
+        const sentMsg = await sock.sendMessage(m.chat, { text: `Pong! \n\n${(performance.now() - start).toFixed(5)} ms` });
     }
 };
