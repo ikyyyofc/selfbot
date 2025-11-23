@@ -10,18 +10,6 @@ export default {
         const start = performance.now();
 
         // Kirim pesan awal untuk diukur & mendapatkan message key
-        const sentMsg = await sock.sendMessage(m.chat, { text: "Pong!" });
-
-        // Timestamp setelah pesan berhasil dikirim
-        const end = performance.now();
-
-        // Hitung selisih waktu dan format ke dua angka desimal
-        const latency = (end - start).toFixed(2);
-
-        // Edit pesan awal dengan hasil kecepatan respons
-        await sock.sendMessage(m.chat, {
-            text: `${latency} ms`,
-            edit: sentMsg.key
-        });
+        const sentMsg = await sock.sendMessage(m.chat, { text: `Pong! ${(performance.now() - start).toFixed(2)}` });
     }
 };
