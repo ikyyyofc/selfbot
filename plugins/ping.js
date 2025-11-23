@@ -1,66 +1,93 @@
-import os from 'os';
-import { performance } from 'perf_hooks';
-import { version as baileysVersion } from '@whiskeysockets/baileys';
+// plugins/status.js
 
-const config = await import("../config.js").then(m => m.default);
+import os from "os";
+import db from "../lib/Database.js";
+import groupCache from "../lib/groupCache.js";
+import sessionCleaner from "../lib/SessionCleaner.js";
+import cooldown from "../libcooldownManager.js";
+import { readFileSync } from "fs";
 
-function formatBytes(bytes) {
-    if (bytes === 0) return '0 B';
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return `${parseFloat((bytes / Math.pow(1024, i)).toFixed(2))} ${['B', 'KB', 'MB', 'GB', 'TB'][i]}`;
-}
-
+/**
+ * Formats uptime from seconds to a readable string (d, h, m, s).
+ * @param {number} seconds - The total seconds of uptime.
+ * @returns {string} The formatted uptime string.
+ */
 function formatUptime(seconds) {
+    function pad(s) {
+        return (s < 10 ? "0" : "") + s;
+    }
     const d = Math.floor(seconds / (3600 * 24));
     const h = Math.floor((seconds % (3600 * 24)) / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = Math.floor(seconds % 60);
 
-    const parts = [];
-    if (d > 0) parts.push(`${d} hari`);
-    if (h > 0) parts.push(`${h} jam`);
-    if (m > 0) parts.push(`${m} menit`);
-    if (s > 0) parts.push(`${s} detik`);
-
-    return parts.join(', ');
+    let result = "";
+    if (d > 0) result += d + "d ";
+    if (h > 0) result += h + "h ";
+    if (m > 0) result += m + "m ";
+    if (s > 0) result += s + "s";
+    
+    return result.trim() || "0s";
 }
 
 export default {
-    name: "speedtest",
-    desc: "Menampilkan kecepatan respon bot dan informasi resource.",
+    name: "status",
+    aliases: ["ping", "stats"],
+    desc: "Cek kecepatan bot dan penggunaan sumber daya.",
     rules: {
-        limit: 1
+        limit: 1 // Menggunakan 1 limit setiap kali command dieksekusi
     },
-    execute: async (context) => {
-        const start = performance.now();
 
-        const used = process.memoryUsage();
-        const totalmem = os.totalmem();
-        const freemem = os.freemem();
+    async execute({ m, reply }) {
+        const startTime = Date.now();
+
+        // --- Data Gathering ---
+        const memoryUsage = process.memoryUsage();
         const cpus = os.cpus();
         const uptime = process.uptime();
         
-        const latency = (performance.now() - start).toFixed(2);
+        const [users, groups] = await Promise.all([
+            db.getAllUsers(),
+            db.getAllGroups()
+        ]);
+        
+        const groupCacheStats = groupCache.getStats();
+        const sessionStats = sessionCleaner.getStats();
+        const cooldownStats = cooldown.getStats();
+        
+        const pkg = JSON.parse(readFileSync("./package.json", "utf-8"));
+        const baileysVersion = pkg.dependencies["@whiskeysockets/baileys"]?.replace("^", "") || "unknown";
 
+        // --- Latency & Processing Time ---
+        const endTime = Date.now();
+        const processingTime = endTime - startTime;
+        const latency = endTime - (m.timestamp * 1000);
+
+        // --- Build Response ---
         const responseText = `
-*💨 Speed Test & Resources 💨*
+*🤖 Bot Status & Performance*
 
-📈 *Respons:* ${latency} ms
+*⚡ Kecepatan Respons:*
+- *Waktu Proses:* ${processingTime} ms
+- *Latensi Server:* ${latency} ms
 
-💻 *Info Server:*
-- *RAM:* ${formatBytes(totalmem - freemem)} / ${formatBytes(totalmem)}
-- *CPU:* ${cpus[0].model} (${cpus.length} core)
+*💻 Sumber Daya Sistem:*
 - *Platform:* ${os.platform()}
-
-🤖 *Info Bot:*
-- *Mode:* ${config.BOT_MODE.toUpperCase()}
-- *Database:* ${config.DB_MODE.toUpperCase()}
+- *CPU:* ${cpus[0].model} (${cpus.length} cores)
+- *Memori (Heap):* ${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB / ${(memoryUsage.heapTotal / 1024 / 1024).toFixed(2)} MB
 - *Uptime:* ${formatUptime(uptime)}
-- *Plugins:* ${context.state.plugins.size} Commands
-- *NodeJS:* ${process.version}
-- *Baileys:* v${baileysVersion.join('.')}
-        `.trim();
 
-        await context.reply(responseText);
+*📊 Statistik Aplikasi:*
+- *Versi Baileys:* v${baileysVersion}
+- *Database:* ${users.length} Users | ${groups.length} Groups
+- *Cache Grup:* ${groupCacheStats.total} groups cached
+- *Cache DB:* ${db.userCache.size} users | ${db.groupCache.size} groups
+- *File Session:* ${sessionStats.fileCount} files (${sessionStats.cleanableSizeMB} MB cleanable)
+- *Cooldown Aktif:* ${cooldownStats.active} users
+
+Dibuat oleh *ikyyofc*
+`.trim();
+
+        await reply(responseText);
     }
 };
