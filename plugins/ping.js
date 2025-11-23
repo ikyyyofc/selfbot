@@ -1,15 +1,15 @@
 import os from 'os';
-import db from '../lib/Database.js';
-import groupCache from '../lib/groupCache.js';
-import sessionCleaner from '../lib/SessionCleaner.js';
-import cooldown from '../lib/CooldownManager.js';
-import config from '../config.js';
+import { performance } from 'perf_hooks';
+import { version as baileysVersion } from '@whiskeysockets/baileys';
 
-/**
- * Formats seconds into a human-readable string (d, h, m, s).
- * @param {number} seconds - The total seconds.
- * @returns {string} The formatted uptime string.
- */
+const config = await import("../config.js").then(m => m.default);
+
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 B';
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return `${parseFloat((bytes / Math.pow(1024, i)).toFixed(2))} ${['B', 'KB', 'MB', 'GB', 'TB'][i]}`;
+}
+
 function formatUptime(seconds) {
     const d = Math.floor(seconds / (3600 * 24));
     const h = Math.floor((seconds % (3600 * 24)) / 3600);
@@ -17,76 +17,50 @@ function formatUptime(seconds) {
     const s = Math.floor(seconds % 60);
 
     const parts = [];
-    if (d > 0) parts.push(`${d}d`);
-    if (h > 0) parts.push(`${h}h`);
-    if (m > 0) parts.push(`${m}m`);
-    if (s > 0) parts.push(`${s}s`);
+    if (d > 0) parts.push(`${d} hari`);
+    if (h > 0) parts.push(`${h} jam`);
+    if (m > 0) parts.push(`${m} menit`);
+    if (s > 0) parts.push(`${s} detik`);
 
-    return parts.join(' ') || '0s';
-}
-
-/**
- * Formats bytes into a human-readable string (KB, MB, GB).
- * @param {number} bytes - The number of bytes.
- * @returns {string} The formatted size string.
- */
-function formatBytes(bytes) {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return parts.join(', ');
 }
 
 export default {
-    name: 'status',
-    desc: 'Cek kecepatan respons dan status sumber daya bot.',
+    name: "speedtest",
+    desc: "Menampilkan kecepatan respon bot dan informasi resource.",
     rules: {
-        limit: 1, // Memberi limit 1 untuk mencegah spam
+        limit: 1
     },
-    async execute(context) {
-        const startTime = Date.now();
-        const latency = startTime - (context.m.timestamp || startTime);
+    execute: async (context) => {
+        const start = performance.now();
 
-        // Mengumpulkan data secara paralel jika memungkinkan
-        const [users, groups, sessionStats, cooldownStats, groupCacheStats] = await Promise.all([
-            db.getAllUsers(),
-            db.getAllGroups(),
-            sessionCleaner.getStats(),
-            cooldown.getStats(),
-            groupCache.getStats(),
-        ]);
-
-        const memUsage = process.memoryUsage();
+        const used = process.memoryUsage();
+        const totalmem = os.totalmem();
+        const freemem = os.freemem();
+        const cpus = os.cpus();
         const uptime = process.uptime();
         
-        const responseTime = Date.now() - startTime;
+        const latency = (performance.now() - start).toFixed(2);
 
-        // Menyusun teks respons
-        const statusText = `
-*🤖 Bot & System Status*
+        const responseText = `
+*💨 Speed Test & Resources 💨*
 
-*📊 Performance*
-- Latency: *${latency} ms*
-- Bot Speed: *${responseTime} ms*
+📈 *Respons:* ${latency} ms
 
-*⚙️ System*
-- Uptime: *${formatUptime(uptime)}*
-- RAM Usage: *${formatBytes(memUsage.rss)}*
-- OS: *${os.type()} (${os.arch()})*
-- CPU Model: *${os.cpus()[0].model}*
+💻 *Info Server:*
+- *RAM:* ${formatBytes(totalmem - freemem)} / ${formatBytes(totalmem)}
+- *CPU:* ${cpus[0].model} (${cpus.length} core)
+- *Platform:* ${os.platform()}
 
-*📦 Bot Resources*
-- Mode: *${config.BOT_MODE.toUpperCase()}*
-- DB Mode: *${db.mode.toUpperCase()}*
-- Total Users: *${users.length}*
-- Total Groups (DB): *${groups.length}*
-- Group Cache: *${groupCacheStats.total}*
-- Session Size: *${sessionStats.cleanableSizeMB} MB (Cleanable)*
-- Active Cooldowns: *${cooldownStats.active}*
-- Plugins Loaded: *${context.state.plugins.size} commands*
+🤖 *Info Bot:*
+- *Mode:* ${config.BOT_MODE.toUpperCase()}
+- *Database:* ${config.DB_MODE.toUpperCase()}
+- *Uptime:* ${formatUptime(uptime)}
+- *Plugins:* ${context.state.plugins.size} Commands
+- *NodeJS:* ${process.version}
+- *Baileys:* v${baileysVersion.join('.')}
         `.trim();
 
-        await context.reply(statusText);
-    },
+        await context.reply(responseText);
+    }
 };
