@@ -56,7 +56,12 @@ export default {
         const sessionStats = sessionCleaner.getStats();
         const cooldownStats = cooldown.getStats();
 
-        const baileysVersion = (await fetchLatestWaWebVersion()).version.join(".");
+        const baileysVersion = (await fetchLatestWaWebVersion()).version.join(
+            "."
+        );
+        const baileysLatest = (await fetchLatestWaWebVersion()).isLatest
+            ? "Latest"
+            : "Deprecated";
 
         // --- Latency & Processing Time ---
         const endTime = Date.now();
@@ -82,7 +87,7 @@ export default {
 - *Uptime:* ${formatUptime(uptime)}
 
 *📊 Statistik Aplikasi:*
-- *Versi Wa Web:* v${baileysVersion}
+- *Versi Wa Web:* v${baileysVersion} ${baileysLatest}
 - *Database:* ${users.length} Users | ${groups.length} Groups
 - *Cache Grup:* ${groupCacheStats.total} groups cached
 - *Cache DB:* ${db.userCache.size} users | ${db.groupCache.size} groups
