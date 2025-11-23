@@ -56,7 +56,7 @@ export default {
         const sessionStats = sessionCleaner.getStats();
         const cooldownStats = cooldown.getStats();
 
-        const baileysVersion = (await fetchLatestWaWebVersion()).version;
+        const baileysVersion = (await fetchLatestWaWebVersion()).version.join(".");
 
         // --- Latency & Processing Time ---
         const endTime = Date.now();
