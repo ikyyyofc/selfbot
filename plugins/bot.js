@@ -1,7 +1,6 @@
 import util from "util";
 import gmn from "../lib/gemini.js";
 
-
 async function displayFilesInFolder(folderPath, options = {}) {
     const fs = await import("fs/promises");
     const path = await import("path");
@@ -152,22 +151,28 @@ export default {
                     }
                 }
 
-                sock.sendInteractiveMessage(m.chat, {
-                    text: jsonFormat(response),
-                    footer: "AI ini dibuat khusus untuk pengembangan bot",
-                    interactiveButtons: copy.length
-                        ? copy
-                        : [
-                              {
-                                  name: "cta_url",
-                                  buttonParamsJson: JSON.stringify({
-                                      display_text:
-                                          "Gada code yang mau di copy",
-                                      url: "https://lynk.id/ikyyofc"
-                                  })
-                              }
-                          ]
-                });
+                sock.sendInteractiveMessage(
+                    m.chat,
+                    {
+                        text: jsonFormat(response),
+                        footer: "AI ini dibuat khusus untuk pengembangan bot",
+                        interactiveButtons: copy.length
+                            ? copy
+                            : [
+                                  {
+                                      name: "cta_url",
+                                      buttonParamsJson: JSON.stringify({
+                                          display_text:
+                                              "Gada code yang mau di copy",
+                                          url: "https://lynk.id/ikyyofc"
+                                      })
+                                  }
+                              ]
+                    },
+                    {
+                        quoted: m
+                    }
+                );
             } else {
                 console.error(
                     "AI mengembalikan kesalahan atau tidak ada hasil:",
