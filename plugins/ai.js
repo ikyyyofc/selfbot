@@ -108,6 +108,21 @@ Selalu berikan respons yang kreatif dan jangan kaku. Ingat, kamu adalah Ikyy.`;
 
             if (commandsToExecute.length > 0 && executionMsg) {
                 const newM = await serialize(executionMsg, sock);
+                if (fileBuffer && newM) {
+                    const originalM = context.m;
+
+                    // "Suntik" properti media dari pesan asli ke konteks baru
+                    // Biar plugin stiker & media lain gak bingung
+                    newM.isMedia = originalM.isMedia;
+                    newM.type = originalM.type;
+                    newM.msg = originalM.msg;
+                    newM.download = originalM.download;
+
+                    // Kalo media aslinya dari reply-an, kita juga titip quoted-nya
+                    if (!newM.quoted && originalM.quoted) {
+                        newM.quoted = originalM.quoted;
+                    }
+                }
                 for (const fullCommand of commandsToExecute) {
                     const commandArgs = fullCommand.split(/ +/);
                     const commandName = commandArgs.shift()?.toLowerCase();
@@ -118,7 +133,7 @@ Selalu berikan respons yang kreatif dan jangan kaku. Ingat, kamu adalah Ikyy.`;
                             ...context,
                             args: commandArgs,
                             text: commandArgs.join(" "),
-                            getFile: context.getFile,
+
                             m: newM,
                             reply: newM.reply
                         };
