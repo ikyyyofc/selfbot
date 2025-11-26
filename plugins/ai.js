@@ -1,6 +1,5 @@
 import gemini from "../lib/gemini.js";
 import { sendInteractiveMessage } from "../lib/button.js";
-import serialize from "../lib/serialize.js";
 
 const conversationHistory = new Map();
 const COOLDOWN_SECONDS = 3;
@@ -30,7 +29,7 @@ export default {
         await m.react("🤖");
 
         const availableCommands = [...state.plugins.entries()]
-            .filter(([command, plugin]) => !/ai|restart/.test(command))
+            .filter(([command, plugin]) => /ai|restart/.test(command))
             .map(
                 ([command, plugin]) =>
                     `- ${command}: ${plugin.desc || "No description available"}`
@@ -80,10 +79,8 @@ Selalu berikan respons yang kreatif dan jangan kaku. Ingat, kamu adalah Ikyy.`;
             ].map(match => match[1].trim());
             const visibleResponse = aiResponse.replace(commandRegex, "").trim();
 
-            let executionMsg;
-
             if (visibleResponse) {
-                executionMsg = await sendInteractiveMessage(
+                await sendInteractiveMessage(
                     sock,
                     m.chat,
                     {
@@ -101,28 +98,9 @@ Selalu berikan respons yang kreatif dan jangan kaku. Ingat, kamu adalah Ikyy.`;
                     },
                     { quoted: m }
                 );
-            } else if (commandsToExecute.length > 0) {
-                // Kalo GA ADA teks tapi ADA perintah, kirim placeholder
-                executionMsg = await m.reply("👍");
             }
 
-            if (commandsToExecute.length > 0 && executionMsg) {
-                const newM = await serialize(executionMsg, sock);
-                if (fileBuffer && newM) {
-                    const originalM = context.m;
-
-                    // "Suntik" properti media dari pesan asli ke konteks baru
-                    // Biar plugin stiker & media lain gak bingung
-                    newM.isMedia = originalM.isMedia;
-                    newM.type = originalM.type;
-                    newM.msg = originalM.msg;
-                    newM.download = originalM.download;
-
-                    // Kalo media aslinya dari reply-an, kita juga titip quoted-nya
-                    if (!newM.quoted && originalM.quoted) {
-                        newM.quoted = originalM.quoted;
-                    }
-                }
+            if (commandsToExecute.length > 0) {
                 for (const fullCommand of commandsToExecute) {
                     const commandArgs = fullCommand.split(/ +/);
                     const commandName = commandArgs.shift()?.toLowerCase();
@@ -133,9 +111,8 @@ Selalu berikan respons yang kreatif dan jangan kaku. Ingat, kamu adalah Ikyy.`;
                             ...context,
                             args: commandArgs,
                             text: commandArgs.join(" "),
-                            getFile: context.getFile,
-                            m: newM,
-                            reply: newM.reply
+                            reply: async (content, options) =>
+                                await m.reply(content, options)
                         };
 
                         try {
@@ -157,9 +134,7 @@ Selalu berikan respons yang kreatif dan jangan kaku. Ingat, kamu adalah Ikyy.`;
         } catch (e) {
             console.error(e);
             await reply(
-                `Sorry, AI-nya lagi pusing nih, coba lagi nanti ya. Error: ${jsonFormat(
-                    e
-                )}`
+                `Sorry, AI-nya lagi pusing nih, coba lagi nanti ya. Error: ${e.message}`
             );
         }
     }
