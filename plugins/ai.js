@@ -1,5 +1,6 @@
 import gemini from "../lib/gemini.js";
 import { sendInteractiveMessage } from "../lib/button.js";
+import serialize from "../lib/serialize.js";
 
 const conversationHistory = new Map();
 const COOLDOWN_SECONDS = 3;
@@ -79,8 +80,10 @@ Selalu berikan respons yang kreatif dan jangan kaku. Ingat, kamu adalah Ikyy.`;
             ].map(match => match[1].trim());
             const visibleResponse = aiResponse.replace(commandRegex, "").trim();
 
+            let msg;
+
             if (visibleResponse) {
-                await sendInteractiveMessage(
+                msg = await sendInteractiveMessage(
                     sock,
                     m.chat,
                     {
@@ -112,7 +115,8 @@ Selalu berikan respons yang kreatif dan jangan kaku. Ingat, kamu adalah Ikyy.`;
                             args: commandArgs,
                             text: commandArgs.join(" "),
                             reply: async (content, options) =>
-                                await m.reply(content, options)
+                                await m.reply(content, options),
+                            m: await serialize(msg)
                         };
 
                         try {
