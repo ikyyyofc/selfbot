@@ -36,7 +36,7 @@ export default {
                 return await reply("❌ Gagal upload gambar, servernya lagi down kayaknya.");
             }
 
-            const { data } = await axios.post("https://api.nekolabs.web.id/ai/gemini/nano-banana", {
+            const { data } = await axios.post("https://api.nekolabs.web.id/ai/gemini/nano-banana/v1", {
                 prompt: prompt,
                 imageUrl: imageUrl,
             }, {
