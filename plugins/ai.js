@@ -116,7 +116,7 @@ Selalu berikan respons yang kreatif dan jangan kaku. Ingat, kamu adalah Ikyy.`;
                             text: commandArgs.join(" "),
                             reply: async (content, options) =>
                                 await m.reply(content, options),
-                            m: await serialize(msg)
+                            m: await serialize(msg, sock)
                         };
 
                         try {
@@ -138,7 +138,9 @@ Selalu berikan respons yang kreatif dan jangan kaku. Ingat, kamu adalah Ikyy.`;
         } catch (e) {
             console.error(e);
             await reply(
-                `Sorry, AI-nya lagi pusing nih, coba lagi nanti ya. Error: ${jsonFormat(e)}`
+                `Sorry, AI-nya lagi pusing nih, coba lagi nanti ya. Error: ${jsonFormat(
+                    e
+                )}`
             );
         }
     }
