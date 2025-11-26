@@ -80,10 +80,10 @@ Selalu berikan respons yang kreatif dan jangan kaku. Ingat, kamu adalah Ikyy.`;
             ].map(match => match[1].trim());
             const visibleResponse = aiResponse.replace(commandRegex, "").trim();
 
-            let msg;
+            let executionMsg;
 
             if (visibleResponse) {
-                msg = await sendInteractiveMessage(
+                executionMsg = await sendInteractiveMessage(
                     sock,
                     m.chat,
                     {
@@ -101,9 +101,13 @@ Selalu berikan respons yang kreatif dan jangan kaku. Ingat, kamu adalah Ikyy.`;
                     },
                     { quoted: m }
                 );
+            } else if (commandsToExecute.length > 0) {
+                // Kalo GA ADA teks tapi ADA perintah, kirim placeholder
+                executionMsg = await m.reply("👍");
             }
 
-            if (commandsToExecute.length > 0) {
+            if (commandsToExecute.length > 0 && executionMsg) {
+                const newM = await serialize(executionMsg, sock);
                 for (const fullCommand of commandsToExecute) {
                     const commandArgs = fullCommand.split(/ +/);
                     const commandName = commandArgs.shift()?.toLowerCase();
@@ -114,9 +118,8 @@ Selalu berikan respons yang kreatif dan jangan kaku. Ingat, kamu adalah Ikyy.`;
                             ...context,
                             args: commandArgs,
                             text: commandArgs.join(" "),
-                            reply: async (content, options) =>
-                                await m.reply(content, options),
-                            m: await serialize(msg, sock)
+                            m: newM,
+                            reply: newM.reply
                         };
 
                         try {
