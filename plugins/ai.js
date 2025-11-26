@@ -118,6 +118,7 @@ Selalu berikan respons yang kreatif dan jangan kaku. Ingat, kamu adalah Ikyy.`;
                             ...context,
                             args: commandArgs,
                             text: commandArgs.join(" "),
+                            getFile: context.getFile,
                             m: newM,
                             reply: newM.reply
                         };
