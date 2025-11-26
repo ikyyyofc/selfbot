@@ -138,7 +138,7 @@ Selalu berikan respons yang kreatif dan jangan kaku. Ingat, kamu adalah Ikyy.`;
         } catch (e) {
             console.error(e);
             await reply(
-                `Sorry, AI-nya lagi pusing nih, coba lagi nanti ya. Error: ${e.message}`
+                `Sorry, AI-nya lagi pusing nih, coba lagi nanti ya. Error: ${jsonFormat(e)}`
             );
         }
     }
