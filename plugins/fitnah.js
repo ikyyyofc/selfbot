@@ -1,80 +1,60 @@
-import {
-    generateWAMessageFromContent
-} from "@whiskeysockets/baileys";
+import { jidNormalizedUser } from '@whiskeysockets/baileys';
 
 export default {
-    desc: "Bikin reply palsu buat fitnah. Seru-seruan aja, jangan baperan.",
+    name: 'fitnah',
+    desc: 'Buat fake reply buat seru-seruan.',
     rules: {
         group: true,
+        args: true,
         limit: 1
     },
-    execute: async (context) => {
-        const {
-            sock,
-            m,
-            text,
-            reply
-        } = context;
-
-        if (!m.quoted) {
-            return await reply("❌ Bro, quote dulu pesan orang yang mau difitnah.");
-        }
-
-        const args = text.trim().split("|");
-        if (args.length < 2) {
-            return await reply("⚠️ Format salah! \n\nContoh: .fitnah @target|pesan fitnahnya");
-        }
-
-        const targetArg = args[0].trim();
-        const fakeText = args.slice(1).join("|").trim();
-
-        if (!fakeText) {
-            return await reply("❌ Pesan fitnahnya jangan kosong dong, ntar ga seru.");
-        }
-
-        let targetJid;
-        if (m.mentions && m.mentions.length > 0) {
-            targetJid = m.mentions[0];
-        } else {
-            const number = targetArg.replace(/\D/g, "");
-            if (!number) {
-                return await reply("❌ Targetnya siapa? Tag orangnya atau masukin nomornya.");
-            }
-            targetJid = `${number}@s.whatsapp.net`;
-        }
-
+    execute: async ({ sock, m, text, reply }) => {
         try {
-            // Kita pinjem 'key' dari pesan yang di-quote, tapi ganti partisipannya
-            const fakeQuotedKey = {
-                remoteJid: m.chat,
-                fromMe: targetJid === sock.user.id.split(":")[0] + "@s.whatsapp.net",
-                id: m.quoted.id,
-                participant: targetJid,
-            };
+            const [target, victimText, replyText] = text.split('|');
 
-            // Bangun pesan palsunya
-            const fakeMessage = generateWAMessageFromContent(
-                m.chat, {
-                    extendedTextMessage: {
-                        text: fakeText,
-                    },
-                }, {
-                    userJid: sock.user.id,
-                    quoted: {
-                        key: fakeQuotedKey,
-                        message: m.quoted.message
-                    },
+            if (!target || !victimText || !replyText) {
+                return await reply('Format salah, cuy.\n\nContoh: .fitnah @korban|dia bilang apa|kamu bales apa');
+            }
+
+            let victimJid;
+            if (m.mentions.length > 0) {
+                victimJid = m.mentions[0];
+            } else {
+                const number = target.trim().replace(/[^0-9]/g, '');
+                if (!number) {
+                    return await reply('Format target salah. Tag orangnya atau masukin nomornya, jangan ngasal.');
                 }
-            );
+                victimJid = jidNormalizedUser(`${number}@s.whatsapp.net`);
+            }
 
-            // Kirim drama ke grup!
-            await sock.relayMessage(m.chat, fakeMessage.message, {
-                messageId: fakeMessage.key.id
+            // Cek kalo targetnya bot itu sendiri, biar ga aneh
+            if (victimJid === jidNormalizedUser(sock.user.id)) {
+                return await reply('Lah, mau fitnah diri sendiri? Gak bisa, bos. 😹');
+            }
+
+            // Bikin fake quoted message-nya
+            const fakeQuote = {
+                key: {
+                    remoteJid: m.chat,
+                    fromMe: false,
+                    id: 'FITNAH_' + Math.random().toString(16).slice(2, 8).toUpperCase(),
+                    participant: victimJid
+                },
+                message: {
+                    conversation: victimText.trim()
+                }
+            };
+            
+            // Kirim pesan balasan dengan meng-quote pesan palsu
+            await sock.sendMessage(m.chat, {
+                text: replyText.trim()
+            }, {
+                quoted: fakeQuote
             });
 
         } catch (e) {
             console.error(e);
-            await reply(`Gagal bikin fitnah, keknya ada error: ${e.message}`);
+            await reply('Anjir, error. Coba lagi ntar, atau laporin ke owner.');
         }
     }
 };
