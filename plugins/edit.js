@@ -1,62 +1,64 @@
-import axios from "axios";
-import upload from "../lib/upload.js";
+import axios from 'axios';
+import upload from '../lib/upload.js';
 
 export default {
+    desc: 'Mengedit gambar dengan AI berdasarkan perintah teks.',
     rules: {
-        limit: 5, // Biaya 5 limit per penggunaan
+        limit: 5, // Menggunakan 5 limit per command
         premium: false,
         owner: false,
         group: false,
-        private: false,
+        private: true, // Biar lebih enak, kita set default ke private aja, tapi di grup juga bisa
     },
     execute: async (context) => {
         const { m, text, reply, getFile, sock, chat } = context;
 
-        const supportedMedia = ["imageMessage"];
-        const isMedia = m.type === "imageMessage" || m.quoted?.type === "imageMessage";
-        const prompt = text.trim();
-
-        if (!isMedia) {
-            return await reply("❌ Gambarnya mana? Reply atau kirim gambar dengan caption.");
-        }
-        if (!prompt) {
-            return await reply("❌ Mau diedit jadi apa gambarnya? Kasih prompt dong.\n\nContoh: .aiedit change the background to beach");
+        // Validasi input dari user
+        if (m.quoted?.type !== 'imageMessage') {
+            return await reply('❌ Reply ke gambar yang mau diedit dong.');
         }
 
-        await reply("⏳ Bentar, AI lagi mikir...");
+        if (!text) {
+            return await reply('❌ Kasih tau dong mau diedit jadi apa.\n\nContoh: .editimage jadi anime');
+        }
+
+        await reply('⏳ Oke, lagi gue edit gambarnya... Sabar ya, proses AI butuh waktu.');
 
         try {
+            // 1. Ambil buffer gambar dari pesan yang di-reply
             const imageBuffer = await getFile();
             if (!imageBuffer) {
-                return await reply("❌ Gagal dapetin gambar, coba lagi.");
+                return await reply('❌ Gagal dapetin gambar. Coba lagi deh.');
             }
 
+            // 2. Upload gambar buat dapet URL
             const imageUrl = await upload(imageBuffer);
             if (!imageUrl) {
-                return await reply("❌ Gagal upload gambar, servernya lagi down kayaknya.");
+                return await reply('❌ Gagal upload gambar sementara. Coba lagi nanti.');
             }
 
-            const { data } = await axios.post("https://api.nekolabs.web.id/ai/gemini/nano-banana/v1", {
-                prompt: prompt,
-                imageUrl: imageUrl,
-            }, {
-                headers: { "Content-Type": "application/json" }
+            // 3. Siapin URL API
+            const prompt = encodeURIComponent(text);
+            const encodedImageUrl = encodeURIComponent(imageUrl);
+            const apiUrl = `https://wudysoft.xyz/api/ai/nano-banana/v26?prompt=${prompt}&imageUrl=${encodedImageUrl}`;
+
+            // 4. Panggil API pake axios
+            const response = await axios.get(apiUrl, {
+                responseType: 'arraybuffer'
             });
 
-            if (!data.success || !data.result) {
-                console.error("API Error:", data);
-                return await reply("❌ Gagal ngedit gambar, AI-nya lagi pusing.");
-            }
-
+            // 5. Kirim hasilnya ke user
             await sock.sendMessage(chat, {
-                image: { url: data.result },
-                caption: `✅ Nih hasilnya:\n\n"${prompt}"`
-            }, { quoted: m });
+                image: Buffer.from(response.data),
+                caption: `*Hasil editan AI:*\n“${text}”`,
+                mimetype: 'image/png'
+            }, {
+                quoted: m
+            });
 
         } catch (error) {
-            console.error("Plugin Error (aiedit):", error);
-            await reply(`❌ Oops, ada error: ${error.message}`);
+            console.error('Error di plugin editimage:', error);
+            await reply(`❌ Duh, sorry banget, ada error nih pas ngedit.\n\nCoba cek lagi gambarnya atau coba beberapa saat lagi ya.`);
         }
-    },
-    help: "Untuk mengedit gambar menggunakan AI. Balas (reply) sebuah gambar atau kirim gambar dengan caption `.aiedit <prompt>`.\nContoh: `.aiedit change clothes to red`."
+    }
 };
