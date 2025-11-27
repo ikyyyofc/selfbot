@@ -29,7 +29,7 @@ export default {
         await m.react("🤖");
 
         const availableCommands = [...state.plugins.entries()]
-            .filter(([command, plugin]) => /ai|restart/.test(command))
+            .filter(([command, plugin]) => !/ai|restart/.test(command))
             .map(
                 ([command, plugin]) =>
                     `- ${command}: ${plugin.desc || "No description available"}`
