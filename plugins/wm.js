@@ -1,46 +1,57 @@
-import { Sticker } from "wa-sticker-formatter";
+import { Sticker, StickerTypes } from "wa-sticker-formatter";
+import config from "../config.js";
 
-export default {
-    name: "wm",
-    desc: "Mengubah watermark stiker dengan me-reply stiker.",
+const plugin = {
     rules: {
         limit: 1,
-        group: true,
-        private: true,
+        desc: "Ubah watermark stiker dengan pack dan author baru.",
+        usage: "Balas stiker dengan perintah .wm [pack|author]",
+        example: ".wm Stiker Keren | Oleh Saya"
     },
-    execute: async ({ m, text, sock, reply }) => {
-        if (!m.quoted || m.quoted.type !== "stickerMessage") {
-            return await reply("Reply stikernya dulu, terus ketik `.wm <pack>|<author>`");
-        }
-
-        if (!text || !text.includes("|")) {
-            return await reply("Formatnya salah, bro. Contoh: `.wm Pack Keren|Author Kece`");
-        }
-
-        const [pack, author] = text.split("|").map(s => s.trim());
-        if (!pack || !author) {
-            return await reply("Pack dan Author ga boleh kosong. Contoh: `.wm Ikyy Pack|ikyyofc`");
-        }
-
-        await reply("Sabar ya, lagi dibikinin...");
+    execute: async (context) => {
+        const { m, text, reply, sock, chat } = context;
 
         try {
-            const buffer = await m.quoted.download();
-            if (!buffer) {
-                return await reply("Gagal download stikernya, coba stiker lain.");
+            const isQuotedSticker = m.quoted && m.quoted.type === "stickerMessage";
+            const isSticker = m.type === "stickerMessage";
+
+            if (!isQuotedSticker && !isSticker) {
+                await reply("☝️ Reply stiker yang mau diubah atau kirim stiker dengan caption perintah ini.");
+                return;
             }
 
-            const sticker = new Sticker(buffer, {
-                pack,
-                author,
-                type: m.quoted.msg.isAnimated ? "full" : "default",
+            await m.react("⏳");
+
+            const media = isQuotedSticker ? await m.quoted.download() : await m.download();
+            if (!media) {
+                await reply("Gagal download stikernya, coba lagi.");
+                await m.react("❌");
+                return;
+            }
+
+            let [pack, author] = text.split("|").map(s => s.trim());
+
+            pack = pack || config.BOT_NAME;
+            author = author || config.OWNER_NAME;
+
+            const sticker = new Sticker(media, {
+                pack: pack,
+                author: author,
+                type: StickerTypes.FULL,
                 quality: 80,
             });
 
-            await sock.sendMessage(m.chat, await sticker.toMessage());
+            const stickerMessage = await sticker.toMessage();
+            await sock.sendMessage(chat, stickerMessage, { quoted: m });
+
+            await m.react("✅");
+
         } catch (error) {
-            console.error("Error creating sticker:", error);
-            await reply(`Gagal bikin stiker, error: ${error.message}`);
+            console.error("Error creating sticker with new WM:", error);
+            await reply(`Gagal, kayaknya ada error: ${error.message}`);
+            await m.react("❌");
         }
     },
 };
+
+export default plugin;
