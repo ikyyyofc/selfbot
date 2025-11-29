@@ -1,49 +1,52 @@
 import { Sticker, StickerTypes } from "wa-sticker-formatter";
+import config from "../config.js";
 
 export default {
-  desc: "membuat stiker",
+    desc: "Membuat stiker dari gambar atau video.",
     rules: {
-        limit: 1
+        limit: 1, // Menggunakan 1 limit per pembuatan stiker
     },
-    async execute({ m, fileBuffer, reply }) {
-        try {
-            let buffer = fileBuffer;
+    async execute(context) {
+        const { m, sock, reply } = context;
 
-            if (!buffer && m.quoted?.isMedia) {
-                buffer = await m.quoted.download();
-            }
-
-            if (!buffer && m.isMedia) {
-                buffer = await m.download();
-            }
-
-            if (!buffer) {
-                return await reply(
-                    "❌ Kirim foto/video atau reply media dengan caption .stiker"
-                );
-            }
-
-            const mediaType = m.quoted?.type || m.type;
-
-            if (!["imageMessage", "videoMessage"].includes(mediaType)) {
-                return await reply("❌ Cuma bisa foto atau video doang!");
-            }
-
-            const sticker = new Sticker(buffer, {
-                pack: "IKYY",
-                author: "SELFBOT",
-                type: StickerTypes.FULL,
-                categories: ["🤖", "🎭"],
-                id: Date.now().toString(),
-                quality: 50
-            });
-
-            const stickerBuffer = await sticker.toBuffer();
-
-            await m.reply({ sticker: stickerBuffer });
-        } catch (error) {
-            console.error("Sticker error:", error);
-            await reply(`❌ Gagal bikin stiker: ${error.message}`);
+        // Cek apakah ada media (gambar/video) di pesan atau di pesan yang dibalas
+        const isMedia = m.isMedia || (m.quoted && m.quoted.isMedia);
+        if (!isMedia) {
+            await reply("❌ Kirim/balas gambar, video, atau gif dengan caption `.sticker`");
+            return;
         }
-    }
+
+        // Kasih reaksi "loading"
+        await m.react("⏳");
+
+        try {
+            // Ambil buffer media
+            const buffer = m.quoted ? await m.quoted.download() : await m.download();
+            if (!buffer) {
+                throw new Error("Gagal mengunduh media.");
+            }
+
+            // Opsi untuk stiker
+            const stickerOptions = {
+                pack: config.BOT_NAME || "Ikyy Bot",
+                author: config.OWNER_NAME || "IkyyOFC",
+                type: StickerTypes.FULL, // Tipe stiker (bisa juga ROUNDED)
+                quality: 70, // Kualitas stiker (0-100)
+            };
+
+            // Buat stiker
+            const sticker = new Sticker(buffer, stickerOptions);
+
+            // Kirim stiker sebagai pesan
+            await sock.sendMessage(m.chat, await sticker.toMessage(), { quoted: m });
+
+            // Kasih reaksi "sukses"
+            await m.react("✅");
+        } catch (error) {
+            console.error("Sticker creation error:", error);
+            await reply(`❌ Gagal membuat stiker. Pastikan file media tidak rusak.\n\nError: ${error.message}`);
+            // Kasih reaksi "gagal"
+            await m.react("❌");
+        }
+    },
 };
