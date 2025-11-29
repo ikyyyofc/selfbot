@@ -1,64 +1,46 @@
-import { Sticker, StickerTypes } from "wa-sticker-formatter";
+import { Sticker } from "wa-sticker-formatter";
 
 export default {
-  desc: "mengubah watermark stiker",
+    name: "wm",
+    desc: "Mengubah watermark stiker dengan me-reply stiker.",
     rules: {
-        limit: 1
+        limit: 1,
+        group: true,
+        private: true,
     },
-    async execute({ sock, m, text, reply }) {
+    execute: async ({ m, text, sock, reply }) => {
+        if (!m.quoted || m.quoted.type !== "stickerMessage") {
+            return await reply("Reply stikernya dulu, terus ketik `.wm <pack>|<author>`");
+        }
+
+        if (!text || !text.includes("|")) {
+            return await reply("Formatnya salah, bro. Contoh: `.wm Pack Keren|Author Kece`");
+        }
+
+        const [pack, author] = text.split("|").map(s => s.trim());
+        if (!pack || !author) {
+            return await reply("Pack dan Author ga boleh kosong. Contoh: `.wm Ikyy Pack|ikyyofc`");
+        }
+
+        await reply("Sabar ya, lagi dibikinin...");
+
         try {
-            // 1. Cek input dari user
-            if (!text) {
-                return await reply(
-                    "Kasih nama pack sama authornya, dong.\nFormat: `.wm <pack>|<author>`"
-                );
+            const buffer = await m.quoted.download();
+            if (!buffer) {
+                return await reply("Gagal download stikernya, coba stiker lain.");
             }
 
-            let [pack, author] = text.split("|");
-            pack = pack?.trim() || ""; // Kalo pack kosong, jadiin string kosong aja
-            author = author?.trim() || ""; // Sama juga buat author
-
-            // 2. Pastiin ada stiker yang di-reply atau dikirim
-            const isSticker =
-                m.type === "stickerMessage" ||
-                m.quoted?.type === "stickerMessage";
-            if (!isSticker) {
-                return await reply(
-                    "Reply stiker yang mau diganti WM-nya, bos."
-                );
-            }
-
-            await m.react("⏳");
-
-            // 3. Download buffer stikernya
-            const stickerBuffer = await (m.quoted
-                ? m.quoted.download()
-                : m.download());
-            if (!stickerBuffer) {
-                throw new Error("Gagal download stiker, coba lagi.");
-            }
-
-            // 4. Buat stiker baru pake wa-sticker-formatter
-            const sticker = new Sticker(stickerBuffer, {
-                pack: pack,
-                author: author,
-                type: StickerTypes.FULL, // Pake 'FULL' biar ga ke-crop
-                quality: 100
+            const sticker = new Sticker(buffer, {
+                pack,
+                author,
+                type: m.quoted.msg.isAnimated ? "full" : "default",
+                quality: 80,
             });
 
-            const newStickerBuffer = await sticker.toBuffer();
-
-            // 5. Kirim stiker yang udah jadi
-            await sock.sendMessage(
-                m.chat,
-                { sticker: newStickerBuffer },
-                { quoted: m }
-            );
-            await m.react("✅");
-        } catch (e) {
-            console.error(e);
-            await reply(`Anjir, error: ${e.message}`);
-            await m.react("❌");
+            await sock.sendMessage(m.chat, await sticker.toMessage());
+        } catch (error) {
+            console.error("Error creating sticker:", error);
+            await reply(`Gagal bikin stiker, error: ${error.message}`);
         }
-    }
+    },
 };
