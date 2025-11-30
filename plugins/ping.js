@@ -32,9 +32,6 @@ export default {
     },
     execute(context) {
         const startTime = Date.now();
-        
-        context.reply('Menganalisis sistem, mohon tunggu sebentar...');
-
         exec('df -h', (err, stdout, stderr) => {
             const diskUsage = err ? `Gagal mengambil data disk: ${stderr}` : stdout.trim();
             const endTime = Date.now();
