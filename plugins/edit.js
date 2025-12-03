@@ -2,63 +2,54 @@ import axios from 'axios';
 import upload from '../lib/upload.js';
 
 export default {
-    desc: 'Mengedit gambar dengan AI berdasarkan perintah teks.',
     rules: {
-        limit: 5, // Menggunakan 5 limit per command
-        premium: false,
-        owner: false,
-        group: false,
-        private: true, // Biar lebih enak, kita set default ke private aja, tapi di grup juga bisa
+        command: "editimage",
+        desc: "Edit gambar dengan AI pake prompt.",
+        limit: 2,
+        usage: "Reply sebuah gambar dan ketik .editimage <deskripsi editan>"
     },
-    execute: async (context) => {
-        const { m, text, reply, getFile, sock, chat } = context;
+    async execute(context) {
+        const { sock, m, text, reply } = context;
 
-        // Validasi input dari user
-        if (m.quoted?.type !== 'imageMessage') {
-            return await reply('❌ Reply ke gambar yang mau diedit dong.');
+        if (!m.quoted?.isMedia || !/image/i.test(m.quoted.msg.mimetype)) {
+            return reply("Salah pake, bro. Reply ke gambar yang mau diedit.");
         }
 
         if (!text) {
-            return await reply('❌ Kasih tau dong mau diedit jadi apa.\n\nContoh: .editimage jadi anime');
+            return reply(`Prompt editannya apa? Contoh:\n\n.editimage ubah jadi kartun 3D`);
         }
 
-        await reply('⏳ Oke, lagi gue edit gambarnya... Sabar ya, proses AI butuh waktu.');
-
         try {
-            // 1. Ambil buffer gambar dari pesan yang di-reply
-            const imageBuffer = await getFile();
+            await reply("Bentar, gambarnya lagi di-make over sama AI...");
+
+            const imageBuffer = await m.quoted.download();
             if (!imageBuffer) {
-                return await reply('❌ Gagal dapetin gambar. Coba lagi deh.');
+                return reply("Gagal download gambar yang di-reply, coba lagi.");
             }
 
-            // 2. Upload gambar buat dapet URL
-            const imageUrl = await upload(imageBuffer);
-            if (!imageUrl) {
-                return await reply('❌ Gagal upload gambar sementara. Coba lagi nanti.');
+            const originalImageUrl = await upload(imageBuffer);
+            if (!originalImageUrl) {
+                return reply("Gagal upload gambar buat diproses, servernya lagi ngambek kayaknya.");
             }
 
-            // 3. Siapin URL API
-            const prompt = encodeURIComponent(text);
-            const encodedImageUrl = encodeURIComponent(imageUrl);
-            const apiUrl = `https://wudysoft.xyz/api/ai/nano-banana/v26?prompt=${prompt}&imageUrl=${encodedImageUrl}`;
+            const apiUrl = `https://wudysoft.xyz/api/ai/nano-banana/v23?prompt=${encodeURIComponent(text)}&imageUrl=${encodeURIComponent(originalImageUrl)}`;
 
-            // 4. Panggil API pake axios
-            const response = await axios.get(apiUrl, {
-                responseType: 'arraybuffer'
+            const { data } = await axios.get(apiUrl, {
+                responseType: 'json'
             });
 
-            // 5. Kirim hasilnya ke user
-            await sock.sendMessage(chat, {
-                image: Buffer.from(response.data),
-                caption: `*Hasil editan AI:*\n“${text}”`,
-                mimetype: 'image/png'
-            }, {
-                quoted: m
-            });
+            if (data && data.imageUrl) {
+                await sock.sendMessage(m.chat, {
+                    image: { url: data.imageUrl },
+                    caption: `Nih hasilnya buat prompt:\n"${text}"`
+                }, { quoted: m });
+            } else {
+                throw new Error("API gak ngasih hasil yang bener.");
+            }
 
         } catch (error) {
-            console.error('Error di plugin editimage:', error);
-            await reply(`❌ Duh, sorry banget, ada error nih pas ngedit.\n\nCoba cek lagi gambarnya atau coba beberapa saat lagi ya.`);
+            console.error("Error di plugin editimage:", error);
+            reply(`Waduh, gagal total. Mungkin API-nya lagi down atau ada masalah lain. Coba lagi nanti.\n\nError: ${error.message}`);
         }
     }
 };
