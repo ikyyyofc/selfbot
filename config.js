@@ -18,16 +18,7 @@ export default {
 
     BOT_MODE: process.env.mode || "self",
 
-    DB_MODE: process.env.db_mode || "local",
-    MONGODB_URI: process.env.mongodb || "",
-    DB_NAME: "whatsapp_bot",
-
-    DEFAULT_LIMIT: 20,
-    LIMIT_RESET_HOUR: 0,
-
-    PREMIUM_GROUPS: [],
-
-    RENT_REMINDER_DAYS: 3
+    PREMIUM_GROUPS: []
 };
 
 global.delay = ms => new Promise(resolve => setTimeout(resolve, ms));
