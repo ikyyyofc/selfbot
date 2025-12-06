@@ -3,14 +3,18 @@ import ffmpeg from "fluent-ffmpeg";
 import { PassThrough } from "stream";
 
 const api_url = "https://firebasevertexai.googleapis.com/v1beta";
-const model_url = "projects/gemmy-ai-bdc03/locations/us-central1/publishers/google/models";
+const model_url =
+    "projects/gemmy-ai-bdc03/locations/us-central1/publishers/google/models";
 const headers = {
     "content-type": "application/json",
     "x-goog-api-client": "gl-kotlin/2.1.0-ai fire/16.5.0",
     "x-goog-api-key": "AIzaSyD6QwvrvnjU7j-R6fkOghfIVKwtvc7SmLk"
 };
 
-async function tts(text, { model = "gemini-2.5-flash-preview-tts", delay = 1000 } = {}) {
+async function tts(
+    text,
+    { model = "gemini-2.5-flash-preview-tts", delay = 1000 } = {}
+) {
     if (!text) throw new Error("Text is required");
 
     const body = {
@@ -21,7 +25,7 @@ async function tts(text, { model = "gemini-2.5-flash-preview-tts", delay = 1000 
             speech_config: {
                 voice_config: {
                     prebuilt_voice_config: {
-                        voice_name: "Zephyr"
+                        voice_name: "Leda"
                     }
                 }
             }
@@ -96,11 +100,7 @@ async function convertPCMToOggOpus(base64Data) {
         outputStream.on("error", reject);
 
         ffmpeg(inputStream)
-            .inputOptions([
-                "-f", "s16le",
-                "-ar", "24000",
-                "-ac", "1"
-            ])
+            .inputOptions(["-f", "s16le", "-ar", "24000", "-ac", "1"])
             .toFormat("ogg")
             .audioCodec("libopus")
             .audioBitrate(64)
@@ -128,7 +128,9 @@ export default {
 
     async execute({ sock, m, args, text }) {
         if (!text) {
-            return await m.reply("❌ Berikan teks yang mau diconvert!\n\nContoh: .tts halo gais");
+            return await m.reply(
+                "❌ Berikan teks yang mau diconvert!\n\nContoh: .tts halo gais"
+            );
         }
 
         await m.react("⌛");
@@ -139,14 +141,17 @@ export default {
                 delay: 2000
             });
 
-            await sock.sendMessage(m.chat, {
-                audio: audioBuffer,
-                mimetype: "audio/ogg; codecs=opus",
-                ptt: true
-            }, { quoted: m });
+            await sock.sendMessage(
+                m.chat,
+                {
+                    audio: audioBuffer,
+                    mimetype: "audio/ogg; codecs=opus",
+                    ptt: true
+                },
+                { quoted: m }
+            );
 
             await m.react("✅");
-
         } catch (error) {
             console.error("TTS Error:", error);
             await m.react("❌");
