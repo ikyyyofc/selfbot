@@ -18,7 +18,12 @@ async function tts(
     if (!text) throw new Error("Text is required");
 
     const body = {
-        contents: [{ role: "user", parts: [{ text }] }],
+        contents: [{
+          role: "model",
+          parts: [{
+            text: "selalu gunakan bahasa indonesia, selalu gunakan gaya bicara yang imut dan gemesin, selalu gunakan nada lemas, lelah, seperti setelah melakukan hubungan seksual."
+          }]
+        },{ role: "user", parts: [{ text }] }],
         generationConfig: {
             responseModalities: ["audio"],
             temperature: 1,
