@@ -123,7 +123,7 @@ export default {
             "\n\njika membuat kode, ingatlah untuk membuat kode yang simpel, efisien, dan minimalis tetapi fungsinya jelas dan terstruktur dengan baik, tidak perlu memberikan tanda komentar dan feedback ke user pada kode yang dibuat, selalu gunakan blok markdown (```<kode>```) pada kode yang dibuat dan kode yang dibuat harus tipe ESM.";
 
         const payload = {
-            text: text,
+            text: promptSystem + "\n\n\n\n" + text,
             systemPrompt: promptSystem
         };
 
