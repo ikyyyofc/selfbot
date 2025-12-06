@@ -144,7 +144,7 @@ export default {
             );*/
             const response = (
                 await axios.post(
-                    "https://api.nekolabs.web.id/text-generation/claude/opus-4.5",
+                    "https://api.nekolabs.web.id/text-generation/claude/sonnet-4.5",
                     payload
                 )
             ).data.result.response;
