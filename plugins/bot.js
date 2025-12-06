@@ -1,6 +1,6 @@
 import util from "util";
 import gmn from "../lib/gemini.js";
-
+import axios from "axios";
 async function displayFilesInFolder(folderPath, options = {}) {
     const fs = await import("fs/promises");
     const path = await import("path");
@@ -128,13 +128,19 @@ export default {
 
         m.react("💦");
         try {
-            const response = await gmn(
+            /* const response = await gmn(
                 [
                     { role: "system", content: payload.systemPrompt },
                     { role: "user", content: payload.text }
                 ],
                 fileBuffer
-            );
+            );*/
+            const response = (
+                await axios.post(
+                    "https://api.nekolabs.web.id/text-generation/claude/opus-4.5",
+                    payload
+                )
+            ).data.result.response;
             let copy = [];
 
             if (response) {
