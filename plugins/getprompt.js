@@ -115,21 +115,24 @@ export default {
             "\n\ngunakan file-file diatas sebagai referensi dan selalu cek dokumentasi terbaru dari https://www.npmjs.com/package/@whiskeysockets/baileys?activeTab=readme versi 7.x.x dan https://baileys.wiki/docs/migration/to-v7.0.0\npastikan selalu update dan sesuai dengan dokumentasi terbaru\n\n" +
             "jika membuat kode, ingatlah untuk membuat kode yang simpel, efisien, dan minimalis tetapi fungsinya jelas dan terstruktur dengan baik, tidak perlu memberikan tanda komentar pada kode yang dibuat, selalu gunakan tipe ESM.\n\n";
 
-        const buttonData = {
-            text: "Klik tombol di bawah buat nyalin kode promptnya!",
-            footer: "Powered by Ikyy",
-            buttons: [
+        const tempFile = join(tmpdir(), `system-prompt-${Date.now()}.txt`);
+
+        try {
+            writeFileSync(tempFile, systemPrompt, "utf8");
+
+            await sock.sendMessage(
+                m.chat,
                 {
-                    name: "cta_copy",
+                    document: { url: tempFile },
+                    fileName: "system-prompt.txt",
+                    mimetype: "text/plain"
+                },
+                { quoted: m }
+            );
 
-                    buttonParamsJson: JSON.stringify({
-                        display_text: "Prompt Developer",
-                        copy_code: systemPrompt
-                    })
-                }
-            ]
-        };
-
-        sock.sendButtons(m.chat, buttonData);
+            unlinkSync(tempFile);
+        } catch (error) {
+            await reply(`Error: ${error.message}`);
+        }
     }
 };
