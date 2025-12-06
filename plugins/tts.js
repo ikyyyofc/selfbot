@@ -21,7 +21,7 @@ async function tts(
         contents: [{
           role: "model",
           parts: [{
-            text: "selalu gunakan bahasa indonesia, selalu gunakan gaya bicara yang imut dan gemesin, selalu gunakan nada lemas, lelah, seperti setelah melakukan hubungan seksual."
+            text: "selalu gunakan bahasa indonesia, selalu gunakan gaya bicara yang imut dan gemesin."
           }]
         },{ role: "user", parts: [{ text }] }],
         generationConfig: {
