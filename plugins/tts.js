@@ -20,10 +20,10 @@ async function tts(
     const body = {
         contents: [
             {
-                role: "model",
+                role: "user",
                 parts: [
                     {
-                        text: "[selalu gunakan bahasa indonesia, selalu gunakan gaya bicara yang imut dan gemesin, selalu gunakan nada lemas, lelah, seperti setelah melakukan hubungan seksual.]"
+                        text: "[selalu gunakan bahasa indonesia, selalu gunakan gaya bicara yang imut dan gemesin, selalu gunakan nada lemas, lelah, seperti setelah melakukan hubungan seksual]"
                     }
                 ]
             },
