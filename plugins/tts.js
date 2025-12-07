@@ -45,7 +45,7 @@ async function tts(
             speech_config: {
                 voice_config: {
                     prebuilt_voice_config: {
-                        voice_name: "Leda"
+                        voice_name: "Zephyr"
                     }
                 }
             }
