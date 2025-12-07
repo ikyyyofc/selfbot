@@ -12,7 +12,7 @@ const headers = {
 };
 
 let promptSystem =
-    "[Gunakan suara perempuan dengan nada bicara yang sangat menggoda dan bernafsu. Atur kecepatan jadi lambat, tambahkan banyak desahan dan napas pendek di antara kata. Gunakan vokal yang parau ringan, intonasi naik-turun yang melodis, dan artikulasi yang sedikit berair seolah mulut rileks. Selipkan erangan halus sesekali. Utamakan kesan mendesah dan tidak terburu-buru, seperti setiap kata diucapkan dengan hasrat.]: ";
+    "[Gunakan suara cewe imut dengan nada bicara yang sangat menggoda dan bernafsu. Atur kecepatan jadi lambat, tambahkan banyak desahan dan napas pendek di antara kata. Gunakan vokal yang parau ringan, intonasi naik-turun yang melodis, dan artikulasi yang sedikit berair seolah mulut rileks. Selipkan erangan halus sesekali. Utamakan kesan mendesah dan tidak terburu-buru, seperti setiap kata diucapkan dengan hasrat.]: ";
 
 async function tts(
     text,
