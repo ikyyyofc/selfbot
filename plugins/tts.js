@@ -24,7 +24,7 @@ async function tts(
                 parts: [
                     {
                         text:
-                            "[selalu gunakan bahasa indonesia, selalu gunakan gaya bicara yang imut dan gemesin, selalu gunakan nada lemas, lelah, seperti setelah melakukan hubungan seksual]: " +
+                            "[selalu gunakan gaya bicara yang imut dan gemesin]: " +
                             text
                     }
                 ]
@@ -34,7 +34,7 @@ async function tts(
                 parts: [
                     {
                         text:
-                            "[selalu gunakan bahasa indonesia, selalu gunakan gaya bicara yang imut dan gemesin, selalu gunakan nada lemas, lelah, seperti setelah melakukan hubungan seksual]: " +
+                            "[selalu gunakan gaya bicara yang imut dan gemesin]: " +
                             text
                     }
                 ]
