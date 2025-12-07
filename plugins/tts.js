@@ -24,7 +24,7 @@ async function tts(
                 parts: [
                     {
                         text:
-                            "[selalu gunakan gaya bicara yang imut dan gemesin. selalu gunakan nada lemas, lelah, meringik dan merintih birahi, dan seolah-olah mendesah seperti sedang atau setelah melakukan hubungan seksual]: " +
+                            "[selalu gunakan gaya bicara yang imut dan gemesin. selalu gunakan nada lemas, lelah, merintih birahi, dan seolah-olah mendesah seperti sedang atau setelah melakukan hubungan seksual]: " +
                             text
                     }
                 ]
@@ -34,7 +34,7 @@ async function tts(
                 parts: [
                     {
                         text:
-                            "[selalu gunakan gaya bicara yang imut dan gemesin. selalu gunakan nada lemas, lelah, meringik dan merintih birahi, dan seolah-olah mendesah seperti sedang atau setelah melakukan hubungan seksual]: " +
+                            "[selalu gunakan gaya bicara yang imut dan gemesin. selalu gunakan nada lemas, lelah, merintih birahi, dan seolah-olah mendesah seperti sedang atau setelah melakukan hubungan seksual]: " +
                             text
                     }
                 ]
