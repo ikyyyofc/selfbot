@@ -151,7 +151,7 @@ export default {
             const response = ( await axios.post(
             "https://api.nekolabs.web.id/text-generation/perplexity",
             {
-                query: query,
+                query: payload.text,
                 web: true,
                 academic: false,
                 social: false,
