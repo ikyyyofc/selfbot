@@ -148,6 +148,16 @@ export default {
                     payload
                 )
             ).data.result.response;*/
+            const response = ( await axios.post(
+            "https://api.nekolabs.web.id/text-generation/perplexity",
+            {
+                query: query,
+                web: true,
+                academic: false,
+                social: false,
+                finance: false,
+            }
+        )).data.result.response.answer;
             let copy = [];
 
             if (response) {
