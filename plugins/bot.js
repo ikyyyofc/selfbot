@@ -135,13 +135,13 @@ export default {
 
         m.react("💦");
         try {
-             const response = await gmn(
+            /* const response = await gmn(
                 [
                     { role: "system", content: payload.systemPrompt },
                     { role: "user", content: payload.text }
                 ],
                 fileBuffer
-            );
+            );*/
             /*const response = (
                 await axios.post(
                     "https://api.nekolabs.web.id/text-generation/claude/opus-4.5",
