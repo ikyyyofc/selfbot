@@ -2,14 +2,16 @@ const statusUpdateCache = new Map();
 
 export default {
     async execute({ sock, m, args }) {
-        if (args[0] === 'confirm') {
+        if (args[0] === "confirm") {
             const targetGroupId = args[1];
             if (!targetGroupId) {
                 return m.reply("❌ ID Grupnya mana bro?");
             }
 
             if (!statusUpdateCache.has(m.sender)) {
-                return m.reply("Sesi lo udah abis, coba ulang dari awal pake `.swgc` sambil reply media.");
+                return m.reply(
+                    "Sesi lo udah abis, coba ulang dari awal pake `.swgc` sambil reply media."
+                );
             }
 
             const { originalMessage, timer } = statusUpdateCache.get(m.sender);
@@ -18,29 +20,37 @@ export default {
             try {
                 await m.reply(`⏳ OTW upload status ke grup...`);
 
-                await sock.relayMessage(targetGroupId, {
-                    groupStatusMessageV2: {
-                        message: originalMessage.message
-                    }
-                }, {});
+                await sock.relayMessage(
+                    targetGroupId,
+                    {
+                        groupStatusMessageV2: {
+                            message: originalMessage.message
+                        }
+                    },
+                    {}
+                );
 
                 await m.reply("✅ Sip, status grup berhasil di-update.");
             } catch (error) {
                 console.error("❌ Gagal update status grup:", error);
-                await m.reply("⚠️ Gagal nih, gabisa update status grup. Coba lagi ntar ya.");
-            } finally {
-                statusUpdateCache.delete(m.sender);
+                await m.reply(
+                    "⚠️ Gagal nih, gabisa update status grup. Coba lagi ntar ya."
+                );
             }
             return;
         }
 
         if (!m.quoted || !m.quoted.isMedia) {
-            return m.reply("❌ Reply ke gambar atau video yang mau dijadiin status grup, bro.");
+            return m.reply(
+                "❌ Reply ke gambar atau video yang mau dijadiin status grup, bro."
+            );
         }
 
         const mediaType = m.quoted.type;
-        if (mediaType !== 'imageMessage' && mediaType !== 'videoMessage') {
-             return m.reply("❌ Cuma bisa gambar sama video doang buat status grup.");
+        if (mediaType !== "imageMessage" && mediaType !== "videoMessage") {
+            return m.reply(
+                "❌ Cuma bisa gambar sama video doang buat status grup."
+            );
         }
 
         try {
@@ -50,36 +60,42 @@ export default {
             if (!groupList || groupList.length === 0) {
                 return m.reply("🤖 Bot lagi ga join grup mana-mana, sorry.");
             }
-            
+
             if (statusUpdateCache.has(m.sender)) {
                 const { timer } = statusUpdateCache.get(m.sender);
                 clearTimeout(timer);
             }
 
-            const expirationTimer = setTimeout(() => {
-                statusUpdateCache.delete(m.sender);
-            }, 2 * 60 * 1000); 
+            const expirationTimer = setTimeout(
+                () => {
+                    statusUpdateCache.delete(m.sender);
+                },
+                2 * 60 * 1000
+            );
 
-            statusUpdateCache.set(m.sender, { 
+            statusUpdateCache.set(m.sender, {
                 originalMessage: m.quoted,
-                timer: expirationTimer 
+                timer: expirationTimer
             });
 
             const buttons = groupList.map(group => ({
                 id: `.swgc confirm ${group.id}`,
                 text: group.subject
             }));
-            
+
             if (buttons.length === 0) {
                 return m.reply("Gagal ngambil daftar grup. Coba lagi ntar.");
             }
 
-            await sock.sendButtons(m.chat, {
-                text: "Pilih grup buat upload status:",
-                buttons: buttons,
-                footer: "Sesi ini cuma 2 menit ya."
-            }, { quoted: m });
-
+            await sock.sendButtons(
+                m.chat,
+                {
+                    text: "Pilih grup buat upload status:",
+                    buttons: buttons,
+                    footer: "Sesi ini cuma 2 menit ya."
+                },
+                { quoted: m }
+            );
         } catch (error) {
             console.error("❌ Error di command swgc:", error);
             await m.reply("⚠️ Duh, ada error. Gagal dapetin list grup.");
