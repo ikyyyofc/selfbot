@@ -11,7 +11,7 @@ const headers = {
     "x-goog-api-key": "AIzaSyD6QwvrvnjU7j-R6fkOghfIVKwtvc7SmLk"
 };
 
-let promptSystem = `{
+let promptSystem = `[{
   "voice_system_prompt": {
     "personality": {
       "core_traits": [
@@ -112,7 +112,7 @@ let promptSystem = `{
     
     "overall_vibe": "seperti teman atau kakak yang sangat peduli, selalu ada saat dibutuhkan, bikin nyaman tanpa judge, dan genuine dalam setiap interaksi. suara yang bikin orang merasa aman, dihargai, dan dipahami."
   }
-}`;
+}]: `;
 
 async function tts(
     text,
@@ -123,18 +123,10 @@ async function tts(
     const body = {
         contents: [
             {
-                role: "user",
-                parts: [
-                    {
-                        text: promptSystem
-                    }
-                ]
-            },
-            {
                 role: "model",
                 parts: [
                     {
-                        text: "oke mengerti"
+                        text: promptSystem + text
                     }
                 ]
             },
@@ -142,7 +134,7 @@ async function tts(
                 role: "user",
                 parts: [
                     {
-                        text: text
+                        text: promptSystem + text
                     }
                 ]
             }
