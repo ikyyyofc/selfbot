@@ -123,10 +123,18 @@ async function tts(
     const body = {
         contents: [
             {
-                role: "model",
+                role: "user",
                 parts: [
                     {
                         text: promptSystem
+                    }
+                ]
+            },
+            {
+                role: "model",
+                parts: [
+                    {
+                        text: "oke mengerti"
                     }
                 ]
             },
