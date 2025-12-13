@@ -9,7 +9,7 @@ export default {
             }
 
             if (!statusUpdateCache.has(m.sender)) {
-                return m.reply("Sesi lo udah abis, coba ulang dari awal pake `.setstatusgc` sambil reply media.");
+                return m.reply("Sesi lo udah abis, coba ulang dari awal pake `.swgc` sambil reply media.");
             }
 
             const { originalMessage, timer } = statusUpdateCache.get(m.sender);
@@ -66,7 +66,7 @@ export default {
             });
 
             const buttons = groupList.map(group => ({
-                id: `.setstatusgc confirm ${group.id}`,
+                id: `.swgc confirm ${group.id}`,
                 text: group.subject
             }));
             
@@ -81,7 +81,7 @@ export default {
             }, { quoted: m });
 
         } catch (error) {
-            console.error("❌ Error di command setstatusgc:", error);
+            console.error("❌ Error di command swgc:", error);
             await m.reply("⚠️ Duh, ada error. Gagal dapetin list grup.");
             if (statusUpdateCache.has(m.sender)) {
                 const { timer } = statusUpdateCache.get(m.sender);
