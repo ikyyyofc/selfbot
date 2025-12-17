@@ -2,15 +2,12 @@ import dotenv from "dotenv/config";
 import { format } from "util";
 
 export default {
-    SESSION: "session",
+    SESSION_DB: "./session.db",
     PAIRING_CODE: "IKYYSELF",
     PREFIX: [".", "!", "/", "-", "😹"],
     BOT_NAME: "IKYY",
     OWNER_NAME: "IKYYOFC",
     OWNER_NUMBER: "6287866255637",
-
-    SESSION_CLEANUP_INTERVAL: 2,
-    SESSION_MAX_SIZE_MB: 10,
 
     GROUP_CACHE_TTL: 300,
 
