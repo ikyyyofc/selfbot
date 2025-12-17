@@ -17,6 +17,7 @@
         "@whiskeysockets/baileys": "latest",
         "crypto": "latest",
         "axios": "latest",
+        "better-sqlite3": "latest",
         "bycf": "latest",
         "cheerio": "latest",
         "chokidar": "latest",
