@@ -26,7 +26,7 @@ async function postData(input) {
 export default {
  async execute({ sock, m, text }) {
  const tiktokRegex =
- /(https?:\/\/(?:www\.)?tiktok\.com\/[^\s]+|https?:\/\/vt\.tiktok\.com\/[^\s]+)/;
+ /(https?:\/\/(?:www\.)?tiktok\.com\/[^\s]+|https?:\/\/vt|vm\.tiktok\.com\/[^\s]+)/;
  const match = text.match(tiktokRegex);
 
  if (!match) {
