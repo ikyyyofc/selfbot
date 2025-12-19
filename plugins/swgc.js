@@ -47,11 +47,11 @@ export default {
         }
 
         const mediaType = m.quoted.type;
-       /* if (mediaType !== "imageMessage" && mediaType !== "videoMessage") {
+        if (mediaType !== "imageMessage" && mediaType !== "videoMessage") {
             return m.reply(
                 "❌ Cuma bisa gambar sama video doang buat status grup."
             );
-        }*/
+        }
 
         try {
             const groups = await sock.groupFetchAllParticipating();
