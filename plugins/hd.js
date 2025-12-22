@@ -1,65 +1,50 @@
-
-import axios from "axios";
-import upload from "../lib/upload.js";
+import axios from 'axios';
+import upload from '../lib/upload.js';
 
 export default {
-    desc: "Meningkatkan kualitas gambar melalui 3 tahap.",
     rules: {
-        limit: 1,
-        premium: true
+        // ga perlu rules aneh aneh, langsung gas
     },
-    execute: async ({ m, reply, getFile }) => {
+    async execute(context) {
+        const { m, reply, sock } = context;
+
+        const quoted = m.quoted;
+
+        if (!quoted || (quoted.type !== 'imageMessage' && quoted.type !== 'stickerMessage')) {
+            return reply('mana gambarnya goblok? reply ke foto atau stiker laa');
+        }
+
+        await reply('bentar, lagi di proses...');
+
         try {
-            const file = await getFile();
-            if (!file) {
-                return await reply(
-                    "Mana gambarnya? Reply atau kirim gambar dengan caption .hd"
-                );
+            const buffer = await quoted.download();
+            if (!buffer) {
+                return reply('gagal download media, coba lagi ntar');
             }
 
-            await reply("Sabar ya, lagi proses upscale gambar kamu...");
-
-            const initialUrl = await upload(file);
-            if (!initialUrl) {
-                return await reply("Gagal upload gambar, coba lagi nanti.");
+            const imageUrl = await upload(buffer);
+            if (!imageUrl) {
+                return reply('gagal upload media, servernya lagi down kali');
             }
 
-            const API_BASE = "https://api.nekolabs.web.id/tools/pxpic";
-            const steps = [
-                {
-                    name: "restore",
-                    message: "Tahap 1 dari 3: Memulihkan detail gambar..."
-                },
-                {
-                    name: "upscale",
-                    message: "Tahap 2 dari 3: Meningkatkan resolusi..."
-                },
-                { name: "enhance", message: "Tahap 3 dari 3: Finishing..." }
-            ];
+            // default scale 2x, kalo mau gede ganti aja
+            const scale = 2;
+            const apiUrl = `https://api.nekolabs.web.id/tools/upscale/real-esrgan/v2?imageUrl=${imageUrl}&scale=${scale}`;
 
-            let currentUrl = initialUrl;
+            const { data } = await axios.get(apiUrl);
 
-            for (const step of steps) {
-                await reply(step.message);
-                const response = await axios.get(
-                    `${API_BASE}/${step.name}?imageUrl=${encodeURIComponent(
-                        currentUrl
-                    )}`
-                );
-
-                if (!response.data || !response.data.success) {
-                    throw new Error(`Gagal pada tahap ${step.name}.`);
-                }
-                currentUrl = response.data.result;
+            if (!data.success || !data.result) {
+                throw new Error('api error, gaada hasil');
             }
 
-            await m.reply({
-                image: { url: currentUrl },
-                caption: "Nih hasilnya, udah HD kan? ✨"
-            });
+            await sock.sendMessage(m.chat, {
+                image: { url: data.result },
+                caption: `dah jadi nih, anjing`
+            }, { quoted: m });
+
         } catch (error) {
-            console.error("HD plugin error:", error);
-            await reply(`Waduh, ada error nih: ${error.message}. Coba lagi bentar ya.`);
+            console.error(error);
+            await reply(`error anjg: ${error.message}`);
         }
     }
 };
