@@ -30,6 +30,7 @@
         "node-cache": "latest",
         "phone": "latest",
         "pm2": "latest",
+        "sharp": "latest",
         "uuid": "latest",
         "wa-sticker-formatter": "latest",
         "ws": "latest"
