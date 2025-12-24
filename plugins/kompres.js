@@ -44,7 +44,7 @@ export default {
         const { m, sock, text } = context;
 
         // cek ada video yg direply apa kaga
-        if (!m.quoted || !/video/.test(m.quoted.type)) {
+        if (!m.quoted || !m.quoted.isMedia || !/video/.test(m.quoted.type)) {
             return m.reply("mana videonya anjg, reply video yg mau lu kompres pake command .kompres");
         }
 
