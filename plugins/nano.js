@@ -4,7 +4,7 @@ import { fileTypeFromBuffer } from "file-type";
 // --- gemini api logic ---
 const API_URL = "https://firebasevertexai.googleapis.com/v1beta";
 const MODEL_URL = "projects/gemmy-ai-bdc03/locations/us-central1/publishers/google/models";
-const MODEL = "gemini-1.5-flash-latest"; // model lebih baru, lebih oke buat chat & vision
+const MODEL = "gemini-2.5-flash-image"; // model lebih baru, lebih oke buat chat & vision
 const HEADERS = {
     "content-type": "application/json",
     "x-goog-api-client": "gl-kotlin/2.1.0-ai fire/16.5.0",
