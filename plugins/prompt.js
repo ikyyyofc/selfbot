@@ -9,12 +9,6 @@ export default {
 
         try {
             const file = await getFile();
-            if (!file) {
-                return await reply(
-                    "mana gambarnya bego, reply atau kirim pake caption"
-                );
-            }
-
             await m.react("🤔");
             await reply("sabar gw proses dulu...");
 
