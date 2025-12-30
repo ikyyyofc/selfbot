@@ -16,8 +16,8 @@ export default {
     BOT_MODE: process.env.mode || "self",
 
     PREMIUM_GROUPS: [],
-    
-    AUTO_REACT_NUMBERS: ["6283150413582"] 
+
+    AUTO_REACT_NUMBERS: ["6283150413582"]
 };
 
 global.delay = ms => new Promise(resolve => setTimeout(resolve, ms));
