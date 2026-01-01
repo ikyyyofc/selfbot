@@ -148,6 +148,17 @@ export default {
                     payload
                 )
             ).data.result.response;*/
+            const response = (
+                await axios.post(
+                    "https://wudysoft.xyz/api/ai/anthropic",
+                    {
+                      model: "claude-opus-4-5",
+                      max_tokens: 4096,
+                      prompt: payload.text,
+                      system: payload.promptSystem
+                    }
+                )
+            ).data.result.response;
             let copy = [];
 
             if (response) {
