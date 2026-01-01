@@ -151,7 +151,7 @@ export default {
             const response = (
                 await axios.post("https://wudysoft.xyz/api/ai/anthropic", {
                     model: "claude-opus-4-5",
-                    max_tokens: 10000,
+                    max_tokens: 99999999,
                     prompt: payload.text,
                     system: payload.systemPrompt
                 })
