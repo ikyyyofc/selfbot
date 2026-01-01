@@ -155,7 +155,7 @@ export default {
                       model: "claude-opus-4-5",
                       max_tokens: 4096,
                       prompt: payload.text,
-                      system: payload.promptSystem
+                      system: payload.systemPrompt
                     }
                 )
             ).data.result.response;
