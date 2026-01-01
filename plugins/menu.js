@@ -1,128 +1,81 @@
+import os from "os";
+
 export default {
-    execute: async ({ sock, m, state }) => {
+    async execute({ sock, m, state }) {
         const config = (await import("../config.js")).default;
         
         const plugins = Array.from(state.plugins.keys()).sort();
-        
-        const categories = {
-            "🤖 AI & Tools": ["ai", "gemini", "gpt", "chat", "tts", "tr", "ocr"],
-            "🎵 Media": ["play", "ytmp3", "ytmp4", "spotify", "tiktok", "ig", "fb"],
-            "🖼️ Image": ["sticker", "s", "toimg", "hd", "removebg", "waifu", "anime"],
-            "🔧 Utility": ["ping", "runtime", "speed", "info", "owner", "sc"],
-            "👥 Group": ["kick", "add", "promote", "demote", "tagall", "hidetag", "group"],
-            "🎮 Fun": ["truth", "dare", "quote", "fakta", "zodiak", "cuaca"],
-            "📥 Downloader": ["mediafire", "gdrive", "apk", "pinterest"],
-            "🔍 Search": ["google", "wiki", "kbbi", "brainly", "lirik"],
-            "💰 Economy": ["daily", "weekly", "transfer", "balance", "slot", "casino"],
-            "⚙️ Settings": ["setpp", "setname", "setwelcome", "setbye", "antilink"]
-        };
-        
-        const categorized = {};
-        const uncategorized = [];
-        
-        for (const cmd of plugins) {
-            let found = false;
-            for (const [cat, cmds] of Object.entries(categories)) {
-                if (cmds.includes(cmd)) {
-                    if (!categorized[cat]) categorized[cat] = [];
-                    categorized[cat].push(cmd);
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) uncategorized.push(cmd);
-        }
-        
-        if (uncategorized.length > 0) {
-            categorized["📦 Lainnya"] = uncategorized;
-        }
+        const totalPlugins = plugins.length;
         
         const uptime = process.uptime();
         const hours = Math.floor(uptime / 3600);
         const minutes = Math.floor((uptime % 3600) / 60);
         const seconds = Math.floor(uptime % 60);
-        const uptimeStr = `${hours}j ${minutes}m ${seconds}s`;
+        const uptimeStr = hours > 0 
+            ? `${hours}j ${minutes}m ${seconds}d`
+            : minutes > 0 
+            ? `${minutes}m ${seconds}d`
+            : `${seconds}d`;
         
-        const memory = process.memoryUsage();
-        const memUsed = Math.round(memory.heapUsed / 1024 / 1024);
-        const memTotal = Math.round(memory.heapTotal / 1024 / 1024);
+        const memUsed = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+        const memTotal = Math.round(os.totalmem() / 1024 / 1024 / 1024 * 100) / 100;
+        const cpuModel = os.cpus()[0]?.model?.split(" ").slice(0, 3).join(" ") || "Unknown";
+        const platform = os.platform();
+        const nodeVer = process.version;
         
         const now = new Date().toLocaleString("id-ID", { 
             timeZone: "Asia/Jakarta",
-            weekday: "long",
             day: "numeric",
-            month: "long",
+            month: "long", 
             year: "numeric",
             hour: "2-digit",
             minute: "2-digit"
         });
         
-        const hour = new Date().toLocaleString("id-ID", { 
-            timeZone: "Asia/Jakarta", 
-            hour: "numeric", 
-            hour12: false 
-        });
-        const h = parseInt(hour);
-        const greeting = h >= 4 && h < 11 ? "Selamat Pagi" : 
-                        h >= 11 && h < 15 ? "Selamat Siang" : 
-                        h >= 15 && h < 18 ? "Selamat Sore" : "Selamat Malam";
-        
         const prefix = config.PREFIX[0];
-        const totalCmd = plugins.length;
-        const userName = m.pushName || "User";
+        const commandList = plugins.map((cmd, i) => `│ ${i + 1}. ${prefix}${cmd}`).join("\n");
         
-        let menu = `
-╭━━━━━━━━━━━━━━━━━━━━━╮
-┃  ✦ ${config.BOT_NAME} ✦
-╰━━━━━━━━━━━━━━━━━━━━━╯
+        const menu = `
+┏━━━━━━━━━━━━━━━━━━━━━┓
+┃    ${config.BOT_NAME} MENU
+┗━━━━━━━━━━━━━━━━━━━━━┛
 
-┌─❏ *${greeting}, ${userName}!*
-│
-├ 📅 ${now}
-├ ⏱️ Uptime: ${uptimeStr}
-├ 💾 RAM: ${memUsed}/${memTotal} MB
-├ 📊 Total: ${totalCmd} commands
-├ 🔖 Prefix: [ ${config.PREFIX.join(" | ")} ]
-└─────────────────
+┏━━━「 INFO BOT 」━━━┓
+│ 
+│ 📛 nama: ${config.BOT_NAME}
+│ 👤 owner: ${config.OWNER_NAME}
+│ 🎭 mode: ${config.BOT_MODE}
+│ 📅 waktu: ${now}
+│ 
+┗━━━━━━━━━━━━━━━━━━━━━┛
 
-`;
+┏━━━「 SISTEM 」━━━┓
+│ 
+│ ⏱️ uptime: ${uptimeStr}
+│ 💾 ram: ${memUsed} MB
+│ 💻 os: ${platform}
+│ 🟢 node: ${nodeVer}
+│ ⚙️ cpu: ${cpuModel}
+│ 
+┗━━━━━━━━━━━━━━━━━━━━━┛
 
-        for (const [category, cmds] of Object.entries(categorized)) {
-            if (cmds.length === 0) continue;
-            
-            menu += `╭──「 ${category} 」\n`;
-            menu += `│\n`;
-            
-            for (const cmd of cmds) {
-                menu += `│ ◦ ${prefix}${cmd}\n`;
-            }
-            
-            menu += `│\n`;
-            menu += `╰──────────────\n\n`;
-        }
+┏━━━「 COMMANDS 」━━━┓
+│ 
+│ 📊 total: ${totalPlugins} perintah
+│ 
+${commandList}
+│ 
+┗━━━━━━━━━━━━━━━━━━━━━┛
 
-        menu += `╭━━━━「 INFO 」━━━━╮
-┃
-┃ Owner: @${config.OWNER_NUMBER}
-┃ Mode: ${config.BOT_MODE.toUpperCase()}
-┃ Bot: ${config.BOT_NAME}
-┃
-╰━━━━━━━━━━━━━━━━━╯
+┏━━━「 SPECIAL 」━━━┓
+│ 
+│ > eval javascript
+│ => eval dengan return
+│ $ exec terminal
+│ 
+┗━━━━━━━━━━━━━━━━━━━━━┛
+`.trim();
 
-> _powered by ${config.OWNER_NAME}_`;
-
-        await sock.sendMessage(m.chat, {
-            text: menu,
-            contextInfo: {
-                mentionedJid: [`${config.OWNER_NUMBER}@s.whatsapp.net`],
-                externalAdReply: {
-                    title: `${config.BOT_NAME} - Menu`,
-                    body: `${totalCmd} Commands Available`,
-                    thumbnailUrl: "https://raw.githubusercontent.com/ikyyyofc/uploader/refs/heads/main/uploads/42400.jpg",
-                    mediaType: 1,
-                    renderLargerThumbnail: true
-                }
-            }
-        }, { quoted: m });
+        await m.reply(menu);
     }
 };
