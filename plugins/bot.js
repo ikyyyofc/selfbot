@@ -135,13 +135,13 @@ export default {
 
         m.react("💦");
         try {
-            const response = await gmn(
+            /*const response = await gmn(
                 [
                     { role: "system", content: payload.systemPrompt },
                     { role: "user", content: payload.text }
                 ],
                 fileBuffer
-            );
+            );*/
             /*const response = (
                 await axios.post(
                     "https://api.nekolabs.web.id/text-generation/claude/opus-4.5",
@@ -149,16 +149,15 @@ export default {
                 )
             ).data.result.response;*/
             const response = (
-                await axios.post(
-                    "https://wudysoft.xyz/api/ai/anthropic",
-                    {
-                      model: "claude-opus-4-5",
-                      max_tokens: 4096,
-                      prompt: payload.text,
-                      system: payload.systemPrompt
-                    }
-                )
-            ).data.result.response;
+                await axios.post("https://wudysoft.xyz/api/ai/anthropic", {
+                    model: "claude-opus-4-5",
+                    max_tokens: 10000,
+                    prompt: payload.text,
+                    system: payload.systemPrompt
+                })
+            ).data.content
+                .map(o => o.text)
+                .join("");
             let copy = [];
 
             if (response) {
