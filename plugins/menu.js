@@ -1,24 +1,20 @@
-import config from "../config.js";
-
 export default {
     async execute({ reply, state }) {
-        // Ambil semua nama command dari state.plugins
-        const commands = [...state.plugins.keys()].sort();
-        const prefix = config.PREFIX[0] || ".";
+        const plugins = Array.from(state.plugins.keys()).sort();
+        
+        let menu = `╭──「 *MENU* 」
+│
+│ Total: ${plugins.length} commands
+│
+├──「 *Commands* 」\n`;
 
-        let menuText = `🤖 *${config.BOT_NAME || "BOT"} MENU* 🤖\n\n`;
-        menuText += "Ini daftar command yang bisa lu pake:\n\n";
+        plugins.forEach(cmd => {
+            menu += `│ • .${cmd}\n`;
+        });
 
-        // Filter 'menu' dari daftar dan format outputnya
-        const commandList = commands
-            .filter(cmd => cmd !== "menu")
-            .map(cmd => `› ${prefix}${cmd}`)
-            .join("\n");
+        menu += `│
+╰──────────────`;
 
-        menuText += commandList;
-        menuText += `\n\nTotal ada *${commands.length - 1}* command yang tersedia.`;
-        menuText += `\n\n_Ketik ${prefix}<command> buat jalanin perintah._`;
-
-        await reply(menuText);
+        await reply(menu);
     }
 };
