@@ -1,76 +1,92 @@
 import os from "os";
-import process from "process";
-import { performance } from "perf_hooks";
-import groupCache from "../lib/groupCache.js";
-import cooldownManager from "../lib/CooldownManager.js";
-
-// fungsi buat ngerapihin format uptime
-function formatUptime(seconds) {
-    const d = Math.floor(seconds / (3600 * 24));
-    const h = Math.floor((seconds % (3600 * 24)) / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = Math.floor(seconds % 60);
-
-    let result = [];
-    if (d > 0) result.push(`${d} hari`);
-    if (h > 0) result.push(`${h} jam`);
-    if (m > 0) result.push(`${m} menit`);
-    if (s > 0) result.push(`${s} detik`);
-
-    return result.join(", ") || "baru aja idup";
-}
 
 export default {
-    name: "speed",
-    aliases: ["ping", "stats", "status"],
-    description: "cek kecepatan bot & stats server.",
-    rules: {
-        owner: true, // cuma owner yg bisa pake, biar ga disalahgunain
-    },
-    execute: async ({ m, reply, state }) => {
-        const start = performance.now();
-
-        // ngambil info sistem
+    async execute({ m, sock }) {
+        const start = Date.now();
+        
+        const sent = await m.reply("⏳");
+        const ping = Date.now() - start;
+        
         const cpus = os.cpus();
-        const cpuModel = cpus[0].model;
+        const cpuModel = cpus[0]?.model || "Unknown";
         const cpuCores = cpus.length;
+        
+        let cpuUsage = 0;
+        const cpuStart = os.cpus();
+        await new Promise(r => setTimeout(r, 100));
+        const cpuEnd = os.cpus();
+        
+        cpuStart.forEach((start, i) => {
+            const end = cpuEnd[i];
+            const startTotal = Object.values(start.times).reduce((a, b) => a + b, 0);
+            const endTotal = Object.values(end.times).reduce((a, b) => a + b, 0);
+            const startIdle = start.times.idle;
+            const endIdle = end.times.idle;
+            cpuUsage += ((endTotal - startTotal) - (endIdle - startIdle)) / (endTotal - startTotal) * 100;
+        });
+        cpuUsage = (cpuUsage / cpuCores).toFixed(1);
+        
         const totalMem = os.totalmem();
         const freeMem = os.freemem();
         const usedMem = totalMem - freeMem;
+        const memPercent = ((usedMem / totalMem) * 100).toFixed(1);
+        
+        const proc = process.memoryUsage();
+        const heapUsed = (proc.heapUsed / 1024 / 1024).toFixed(1);
+        const heapTotal = (proc.heapTotal / 1024 / 1024).toFixed(1);
+        const rss = (proc.rss / 1024 / 1024).toFixed(1);
+        
         const uptime = process.uptime();
-        const memoryUsage = process.memoryUsage();
+        const days = Math.floor(uptime / 86400);
+        const hours = Math.floor((uptime % 86400) / 3600);
+        const mins = Math.floor((uptime % 3600) / 60);
+        const secs = Math.floor(uptime % 60);
+        
+        const sysUptime = os.uptime();
+        const sysDays = Math.floor(sysUptime / 86400);
+        const sysHours = Math.floor((sysUptime % 86400) / 3600);
+        const sysMins = Math.floor((sysUptime % 3600) / 60);
+        
+        const formatBytes = bytes => {
+            if (bytes < 1024) return bytes + " B";
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+            if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + " MB";
+            return (bytes / 1024 / 1024 / 1024).toFixed(2) + " GB";
+        };
+        
+        const text = `🤖 *BOT STATUS*
 
-        // ngambil info bot
-        const pluginCount = state.plugins.size;
-        const groupCacheStats = groupCache.getStats();
-        const cooldownStats = cooldownManager.getStats();
+⚡ *Response Time*
+├ Ping: ${ping}ms
+└ Status: ${ping < 100 ? "🟢 Excellent" : ping < 300 ? "🟡 Good" : "🔴 Slow"}
 
-        const end = performance.now();
-        const latency = (end - start).toFixed(2);
+💻 *System Info*
+├ Platform: ${os.platform()}
+├ Arch: ${os.arch()}
+├ Hostname: ${os.hostname()}
+├ Node: ${process.version}
+└ Uptime: ${sysDays}d ${sysHours}h ${sysMins}m
 
-        // ngerakit pesen balasan
-        const response = `
-*GOKIL CEPET BANGET!!* ⚡
-- *Kecepatan Respon:* ${latency} ms
+🔧 *CPU*
+├ Model: ${cpuModel.trim()}
+├ Cores: ${cpuCores}
+└ Usage: ${cpuUsage}%
 
-💻 *INFO SERVER*
-- *OS:* ${os.platform()} (${os.arch()})
-- *CPU:* ${cpuModel} (${cpuCores} core)
-- *RAM (Total):* ${(totalMem / 1024 / 1024).toFixed(2)} MB
-- *RAM (Terpakai):* ${(usedMem / 1024 / 1024).toFixed(2)} MB
-- *Server Uptime:* ${formatUptime(os.uptime())}
+🧠 *RAM System*
+├ Total: ${formatBytes(totalMem)}
+├ Used: ${formatBytes(usedMem)}
+├ Free: ${formatBytes(freeMem)}
+└ Usage: ${memPercent}%
 
-🤖 *INFO BOT*
-- *Node.js:* ${process.version}
-- *Memori (Heap):* ${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB / ${(memoryUsage.heapTotal / 1024 / 1024).toFixed(2)} MB
-- *Bot Uptime:* ${formatUptime(uptime)}
-- *Total Plugins:* ${pluginCount} command
-- *Group Cache:* ${groupCacheStats.total} grup di-cache
-- *Cooldown Aktif:* ${cooldownStats.active} user
+📦 *Process Memory*
+├ RSS: ${rss} MB
+├ Heap Used: ${heapUsed} MB
+├ Heap Total: ${heapTotal} MB
+└ External: ${(proc.external / 1024 / 1024).toFixed(1)} MB
 
-*spek dewa gini mah, mau lo apain lagi coba?*
-        `.trim();
+⏱️ *Bot Uptime*
+└ ${days}d ${hours}h ${mins}m ${secs}s`;
 
-        await reply(response);
-    },
+        await sock.sendMessage(m.chat, { text, edit: sent.key });
+    }
 };
