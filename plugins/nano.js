@@ -12,14 +12,8 @@ const HEADERS = {
     "x-goog-api-key": "AIzaSyD6QwvrvnjU7j-R6fkOghfIVKwtvc7SmLk" // ati ati ini api key jangan disebar
 };
 
-const system = `buat gambar sesuai instruksi, usahakan kualitas hp bukan kamera kualitas tinggi`;
-
 const callGemini = async (history, newParts) => {
-    const contents = [
-        { role: "model", parts: [{ text: system }] },
-        ...history,
-        { role: "user", parts: newParts }
-    ];
+    const contents = [...history, { role: "user", parts: newParts }];
 
     try {
         const r = await axios.post(
