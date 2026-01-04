@@ -333,7 +333,7 @@ const system = `{
 
 const callGemini = async (history, newParts) => {
     const contents = [
-        { role: "model", content: system },
+        { role: "model", parts: [{ text: system }] },
         ...history,
         { role: "user", parts: newParts }
     ];
