@@ -105,36 +105,41 @@ export default {
                     );
                 }
             }
-            const replyText = responseTexts.join("\n\n").trim();
+            const replyText =
+                responseTexts.join("\n\n").trim() ||
+                "ga ada jawaban yg bisa gw kasih, coba tanya yg laen.";
+                
+            // 6. siapin tombol reset
+            const buttons = [{ id: ".nano reset", text: "Reset Konteks" }];
+            const footer = "tekan tombol untuk memulai percakapan baru";
 
-            // 6. kirim balasan
+            // 7. kirim balasan
             if (responseImages.length === 0) {
-                await reply(
-                    replyText ||
-                        "ga ada jawaban yg bisa gw kasih, coba tanya yg laen."
-                );
-            } else if (responseImages.length === 1) {
-                await sock.sendMessage(
-                    m.chat,
-                    {
-                        image: responseImages[0],
-                        caption: replyText || "nih gambarnya."
-                    },
+                await sock.sendButtons(m.chat, 
+                    { text: replyText, buttons, footer }, 
                     { quoted: m }
                 );
+            } else if (responseImages.length === 1) {
+                await sock.sendButtons(m.chat, {
+                    image: responseImages[0],
+                    caption: replyText,
+                    buttons,
+                    footer
+                }, { quoted: m });
             } else {
-                if (replyText) await reply(replyText);
-                const albumContent = responseImages.map(img => ({
-                    image: img
-                }));
+                await sock.sendButtons(m.chat,
+                    { text: replyText, buttons, footer },
+                    { quoted: m }
+                );
+                const albumContent = responseImages.map(img => ({ image: img }));
                 await sock.sendAlbumMessage(m.chat, albumContent, m);
             }
 
-            // 7. update history
+            // 8. update history
             history.push({ role: "user", parts: newParts });
             history.push({ role: "model", parts: [{ text: replyText }] });
 
-            // 8. potong history kalo kepanjangan
+            // 9. potong history kalo kepanjangan
             if (history.length > MAX_HISTORY) {
                 history = history.slice(history.length - MAX_HISTORY);
             }
