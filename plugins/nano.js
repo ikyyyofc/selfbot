@@ -1,234 +1,211 @@
-import axios from "axios";
-import crypto from "crypto";
-import { URL } from "url";
+import fetch from "node-fetch";
 import FormData from "form-data";
-import upload from "../lib/upload.js";
+import crypto from "crypto";
 
-const TEMPMAIL_API = Buffer.from(
-    "aHR0cHM6Ly9hcGkubmVrb2xhYnMud2ViLmlkL3Rvb2xzL3RlbXBtYWlsL3Yx",
-    "base64"
-).toString();
+const headers = {
+    "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36",
+    Accept: "*/*",
+    "Accept-Language": "id-ID,id;q=0.7",
+    Origin: "https://nano-banana-pro.co",
+    Referer: "https://nano-banana-pro.co/",
+    "sec-ch-ua-platform": '"Android"',
+    "sec-ch-ua-mobile": "?1",
+    "sec-gpc": "1",
+    priority: "u=1, i"
+};
 
-const SUPABASE_URL = "https://urrxpnraqkaiickvdtfl.supabase.co";
-const SUPABASE_KEY =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVycnhwbnJhcWthaWlja3ZkdGZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMzNjMsImV4cCI6MjA3NDYxOTM2M30.JFp8mnLQRuHAh7oYTGXFGP9K9hShl_MxMFZAesNjtcE";
+const createTempMail = async () => {
+    try {
+        const r = await fetch("https://api.nekolabs.web.id/tools/tempmail/v1/create");
+        return (await r.json()).result;
+    } catch {
+        return null;
+    }
+};
 
-function generatePKCE() {
-    const verifier = base64URLEncode(crypto.randomBytes(32));
-    const challenge = base64URLEncode(
-        crypto.createHash("sha256").update(verifier).digest()
-    );
-    return { code_verifier: verifier, code_challenge: challenge };
-}
-
-function base64URLEncode(buf) {
-    return buf
-        .toString("base64")
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=/g, "");
-}
+const checkInbox = async id => {
+    try {
+        const r = await fetch(`https://api.nekolabs.web.id/tools/tempmail/v1/inbox?id=${id}`);
+        return (await r.json()).result;
+    } catch {
+        return null;
+    }
+};
 
 export default {
-    execute: async context => {
-        const { m, args, getFile, reply } = context;
-        const prompt = args.join(" ");
+    name: "nano",
+    description: "Edit gambar pake AI Nano Banana Pro",
+    category: "ai",
 
-        if (!m.quoted && !m.isMedia) {
-            return await reply(
-                "kirim/reply gambar dulu bro\ncontoh: .artany ubah jadi anime"
+    async execute({ m, args }) {
+        const text = args.join(" ");
+
+        if (!m.quoted?.isMedia && !m.isMedia) {
+            return await m.reply(
+                `Reply gambar dulu bro!\n\nContoh:\nReply gambar terus ketik:\n.nano jadi anime`
             );
         }
 
-        if (!prompt) {
-            return await reply(
-                "prompt mana bro?\ncontoh: .artany ubah jadi anime"
+        if (!text) {
+            return await m.reply(
+                `Kasih prompt dong!\n\nContoh:\nReply gambar terus ketik:\n.nano jadi anime`
             );
         }
 
-        await m.react("⏳");
+        await m.reply("⏳ lagi edit gambar pake AI nih, tunggu bentar ya...");
 
         try {
-            const buffer = await getFile();
-            if (!buffer) throw "ga bisa download gambar";
+            const emailData = await createTempMail();
+            if (!emailData) {
+                return await m.reply("❌ gagal bikin email temporary bro");
+            }
 
-            const imageUrl = await upload(buffer);
-            if (!imageUrl) throw "gagal upload gambar";
+            const { email, sessionId } = emailData;
+            const password = "Pass" + crypto.randomBytes(4).toString("hex") + "!";
+            const name = "User" + crypto.randomBytes(2).toString("hex");
 
-            const { code_verifier, code_challenge } = generatePKCE();
+            await fetch("https://nano-banana-pro.co/api/auth/sign-up/email", {
+                method: "POST",
+                headers: { ...headers, "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password, name })
+            });
 
-            const mailData = await axios
-                .get(`${TEMPMAIL_API}/create`)
-                .then(r => r.data);
-            if (!mailData.success) throw "ga bisa bikin email temp";
-
-            const { email, sessionId } = mailData.result;
-            const redirectUrl = "http://localhost:3000/callback";
-
-            const headers = {
-                "content-type": "application/json",
-                apikey: SUPABASE_KEY,
-                "user-agent":
-                    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36"
-            };
-
-            await axios.post(
-                `${SUPABASE_URL}/auth/v1/otp?redirect_to=${encodeURIComponent(
-                    redirectUrl
-                )}`,
-                {
-                    email,
-                    create_user: true,
-                    gotrue_meta_security: {},
-                    code_challenge,
-                    code_challenge_method: "s256"
-                },
-                { headers }
-            );
-
-            let authCode = null;
+            let verifyLink = null;
             let attempts = 0;
 
-            while (attempts < 20 && !authCode) {
-                await new Promise(r => setTimeout(r, 2000));
-
-                const inbox = await axios
-                    .get(`${TEMPMAIL_API}/inbox`, {
-                        params: { id: sessionId }
-                    })
-                    .then(r => r.data);
-
-                if (inbox.success && inbox.result.emails?.length) {
-                    const mail = inbox.result.emails[0];
-                    const content = mail.text || mail.html || "";
-                    const match = content.match(
-                        /https:\/\/urrxpnraqkaiickvdtfl\.supabase\.co\/auth\/v1\/verify\?token=[^\s"&]+&type=signup&redirect_to=[^\s"&]+/
-                    );
-
-                    if (match) {
-                        const verifyUrl = match[0].replace(/&amp;/g, "&");
-
-                        const verifyRes = await axios.get(verifyUrl, {
-                            maxRedirects: 0,
-                            validateStatus: s => s >= 200 && s < 400
-                        });
-
-                        const location = verifyRes.headers.location;
-                        if (location) {
-                            const u = new URL(location);
-                            authCode = u.searchParams.get("code");
-                        }
-                    }
+            while (attempts < 20 && !verifyLink) {
+                await delay(3000);
+                const inbox = await checkInbox(sessionId);
+                if (inbox?.emails?.length) {
+                    const body = inbox.emails[0].text || inbox.emails[0].html || "";
+                    const match = body.match(/https:\/\/nano-banana-pro\.co\/api\/auth\/verify-email\?token=[^\s"]+/);
+                    if (match) verifyLink = match[0];
                 }
                 attempts++;
             }
 
-            if (!authCode) throw "ga dapet auth code dari email";
+            if (!verifyLink) {
+                return await m.reply("❌ timeout verifikasi email bro, coba lagi");
+            }
 
-            const exchangeRes = await axios.post(
-                `${SUPABASE_URL}/auth/v1/token?grant_type=pkce`,
-                {
-                    auth_code: authCode,
-                    code_verifier
-                },
-                { headers }
-            );
+            const verifyRes = await fetch(verifyLink, { headers, redirect: "manual" });
+            const rawCookies = verifyRes.headers.raw()["set-cookie"];
+            const cookie = rawCookies ? rawCookies.map(v => v.split(";")[0]).join("; ") : "";
 
-            const { access_token, refresh_token } = exchangeRes.data;
-            if (!access_token) throw "gagal tuker code jadi token";
+            if (!cookie) {
+                return await m.reply("❌ cookie ga ketemu anjir");
+            }
 
-            const authCookie = `sb-urrxpnraqkaiickvdtfl-auth-token=${encodeURIComponent(
-                JSON.stringify([
-                    access_token,
-                    refresh_token,
-                    null,
-                    null,
-                    null
-                ])
-            )}`;
+            const media = await (m.quoted?.isMedia ? m.quoted.download() : m.download());
+            const mime = m.quoted?.msg?.mimetype || m.msg?.mimetype || "image/jpeg";
+            
+            const form = new FormData();
+            form.append("files", media, { filename: "image.jpg", contentType: mime });
 
-            const creditHeaders = {
-                "user-agent": headers["user-agent"],
-                "content-type": "application/json",
-                cookie: authCookie,
-                authority: "www.artany.ai",
-                origin: "https://www.artany.ai",
-                referer: "https://www.artany.ai/"
+            const upRes = await fetch("https://nano-banana-pro.co/api/storage/upload-image", {
+                method: "POST",
+                headers: { ...headers, Cookie: cookie, ...form.getHeaders() },
+                body: form
+            });
+
+            const upJson = await upRes.json();
+            const uploadedUrl = upJson?.data?.urls?.[0];
+
+            if (!uploadedUrl) {
+                return await m.reply("❌ upload gambar gagal bro");
+            }
+
+            const payload = {
+                mediaType: "image",
+                scene: "image-to-image",
+                provider: "kie",
+                model: "nano-banana",
+                prompt: text,
+                options: { image_input: [uploadedUrl] }
             };
 
-            const creditRes = await axios.post(
-                "https://www.artany.ai/api/credits",
-                {},
-                { headers: creditHeaders }
-            );
-            if (creditRes.data?.credits < 1) throw "credit masih 0 bro";
+            const genRes = await fetch("https://nano-banana-pro.co/api/ai/generate", {
+                method: "POST",
+                headers: { ...headers, "Content-Type": "application/json", Cookie: cookie },
+                body: JSON.stringify(payload)
+            });
 
-            const genPayload = {
-                prompt,
-                model: "nano-banana-pro-image-editor",
-                enable_safety_checker: false,
-                num_images: 1,
-                aspect_ratio: "1:1",
-                quality: "1k",
-                image_urls: [imageUrl]
-            };
+            const genJson = await genRes.json();
+            const taskId = genJson?.data?.id;
 
-            const genHeaders = {
-                ...creditHeaders,
-                referer: "https://www.artany.ai/ai-image-editor"
-            };
+            if (!taskId) {
+                return await m.reply("❌ gagal dapet task ID nih");
+            }
 
-            const genRes = await axios.post(
-                "https://www.artany.ai/api/image-generator/nano-banana-pro",
-                genPayload,
-                { headers: genHeaders }
-            );
+            let resultImg = null;
+            let poll = 0;
 
-            const taskId = genRes.data?.data?.task_id;
-            if (!taskId) throw "gagal mulai generate";
+            while (poll < 60 && !resultImg) {
+                await delay(4000);
 
-            let finalImageUrl = null;
-            let status = "PENDING";
-            let checks = 0;
+                const qRes = await fetch("https://nano-banana-pro.co/api/ai/query", {
+                    method: "POST",
+                    headers: { ...headers, "Content-Type": "application/json", Cookie: cookie },
+                    body: JSON.stringify({ taskId })
+                });
 
-            while (!["SUCCEEDED", "FAILED"].includes(status) && checks < 30) {
-                await new Promise(r => setTimeout(r, 2000));
+                const type = qRes.headers.get("content-type") || "";
 
-                const s = await axios.get(
-                    `https://www.artany.ai/api/image-task-status?task_id=${taskId}`,
-                    { headers: genHeaders }
-                );
-
-                status = s.data?.data?.status;
-                if (status === "SUCCEEDED") {
-                    finalImageUrl = s.data?.data?.result_images?.[0]?.url;
+                if (type.includes("image")) {
+                    resultImg = await qRes.buffer();
+                    break;
                 }
-                checks++;
+
+                const json = await qRes.json().catch(() => ({}));
+                const taskStr = json?.data?.taskResult;
+                
+                if (!taskStr) {
+                    poll++;
+                    continue;
+                }
+
+                let task;
+                try {
+                    task = JSON.parse(taskStr);
+                } catch {
+                    poll++;
+                    continue;
+                }
+
+                if (["waiting", "pending"].includes(task.state)) {
+                    poll++;
+                    continue;
+                }
+
+                if (["failed", "error"].includes(task.state)) {
+                    return await m.reply(`❌ task gagal: ${task.failMsg || "unknown error"}`);
+                }
+
+                if (["success", "completed"].includes(task.state)) {
+                    const res = JSON.parse(task.resultJson || "{}");
+                    const url = res?.resultUrls?.[0];
+                    if (!url) {
+                        return await m.reply("❌ URL hasil ga ketemu bro");
+                    }
+                    const dl = await fetch(url);
+                    resultImg = await dl.buffer();
+                    break;
+                }
+
+                poll++;
             }
 
-            if (!finalImageUrl) throw "gagal generate atau timeout";
+            if (!resultImg) {
+                return await m.reply("❌ timeout nih, proses kelamaan coba lagi");
+            }
 
-            await context.sock.sendMessage(
-                m.chat,
-                {
-                    image: { url: finalImageUrl },
-                    caption: `done nih\nprompt: ${prompt}`
-                },
-                { quoted: m }
-            );
+            await m.reply({
+                image: resultImg,
+                caption: `✅ *Nano Banana Pro - AI Edit*\n\n📝 Prompt: ${text}\n🎨 Mode: Image to Image\n⚡ Powered by Nano Banana`
+            });
 
-            await m.react("✅");
         } catch (e) {
-            await m.react("❌");
-            if (e.response) {
-                await reply(
-                    `error api (${e.response.status}): ${JSON.stringify(
-                        e.response.data
-                    )}`
-                );
-            } else {
-                await reply(`error: ${e}`);
-            }
+            await m.reply(`❌ error nih bro: ${e.message}`);
         }
     }
 };
