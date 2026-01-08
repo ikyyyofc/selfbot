@@ -1,155 +1,234 @@
 import axios from "axios";
-import { fileTypeFromBuffer } from "file-type";
+import crypto from "crypto";
+import { URL } from "url";
+import FormData from "form-data";
+import upload from "../lib/upload.js";
 
-// --- gemini api logic ---
-const API_URL = "https://generativelanguage.googleapis.com/";
-const MODEL_URL =
-    "projects/gemmy-ai-bdc03/locations/us-central1/publishers/google/models";
-const MODEL = "gemini-2.5-flash-image"; // model lebih baru, lebih oke buat chat & vision
-const HEADERS = {
-    "content-type": "application/json",
-    "x-goog-api-client": "gl-kotlin/2.1.0-ai fire/16.5.0",
-    "x-goog-api-key": "AIzaSyD6QwvrvnjU7j-R6fkOghfIVKwtvc7SmLk" // ati ati ini api key jangan disebar
-};
+const TEMPMAIL_API = Buffer.from(
+    "aHR0cHM6Ly9hcGkubmVrb2xhYnMud2ViLmlkL3Rvb2xzL3RlbXBtYWlsL3Yx",
+    "base64"
+).toString();
 
-const callGemini = async (history, newParts) => {
-    const contents = [...history, { role: "user", parts: newParts }];
+const SUPABASE_URL = "https://urrxpnraqkaiickvdtfl.supabase.co";
+const SUPABASE_KEY =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVycnhwbnJhcWthaWlja3ZkdGZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMzNjMsImV4cCI6MjA3NDYxOTM2M30.JFp8mnLQRuHAh7oYTGXFGP9K9hShl_MxMFZAesNjtcE";
 
-    try {
-        const r = await axios.post(
-            `${API_URL}/${MODEL_URL}/${MODEL}:generateContent`,
-            { contents },
-            { headers: HEADERS }
-        );
+function generatePKCE() {
+    const verifier = base64URLEncode(crypto.randomBytes(32));
+    const challenge = base64URLEncode(
+        crypto.createHash("sha256").update(verifier).digest()
+    );
+    return { code_verifier: verifier, code_challenge: challenge };
+}
 
-        if (r.status !== 200 || !r.data.candidates?.[0]?.content?.parts) {
-            throw new Error("ga ada hasil dari api, coba lagi ntar");
-        }
-
-        return r.data.candidates[0].content.parts;
-    } catch (error) {
-        console.error(
-            "kesalahan pas manggil api:",
-            error.response?.data || error.message
-        );
-        throw new Error(
-            error.response?.data?.error?.message || "gagal manggil api gemini"
-        );
-    }
-};
-
-// --- plugin logic ---
-const conversationHistory = new Map();
-const MAX_HISTORY = 10; // simpen 5 pasang percakapan (user & model)
+function base64URLEncode(buf) {
+    return buf
+        .toString("base64")
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=/g, "");
+}
 
 export default {
-    command: "nano",
-    description: "ai multi-modal dengan memori percakapan",
-    rules: {
-        text: true
-    },
     execute: async context => {
-        const { m, text, sock, reply, chat } = context;
-        const historyKey = chat;
+        const { m, args, getFile, reply } = context;
+        const prompt = args.join(" ");
 
-        if (text.toLowerCase() === "reset") {
-            conversationHistory.delete(historyKey);
-            await m.react("✅");
-            return reply("memori percakapan di chat ini udah gw reset.");
+        if (!m.quoted && !m.isMedia) {
+            return await reply(
+                "kirim/reply gambar dulu bro\ncontoh: .artany ubah jadi anime"
+            );
         }
 
+        if (!prompt) {
+            return await reply(
+                "prompt mana bro?\ncontoh: .artany ubah jadi anime"
+            );
+        }
+
+        await m.react("⏳");
+
         try {
-            await m.react("🤔");
+            const buffer = await getFile();
+            if (!buffer) throw "ga bisa download gambar";
 
-            // 1. kumpulin semua gambar dari caption & reply
-            const imageBuffers = [];
-            if (m.isMedia) {
-                const buffer = await m.download();
-                if (buffer) imageBuffers.push(buffer);
-            }
-            if (m.quoted && m.quoted.isMedia) {
-                const buffer = await m.quoted.download();
-                if (buffer) imageBuffers.push(buffer);
-            }
+            const imageUrl = await upload(buffer);
+            if (!imageUrl) throw "gagal upload gambar";
 
-            // 2. siapin parts buat prompt sekarang
-            const newParts = [{ text }];
-            for (const buffer of imageBuffers) {
-                const type = await fileTypeFromBuffer(buffer);
-                if (type) {
-                    newParts.push({
-                        inlineData: {
-                            mimeType: type.mime,
-                            data: buffer.toString("base64")
-                        }
-                    });
-                }
-            }
+            const { code_verifier, code_challenge } = generatePKCE();
 
-            // 3. ambil history percakapan
-            let history = conversationHistory.get(historyKey) || [];
+            const mailData = await axios
+                .get(`${TEMPMAIL_API}/create`)
+                .then(r => r.data);
+            if (!mailData.success) throw "ga bisa bikin email temp";
 
-            // 4. panggil ai
-            const resultParts = await callGemini(history, newParts);
+            const { email, sessionId } = mailData.result;
+            const redirectUrl = "http://localhost:3000/callback";
 
-            // 5. proses hasil dari ai
-            const responseTexts = [];
-            const responseImages = [];
-            for (const part of resultParts) {
-                if (part.text) {
-                    responseTexts.push(part.text);
-                }
-                if (part.inlineData) {
-                    responseImages.push(
-                        Buffer.from(part.inlineData.data, "base64")
+            const headers = {
+                "content-type": "application/json",
+                apikey: SUPABASE_KEY,
+                "user-agent":
+                    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36"
+            };
+
+            await axios.post(
+                `${SUPABASE_URL}/auth/v1/otp?redirect_to=${encodeURIComponent(
+                    redirectUrl
+                )}`,
+                {
+                    email,
+                    create_user: true,
+                    gotrue_meta_security: {},
+                    code_challenge,
+                    code_challenge_method: "s256"
+                },
+                { headers }
+            );
+
+            let authCode = null;
+            let attempts = 0;
+
+            while (attempts < 20 && !authCode) {
+                await new Promise(r => setTimeout(r, 2000));
+
+                const inbox = await axios
+                    .get(`${TEMPMAIL_API}/inbox`, {
+                        params: { id: sessionId }
+                    })
+                    .then(r => r.data);
+
+                if (inbox.success && inbox.result.emails?.length) {
+                    const mail = inbox.result.emails[0];
+                    const content = mail.text || mail.html || "";
+                    const match = content.match(
+                        /https:\/\/urrxpnraqkaiickvdtfl\.supabase\.co\/auth\/v1\/verify\?token=[^\s"&]+&type=signup&redirect_to=[^\s"&]+/
                     );
+
+                    if (match) {
+                        const verifyUrl = match[0].replace(/&amp;/g, "&");
+
+                        const verifyRes = await axios.get(verifyUrl, {
+                            maxRedirects: 0,
+                            validateStatus: s => s >= 200 && s < 400
+                        });
+
+                        const location = verifyRes.headers.location;
+                        if (location) {
+                            const u = new URL(location);
+                            authCode = u.searchParams.get("code");
+                        }
+                    }
                 }
+                attempts++;
             }
-            const replyText =
-                responseTexts.join("\n\n").trim() ||
-                "ga ada jawaban yg bisa gw kasih, coba tanya yg laen.";
-                
-            // 6. siapin tombol reset
-            const buttons = [{ id: ".nano reset", text: "Reset Konteks" }];
-            const footer = "tekan tombol untuk memulai percakapan baru";
 
-            // 7. kirim balasan
-            if (responseImages.length === 0) {
-                await sock.sendButtons(m.chat, 
-                    { text: replyText, buttons, footer }, 
-                    { quoted: m }
+            if (!authCode) throw "ga dapet auth code dari email";
+
+            const exchangeRes = await axios.post(
+                `${SUPABASE_URL}/auth/v1/token?grant_type=pkce`,
+                {
+                    auth_code: authCode,
+                    code_verifier
+                },
+                { headers }
+            );
+
+            const { access_token, refresh_token } = exchangeRes.data;
+            if (!access_token) throw "gagal tuker code jadi token";
+
+            const authCookie = `sb-urrxpnraqkaiickvdtfl-auth-token=${encodeURIComponent(
+                JSON.stringify([
+                    access_token,
+                    refresh_token,
+                    null,
+                    null,
+                    null
+                ])
+            )}`;
+
+            const creditHeaders = {
+                "user-agent": headers["user-agent"],
+                "content-type": "application/json",
+                cookie: authCookie,
+                authority: "www.artany.ai",
+                origin: "https://www.artany.ai",
+                referer: "https://www.artany.ai/"
+            };
+
+            const creditRes = await axios.post(
+                "https://www.artany.ai/api/credits",
+                {},
+                { headers: creditHeaders }
+            );
+            if (creditRes.data?.credits < 1) throw "credit masih 0 bro";
+
+            const genPayload = {
+                prompt,
+                model: "nano-banana-pro-image-editor",
+                enable_safety_checker: false,
+                num_images: 1,
+                aspect_ratio: "1:1",
+                quality: "1k",
+                image_urls: [imageUrl]
+            };
+
+            const genHeaders = {
+                ...creditHeaders,
+                referer: "https://www.artany.ai/ai-image-editor"
+            };
+
+            const genRes = await axios.post(
+                "https://www.artany.ai/api/image-generator/nano-banana-pro",
+                genPayload,
+                { headers: genHeaders }
+            );
+
+            const taskId = genRes.data?.data?.task_id;
+            if (!taskId) throw "gagal mulai generate";
+
+            let finalImageUrl = null;
+            let status = "PENDING";
+            let checks = 0;
+
+            while (!["SUCCEEDED", "FAILED"].includes(status) && checks < 30) {
+                await new Promise(r => setTimeout(r, 2000));
+
+                const s = await axios.get(
+                    `https://www.artany.ai/api/image-task-status?task_id=${taskId}`,
+                    { headers: genHeaders }
                 );
-            } else if (responseImages.length === 1) {
-                await sock.sendButtons(m.chat, {
-                    image: responseImages[0],
-                    caption: replyText,
-                    buttons,
-                    footer
-                }, { quoted: m });
-            } else {
-                await sock.sendButtons(m.chat,
-                    { text: replyText, buttons, footer },
-                    { quoted: m }
-                );
-                const albumContent = responseImages.map(img => ({ image: img }));
-                await sock.sendAlbumMessage(m.chat, albumContent, m);
+
+                status = s.data?.data?.status;
+                if (status === "SUCCEEDED") {
+                    finalImageUrl = s.data?.data?.result_images?.[0]?.url;
+                }
+                checks++;
             }
 
-            // 8. update history
-            history.push({ role: "user", parts: newParts });
-            history.push({ role: "model", parts: [{ text: replyText }] });
+            if (!finalImageUrl) throw "gagal generate atau timeout";
 
-            // 9. potong history kalo kepanjangan
-            if (history.length > MAX_HISTORY) {
-                history = history.slice(history.length - MAX_HISTORY);
-            }
-            conversationHistory.set(historyKey, history);
+            await context.sock.sendMessage(
+                m.chat,
+                {
+                    image: { url: finalImageUrl },
+                    caption: `done nih\nprompt: ${prompt}`
+                },
+                { quoted: m }
+            );
 
             await m.react("✅");
-        } catch (error) {
-            console.error("nano plugin error:", error);
-            await reply(`waduh error: ${error.message}`);
+        } catch (e) {
             await m.react("❌");
+            if (e.response) {
+                await reply(
+                    `error api (${e.response.status}): ${JSON.stringify(
+                        e.response.data
+                    )}`
+                );
+            } else {
+                await reply(`error: ${e}`);
+            }
         }
     }
 };
