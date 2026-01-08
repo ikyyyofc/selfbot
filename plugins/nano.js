@@ -2,7 +2,7 @@ import axios from "axios";
 import { fileTypeFromBuffer } from "file-type";
 
 // --- gemini api logic ---
-const API_URL = "https://firebasevertexai.googleapis.com/v1beta";
+const API_URL = "https://generativelanguage.googleapis.com/";
 const MODEL_URL =
     "projects/gemmy-ai-bdc03/locations/us-central1/publishers/google/models";
 const MODEL = "gemini-2.5-flash-image"; // model lebih baru, lebih oke buat chat & vision
