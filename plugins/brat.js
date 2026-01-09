@@ -14,7 +14,7 @@ export default {
         }
 
         try {
-            const apiUrl = "https://api.nekolabs.web.id/canvas/brat/v1";
+            const apiUrl = "https://api.nekolabs.web.id/canvas/brat";
             const apiResponse = await axios.post(
                 apiUrl,
                 { text: text },
