@@ -135,16 +135,16 @@ export default {
 
         m.react("💦");
         try {
-            const response = await gmn({
+           /* const response = await gmn({
                 message: payload.text,
                 instruction: payload.systemPrompt
-            });
-            /*const response = (
+            });*/
+            const response = (
                 await axios.post(
-                    "https://api.nekolabs.web.id/text-generation/claude/opus-4.5",
+                    "https://api.nekolabs.web.id/text.gen/gemini/2.5-pro",
                     payload
                 )
-            ).data.result.response;*/
+            ).data.result;
             /*const response = (
                 await axios.post("https://wudysoft.xyz/api/ai/anthropic", {
                     model: "claude-opus-4-5",
