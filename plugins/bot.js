@@ -1,5 +1,4 @@
 import util from "util";
-import gmn from "../lib/gemini.js";
 import axios from "axios";
 import up from "../lib/upload.js";
 async function displayFilesInFolder(folderPath, options = {}) {
