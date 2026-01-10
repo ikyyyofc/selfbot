@@ -137,7 +137,7 @@ export default {
         try {
             const response = await gmn({
                 message: payload.text,
-                //instruction: payload.systemPrompt
+                instruction: payload.systemPrompt
             });
             /*const response = (
                 await axios.post(
