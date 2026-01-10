@@ -1,81 +1,37 @@
-import os from "os";
+import time from '../lib/TimeHelper.js'
+const config = (await import('../config.js')).default
 
 export default {
-    async execute({ sock, m, state }) {
-        const config = (await import("../config.js")).default;
-        
-        const plugins = Array.from(state.plugins.keys()).sort();
-        const totalPlugins = plugins.length;
-        
-        const uptime = process.uptime();
-        const hours = Math.floor(uptime / 3600);
-        const minutes = Math.floor((uptime % 3600) / 60);
-        const seconds = Math.floor(uptime % 60);
-        const uptimeStr = hours > 0 
-            ? `${hours}j ${minutes}m ${seconds}d`
-            : minutes > 0 
-            ? `${minutes}m ${seconds}d`
-            : `${seconds}d`;
-        
-        const memUsed = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
-        const memTotal = Math.round(os.totalmem() / 1024 / 1024 / 1024 * 100) / 100;
-        const cpuModel = os.cpus()[0]?.model?.split(" ").slice(0, 3).join(" ") || "Unknown";
-        const platform = os.platform();
-        const nodeVer = process.version;
-        
-        const now = new Date().toLocaleString("id-ID", { 
-            timeZone: "Asia/Jakarta",
-            day: "numeric",
-            month: "long", 
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit"
-        });
-        
-        const prefix = config.PREFIX[0];
-        const commandList = plugins.map((cmd, i) => `│ ${i + 1}. ${prefix}${cmd}`).join("\n");
-        
-        const menu = `
-┏━━━━━━━━━━━━━━━━━━━━━┓
-┃    ${config.BOT_NAME} MENU
-┗━━━━━━━━━━━━━━━━━━━━━┛
+    execute: async (context) => {
+        const { m, state, reply } = context
+        const commands = [...state.plugins.keys()].sort()
+        const prefix = config.PREFIX[0]
+        const senderName = m.pushName || 'manusia gajelas'
+        const botName = config.BOT_NAME || 'bot'
+        const ownerName = config.OWNER_NAME || 'owner'
 
-┏━━━「 INFO BOT 」━━━┓
-│ 
-│ 📛 nama: ${config.BOT_NAME}
-│ 👤 owner: ${config.OWNER_NAME}
-│ 🎭 mode: ${config.BOT_MODE}
-│ 📅 waktu: ${now}
-│ 
-┗━━━━━━━━━━━━━━━━━━━━━┛
+        const hour = time.getWIBHour()
+        let greeting
+        if (hour < 11) {
+            greeting = 'pagi'
+        } else if (hour < 15) {
+            greeting = 'siang'
+        } else if (hour < 19) {
+            greeting = 'sore'
+        } else {
+            greeting = 'malem'
+        }
 
-┏━━━「 SISTEM 」━━━┓
-│ 
-│ ⏱️ uptime: ${uptimeStr}
-│ 💾 ram: ${memUsed} MB
-│ 💻 os: ${platform}
-│ 🟢 node: ${nodeVer}
-│ ⚙️ cpu: ${cpuModel}
-│ 
-┗━━━━━━━━━━━━━━━━━━━━━┛
+        let menuText = `halo ${senderName} selamat ${greeting}\n`
+        menuText += `gw ${botName.toLowerCase()} bot wa buatan ${ownerName.toLowerCase()}\n\n`
+        menuText += 'nih daftar command yg ada:\n\n'
 
-┏━━━「 COMMANDS 」━━━┓
-│ 
-│ 📊 total: ${totalPlugins} perintah
-│ 
-${commandList}
-│ 
-┗━━━━━━━━━━━━━━━━━━━━━┛
+        for (const cmd of commands) {
+            menuText += ` › ${prefix}${cmd}\n`
+        }
 
-┏━━━「 SPECIAL 」━━━┓
-│ 
-│ > eval javascript
-│ => eval dengan return
-│ $ exec terminal
-│ 
-┗━━━━━━━━━━━━━━━━━━━━━┛
-`.trim();
+        menuText += `\npake command nya yg bener jgn nyepam tolol`
 
-        await m.reply(menu);
+        await reply(menuText.trim())
     }
-};
+}
