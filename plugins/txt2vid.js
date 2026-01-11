@@ -1,68 +1,78 @@
-import axios from 'axios';
+import axios from 'axios'
+
+const API_CREATE = 'https://api.nekolabs.web.id/video.gen/sora/create'
+const API_GET = 'https://api.nekolabs.web.id/video.gen/sora/get'
+const POLLING_INTERVAL = 15000 
+const MAX_WAIT_TIME = 30 * 60 * 1000 
 
 export default {
-    desc: 'Create video from text using AI',
-    usage: '.txt2vid <prompt>',
-    rules: {
-        limit: 5,
-        premium: true
-    },
-    async execute({ m, text, sock, reply }) {
+    name: 'sora',
+    aliases: ['soraai', 'aivideo'],
+    
+    execute: async ({ m, text, reply, sock }) => {
         if (!text) {
-            return await reply(`Provide a prompt to generate the video.\n\nExample: \`${this.usage}\``);
+            return await reply('promptnya mana anjg')
         }
 
         try {
-            await reply('⏳ Generating video from your prompt, please wait a moment...');
+            await m.react('⏳')
+            const initialMsg = await reply(`sabar cok, lagi dibuatin video dari prompt: "${text}". prosesnya bisa sampe setengah jam, jangan di spam ya anjg.`)
 
-            const generateUrl = `https://wudysoft.xyz/api/ai/muapi?action=generate&tools=openai-sora-2-pro-text-to-video&prompt=${encodeURIComponent(text)}&aspect_ratio=9:16`;
-            const generateRes = await axios.get(generateUrl);
+            const createRes = await axios.get(API_CREATE, {
+                params: {
+                    prompt: text,
+                    ratio: '16:9'
+                }
+            })
 
-            if (generateRes.data.status !== 'processing' || !generateRes.data.request_id) {
-                throw new Error(generateRes.data.error || 'Failed to start video generation process.');
+            if (!createRes.data.success || !createRes.data.result?.id) {
+                await m.react('❌')
+                return await reply('gagal mulai sesi generate video, api nya error kali')
             }
 
-            const taskId = generateRes.data.request_id;
-            const pollUrl = `https://wudysoft.xyz/api/ai/muapi?action=status&task_id=${taskId}`;
-            
-            const startTime = Date.now();
-            const timeout = 15 * 60 * 1000;
-            let videoUrl = null;
+            const taskId = createRes.data.result.id
+            const startTime = Date.now()
 
-            while (Date.now() - startTime < timeout) {
-                await new Promise(resolve => setTimeout(resolve, 10000)); 
+            while (Date.now() - startTime < MAX_WAIT_TIME) {
+                await delay(POLLING_INTERVAL)
+                
+                const statusRes = await axios.get(API_GET, {
+                    params: { id: taskId }
+                })
 
-                const pollRes = await axios.get(pollUrl);
-                const status = pollRes.data.status;
-
-                if (status === 'completed') {
-                    if (pollRes.data.outputs && pollRes.data.outputs.length > 0) {
-                        videoUrl = pollRes.data.outputs[0];
-                        break;
-                    } else {
-                        throw new Error('Process completed but no video URL was found.');
+                if (statusRes.data.success) {
+                    const { status, output } = statusRes.data.result
+                    
+                    if (status === 'succeeded' && output) {
+                        await m.react('✅')
+                        await sock.sendMessage(m.chat, { 
+                            video: { url: output }, 
+                            caption: `nih video lu anjg\n\nprompt: ${text}`
+                        }, { quoted: m })
+                        
+                        // edit pesan awal kalo bisa (opsional)
+                        if (initialMsg.key) {
+                           await sock.sendMessage(m.chat, {
+                                delete: initialMsg.key
+                           })
+                        }
+                        return
                     }
-                } else if (status === 'failed' || pollRes.data.error) {
-                    throw new Error(pollRes.data.error || 'Video generation failed.');
+
+                    if (status === 'failed' || status === 'error') {
+                        await m.react('❌')
+                        return await reply(`prosesnya gagal di tengah jalan, status: ${status}`)
+                    }
                 }
             }
+            
+            await m.react('❌')
+            await reply('udah 30 menit kaga jadi jadi videonya, timeout anjg. coba lagi aja ntar.')
 
-            if (!videoUrl) {
-                throw new Error('Video generation timed out after 15 minutes.');
-            }
-
-            await sock.sendMessage(
-                m.chat, 
-                { 
-                    video: { url: videoUrl },
-                    caption: `✅ Video generated!\n\n*Prompt:* ${text}` 
-                }, 
-                { quoted: m }
-            );
-
-        } catch (error) {
-            console.error(error);
-            await reply(`❌ An error occurred: ${error.message}`);
+        } catch (e) {
+            console.error(e)
+            await m.react('❌')
+            await reply(`error cok, gatau kenapa. cek console aja.\n\n${e.message}`)
         }
     }
-};
+}
