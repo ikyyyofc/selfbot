@@ -140,7 +140,7 @@ export default {
             });*/
             const response = (
                 await axios.post(
-                    "https://api.nekolabs.web.id/text.gen/gemini/2.5-pro",
+                    "https://api.nekolabs.web.id/text.gen/gpt/4.1",
                     payload
                 )
             ).data.result;
