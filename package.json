@@ -33,6 +33,7 @@
         "sharp": "latest",
         "uuid": "latest",
         "wa-sticker-formatter": "latest",
-        "ws": "latest"
+        "ws": "latest",
+        "yt-search": "latest"
     }
 }
