@@ -1,34 +1,34 @@
+import axios from "axios"
+import yts from "yt-search"
+
 export default {
-  desc: "memutar lagu",
-    rules: {
-        limit: 3
-    },
-    async execute({ sock, text, reply, m }) {
+    execute: async ({ sock, m, text }) => {
+        if (!text) return m.reply("mau denger lagu apa goblok tulis judulnya")
         try {
-            if (!text) return reply("judulnya apa anjir");
-            let proses = await (
-                await fetch(
-                    `https://api.nekolabs.web.id/downloader/youtube/play/v1?q=${text}`
-                )
-            ).json();
-            if (!proses.success) return reply("gagal jir");
-            reply({
-                audio: { url: proses.result.downloadUrl },
-                mimetype: "audio/mpeg",
-                fileName: `${proses.result.metadata.title}.mp3`,
+            let res = await yts(text)
+            let vid = res.videos[Math.floor(Math.random() * res.videos.length)]
+            if (!vid) return m.reply("kagak ketemu anjing ganti judul lain")
+            let { data } = await axios.get(`https://api.nekolabs.web.id/downloader/youtube/v5?url=${encodeURIComponent(vid.url)}`)
+            if (!data.success) return m.reply("api nya lg ampas kek muka lu")
+            let aud = data.result.adaptiveFormats.find(f => f.itag === 140)?.url || data.result.formats[0].url
+            await sock.sendMessage(m.chat, {
+                audio: { url: aud },
+                mimetype: "audio/mp4",
+                ptt: false,
                 contextInfo: {
                     externalAdReply: {
-                        title: proses.result.metadata.title,
-                        body: `${proses.result.metadata.channel}`,
-                        thumbnailUrl: proses.result.metadata.cover,
+                        title: data.result.title,
+                        body: vid.author.name,
+                        thumbnailUrl: vid.thumbnail,
+                        sourceUrl: vid.url,
                         mediaType: 1,
-                        showAdAttribution: false,
                         renderLargerThumbnail: true
                     }
                 }
-            });
-        } catch {
-            reply("ntahlah error pluginnya");
+            }, { quoted: m })
+        } catch (e) {
+            console.log(e)
+            m.reply("error mampus lagian lu banyak gaya")
         }
     }
-};
+}
