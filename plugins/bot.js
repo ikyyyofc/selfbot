@@ -134,16 +134,16 @@ export default {
 
         m.react("💦");
         try {
-           /* const response = await gmn({
-                message: payload.text,
-                instruction: payload.systemPrompt
-            });*/
-            const response = (
+            const response = await gmn([
+                { role: "system", content: payload.systemPrompt },
+                { role: "user", content: payload.text }
+            ]);
+            /*    const response = (
                 await axios.post(
                     "https://api.nekolabs.web.id/text.gen/gpt/4.1",
                     payload
                 )
-            ).data.result;
+            ).data.result;*/
             /*const response = (
                 await axios.post("https://wudysoft.xyz/api/ai/anthropic", {
                     model: "claude-opus-4-5",
