@@ -40,7 +40,7 @@ export default {
             }, { quoted: m })
 
         } catch (e) {
-            reply("ah elah error nih palak bapak lu")
+            reply("ah elah error nih palak bapak lu: \n\n" + jsonFormat(e));
         }
     }
 }
