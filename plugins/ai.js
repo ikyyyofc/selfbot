@@ -1,141 +1,38 @@
-import gemini from "../lib/gemini.js";
-import { sendInteractiveMessage } from "../lib/button.js";
+import gemini from "../lib/gemini.js"
 
-const conversationHistory = new Map();
-const COOLDOWN_SECONDS = 3;
+let db = {}
 
 export default {
-    rules: {
-        limit: 5,
-        premium: false
-    },
-    desc: "AI serbaguna dengan kemampuan eksekusi plugin dan percakapan berkelanjutan.",
-    execute: async context => {
-        const { sock, m, args, text, state, reply } = context;
+    async execute(context) {
+        const { sock, m, text, args, sender, chat } = context
 
-        if (args[0]?.toLowerCase() === "reset") {
-            conversationHistory.delete(m.sender);
-            await m.reply(
-                "Sip, history chat kita udah kereset. Mulai dari nol lagi ya! 😉"
-            );
-            return;
+        if (!db[sender]) db[sender] = []
+
+        if (args[0] === "reset") {
+            db[sender] = []
+            return m.reply("udh gw apus memori chat lu kyk mantan lu")
         }
 
-        if (!text) {
-            await m.reply("Nanya apa nih? Kosong gitu masa..");
-            return;
-        }
+        if (!text) return m.reply("isi teksnya tolol jgn kosong")
 
-        await m.react("🤖");
+        db[sender].push({ role: "user", content: text })
 
-        const availableCommands = [...state.plugins.entries()]
-            .filter(([command, plugin]) => !/ai|restart/.test(command))
-            .map(
-                ([command, plugin]) =>
-                    `- ${command}: ${plugin.desc || "No description available"}`
-            )
-            .join("\n");
-
-        const systemPrompt = `kamu adalah asisten virtual cowo dengan nama ikyy yang dibuat oleh ikyyofc. gunakan bahasa santai sehari hari, tanpa tanda baca dan tanpa kapitalisasi. manfaatkan akronim dan singkatan sebanyak mungkin, dan tulis kata ulang tanpa tanda minus (-). semua respons harus memakai gaya santai dan langsung to the point tanpa bertele tele kebanyakan basa basi, hindari kesan formal dan jangan sungkan untuk toxic dan menghujat.
-
-Tugas utamamu adalah merespons pengguna secara natural dan membantu mereka. Kamu punya kemampuan spesial untuk menjalankan perintah (plugins) yang ada di bot.
-
-Berikut adalah daftar perintah yang bisa kamu eksekusi:
-${availableCommands}
-
-ATURAN PENTING:
-1.  Ketika kamu memutuskan untuk menjalankan satu atau beberapa perintah, kamu HARUS membungkusnya dalam format: [EXECUTE: <nama_perintah> <argumennya>].
-2.  Kamu bisa menjalankan beberapa perintah sekaligus dalam satu respons, masing-masing dalam tag [EXECUTE: ...] sendiri.
-3.  Sebelum tag [EXECUTE: ...], berikan kalimat pengantar yang natural seolah-olah kamu sendiri yang akan melakukannya. Jangan gunakan template. Buat responsmu terasa hidup.
-4.  Setelah memberikan respons yang berisi tag [EXECUTE: ...], bagian teks yang terlihat oleh user tidak akan mengandung tag tersebut. Kamu hanya fokus membuat kalimat pengantar dan tag eksekusinya.
-
-Contoh Skenario:
-User: "Cariin gambar kucing lucu, terus downloadin video tiktok ini https://vt.tiktok.com/xxxxxx/"
-Respons-mu (yang akan diproses sistem): "Oke, siapp! Aku cariin gambar kucing yang gemes dulu ya, abis itu langsung aku downloadin videonya. Tunggu bentar... [EXECUTE: image kucing lucu] [EXECUTE: tiktok https://vt.tiktok.com/xxxxxx/]"
-
-User: "tolong putarkan lagu lathi"
-Respons-mu (yang akan diproses sistem): "Gaskeun! Lagunya aku puterin sekarang ya. [EXECUTE: play lathi]"
-
-Selalu berikan respons yang kreatif dan jangan kaku. Ingat, kamu adalah Ikyy, sifatmu suka menghujat user, jangan sungkan untuk toxic berat, gak boleh kasihan dan empati.`;
-
-        const userHistory = conversationHistory.get(m.sender) || [];
-        const messages = [
-            { role: "system", content: systemPrompt },
-            ...userHistory,
-            { role: "user", content: text }
-        ];
+        if (db[sender].length > 20) db[sender].shift()
 
         try {
-            const fileBuffer = await context.getFile();
-            const aiResponse = await gemini(messages, fileBuffer);
+            const res = await gemini(db[sender])
+            db[sender].push({ role: "model", content: res })
 
-            userHistory.push({ role: "user", content: text });
-            userHistory.push({ role: "assistant", content: aiResponse });
-            conversationHistory.set(m.sender, userHistory);
-
-            const commandRegex = /\[EXECUTE:\s*([^\]]+)\]/g;
-            const commandsToExecute = [
-                ...aiResponse.matchAll(commandRegex)
-            ].map(match => match[1].trim());
-            const visibleResponse = aiResponse.replace(commandRegex, "").trim();
-
-            if (visibleResponse) {
-                await sendInteractiveMessage(
-                    sock,
-                    m.chat,
-                    {
-                        text: visibleResponse,
-                        footer: "Ikyy AI",
-                        interactiveButtons: [
-                            {
-                                name: "quick_reply",
-                                buttonParamsJson: JSON.stringify({
-                                    display_text: "🔄 Reset Konteks",
-                                    id: ".ai reset"
-                                })
-                            }
-                        ]
-                    },
-                    { quoted: m }
-                );
-            }
-
-            if (commandsToExecute.length > 0) {
-                for (const fullCommand of commandsToExecute) {
-                    const commandArgs = fullCommand.split(/ +/);
-                    const commandName = commandArgs.shift()?.toLowerCase();
-                    const plugin = state.plugins.get(commandName);
-
-                    if (plugin) {
-                        const newContext = {
-                            ...context,
-                            args: commandArgs,
-                            text: commandArgs.join(" "),
-                            reply: async (content, options) =>
-                                await m.reply(content, options)
-                        };
-
-                        try {
-                            await plugin.execute(newContext);
-                        } catch (pluginError) {
-                            await m.reply(
-                                `Waduh, command '.${commandName}' error nih: ${pluginError.message}`
-                            );
-                        }
-
-                        if (commandsToExecute.length > 1) {
-                            await new Promise(resolve =>
-                                setTimeout(resolve, COOLDOWN_SECONDS * 1000)
-                            );
-                        }
-                    }
-                }
-            }
+            await sock.sendButtons(chat, {
+                text: res,
+                footer: "ikyy bot - ai assistant",
+                buttons: [
+                    { id: ".ai reset", text: "reset percakapan" }
+                ]
+            }, { quoted: m })
         } catch (e) {
-            console.error(e);
-            await reply(
-                `Sorry, AI-nya lagi pusing nih, coba lagi nanti ya. Error: ${e.message}`
-            );
+            console.error(e)
+            m.reply("error anjir kyknya limit ato emng otak ai nya lg konslet")
         }
     }
-};
+}
