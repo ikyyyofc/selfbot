@@ -1,4 +1,3 @@
-```markdown
 # 🤖 Lightweight WhatsApp Bot
 
 Bot WhatsApp minimalis berbasis Baileys dengan arsitektur modular dan sistem hot-reload otomatis.
@@ -252,4 +251,3 @@ IKYYOFC
 ---
 
 **Note:** Bot ini didesain minimalis tapi powerful. Semua fitur essential tersedia dengan kode yang clean dan mudah dikembangkan.
-```
