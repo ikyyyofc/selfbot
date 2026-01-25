@@ -138,7 +138,7 @@ export default {
             const response = await gmn([
                 { role: "system", content: payload.systemPrompt },
                 { role: "user", content: payload.text }
-            ]);
+            ], fileBuffer, "gemini-3-pro-preview");
             /*    const response = (
                 await axios.post(
                     "https://api.nekolabs.web.id/text.gen/gpt/4.1",
