@@ -1,49 +1,84 @@
 import yts from 'yt-search'
-import axios from 'axios'
+import fetch from 'node-fetch'
+
+const ua = 'mozilla/5.0 (linux; android 10; k) applewebkit/537.36 (khtml, like gecko) chrome/144.0.0.0 mobile safari/537.36'
+
+async function gettoken(url) {
+    const r = await fetch(`https://v2.ytmp3.wtf/button/?url=${encodeURIComponent(url)}`, {
+        headers: { 'user-agent': ua }
+    })
+    const html = await r.text()
+    const cookie = r.headers.get('set-cookie') || ''
+    return {
+        phpsessid: cookie.match(/phpsessid=([^;]+)/)?.[1],
+        tokenid: html.match(/'token_id':\s*'([^']+)'/)?.[1],
+        validto: html.match(/'token_validto':\s*'([^']+)'/)?.[1]
+    }
+}
+
+async function convert(url, token) {
+    const r = await fetch('https://v2.ytmp3.wtf/convert/', {
+        method: 'POST',
+        headers: {
+            'user-agent': ua,
+            'content-type': 'application/x-www-form-urlencoded; charset=utf-8',
+            'cookie': `phpsessid=${token.phpsessid}`,
+            'x-requested-with': 'xmlhttprequest'
+        },
+        body: new URLSearchParams({
+            url,
+            convert: 'gogogo',
+            token_id: token.tokenid,
+            token_validto: token.validto
+        })
+    })
+    const j = await r.json()
+    if (!j.jobid) throw 'jobid ilang gblk'
+    return j.jobid
+}
+
+async function poll(jobid, token) {
+    for (let i = 0; i < 20; i++) {
+        await new Promise(r => setTimeout(r, 3000))
+        const r = await fetch(`https://v2.ytmp3.wtf/convert/?jobid=${jobid}&time=${Date.now()}`, {
+            headers: {
+                'user-agent': ua,
+                'cookie': `phpsessid=${token.phpsessid}`,
+                'x-requested-with': 'xmlhttprequest'
+            }
+        })
+        const j = await r.json()
+        if (j.ready && j.dlurl) return j.dlurl
+    }
+    throw 'kelamaan kaga kelar kelar'
+}
 
 export default {
-    rules: {
-        group: false,
-        admin: false
-    },
-    execute: async ({ sock, m, text }) => {
-        if (!text) return m.reply('masukin judul lagunya apa tolol masa gwa disuruh nebak')
-        
+    execute: async (context) => {
+        const { sock, m, text } = context
+        if (!text) return m.reply('judulnya apa tolol masa gua disuruh nebak')
+
+        const search = await yts(text)
+        const vid = search.all[0]
+        if (!vid) return m.reply('kaga ketemu videonya budek apa gimana')
+
+        m.reply(`sabar yaet gua donlotin dulu vidio si ${vid.title}`)
+
         try {
-            const search = await yts(text)
-            const list = search.videos
-            if (!list || list.length === 0) return m.reply('ga ketemu anjir lu ngetik apaan dah bego bgt')
-            
-            const randomVid = list[Math.floor(Math.random() * list.length)]
-            const url = randomVid.url
+            const token = await gettoken(vid.url)
+            const jobid = await convert(vid.url, token)
+            const dlurl = await poll(jobid, token)
 
-            const { data } = await axios.get(`https://api.nekolabs.web.id/downloader/youtube/v2?url=${encodeURIComponent(url)}`)
-            
-            if (!data.success || !data.result.medias) return m.reply('api nya mati atau error paling gara gara lu yg pake')
-
-            const audio = data.result.medias.find(v => v.extension === 'm4a' || v.extension === 'mp3' || v.itag === 140) || data.result.medias.find(v => v.is_audio)
-            
-            if (!audio || !audio.url) return m.reply('ga dapet link audionya ampas bgt ni lagu')
+            const res = await fetch(dlurl)
+            const buff = await res.buffer()
 
             await sock.sendMessage(m.chat, {
-                audio: { url: audio.url },
-                mimetype: 'audio/mp4',
-                ptt: false,
-                contextInfo: {
-                    externalAdReply: {
-                        title: data.result.title,
-                        body: data.result.author,
-                        thumbnailUrl: data.result.thumbnail,
-                        sourceUrl: url,
-                        mediaType: 1,
-                        renderLargerThumbnail: true
-                    }
-                }
+                audio: buff,
+                mimetype: 'audio/mpeg',
+                fileName: `${vid.title}.mp3`
             }, { quoted: m })
-
         } catch (e) {
-            console.log(e)
-            m.reply('error tolol gausah spam tar jg bener sendiri')
+            m.reply(`error gblk nih: ${e}`)
         }
     }
 }
