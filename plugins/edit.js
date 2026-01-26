@@ -12,7 +12,7 @@ const CONFIG = {
 };
 
 const HEADERS = {
-    "product-serial": "367c957aa6b1ffb6cf7107c247f552e9",
+    /*"product-serial": "367c957aa6b1ffb6cf7107c247f552e9",*/
     "user-agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36",
     "origin": "https://photoeditorai.io",
     "referer": "https://photoeditorai.io/"
