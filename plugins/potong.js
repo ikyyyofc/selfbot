@@ -1,75 +1,81 @@
 import fs from "fs";
 import path from "path";
-import { tmpdir } from "os";
 import ffmpeg from "fluent-ffmpeg";
+import { promisify } from "util";
+
+const getDuration = (filePath) => {
+    return new Promise((resolve, reject) => {
+        ffmpeg.ffprobe(filePath, (err, metadata) => {
+            if (err) return reject(err);
+            resolve(metadata.format.duration);
+        });
+    });
+};
+
+const splitChunk = (inputPath, start, duration, outputPath) => {
+    return new Promise((resolve, reject) => {
+        ffmpeg(inputPath)
+            .setStartTime(start)
+            .setDuration(duration)
+            .outputOptions(["-c copy", "-map 0"])
+            .save(outputPath)
+            .on("end", () => resolve(outputPath))
+            .on("error", (err) => reject(err));
+    });
+};
 
 export default {
-    name: "cutvideo",
-    description: "Potong video panjang jadi part 60 detik",
-    cmd: ["cutvideo", "potongvideo", "splitvideo"],
-    run: async ({ sock, m, getFile, chat }) => {
-        if (!m.quoted && !m.isMedia) return m.reply("Mana videonya kocak? Reply atau kirim video dong.");
-        
-        const type = m.quoted ? m.quoted.mimetype : m.msg.mimetype;
-        if (!type || !type.includes("video")) return m.reply("Itu bukan video, bjir.");
+    name: "splitvideo",
+    aliases: ["potongvideo", "split"],
+    description: "Potong video jadi per 60 detik otomatis",
+    execute: async ({ m, sock, getFile, reply }) => {
+        const quoted = m.quoted ? m.quoted : m;
+        if (!quoted.isMedia || !quoted.type.includes("video")) {
+            return reply("❌ Kirim atau reply video yang mau dipotong cuy.");
+        }
 
-        await m.reply("⏳ Otw potongin videonya, sabar yak...");
+        await reply("⏳ Chill, lagi diproses nih...");
 
         const buffer = await getFile();
-        if (!buffer) return m.reply("Gagal download videonya, coba lagi.");
+        if (!buffer) return reply("❌ Gagal download videonya.");
 
-        const tempInput = path.join(tmpdir(), `input_${Date.now()}.mp4`);
-        fs.writeFileSync(tempInput, buffer);
+        const tempDir = "./temp_split";
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
-        const getDuration = (filePath) => {
-            return new Promise((resolve, reject) => {
-                ffmpeg.ffprobe(filePath, (err, metadata) => {
-                    if (err) reject(err);
-                    else resolve(metadata.format.duration);
-                });
-            });
-        };
+        const inputPath = path.join(tempDir, `input_${Date.now()}.mp4`);
+        fs.writeFileSync(inputPath, buffer);
 
         try {
-            const duration = await getDuration(tempInput);
-            const partDuration = 60; 
-            const totalParts = Math.ceil(duration / partDuration);
+            const totalDuration = await getDuration(inputPath);
+            const chunkDuration = 60; 
+            const totalChunks = Math.ceil(totalDuration / chunkDuration);
 
-            if (totalParts <= 1) {
-                fs.unlinkSync(tempInput);
-                return m.reply("Videonya kurang dari 60 detik, ngapain dipotong? 🗿");
+            if (totalChunks <= 1) {
+                fs.unlinkSync(inputPath);
+                return reply("⚠️ Videonya kurang dari 60 detik, ngapain dipotong kocak.");
             }
 
-            await m.reply(`✂️ Video durasi ${Math.floor(duration)}s bakal dibagi jadi ${totalParts} part.`);
+            for (let i = 0; i < totalChunks; i++) {
+                const startTime = i * chunkDuration;
+                const outputPath = path.join(tempDir, `chunk_${Date.now()}_${i}.mp4`);
 
-            for (let i = 0; i < totalParts; i++) {
-                const tempOutput = path.join(tmpdir(), `output_${Date.now()}_part${i + 1}.mp4`);
-                
-                await new Promise((resolve, reject) => {
-                    ffmpeg(tempInput)
-                        .setStartTime(i * partDuration)
-                        .setDuration(partDuration)
-                        .output(tempOutput)
-                        .on("end", resolve)
-                        .on("error", reject)
-                        .run();
-                });
+                await splitChunk(inputPath, startTime, chunkDuration, outputPath);
 
-                await sock.sendMessage(chat, { 
-                    video: { url: tempOutput }, 
-                    caption: `Part ${i + 1}/${totalParts} ✅` 
+                await sock.sendMessage(m.chat, {
+                    video: fs.readFileSync(outputPath),
+                    caption: `✂️ Part ${i + 1}/${totalChunks}`,
+                    mimetype: "video/mp4"
                 }, { quoted: m });
 
-                fs.unlinkSync(tempOutput);
+                fs.unlinkSync(outputPath);
             }
 
-            fs.unlinkSync(tempInput);
-            m.reply("Done semua wir! 😎");
-
+            fs.unlinkSync(inputPath);
+            
         } catch (e) {
-            if (fs.existsSync(tempInput)) fs.unlinkSync(tempInput);
+            if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
             console.error(e);
-            m.reply("Yah error pas motong video. Cek console deh.");
+            reply(`❌ Error pas motong video: ${e.message}`);
         }
     }
 };
