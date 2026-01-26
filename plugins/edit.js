@@ -1,91 +1,143 @@
-import axios from 'axios';
-import FormData from 'form-data';
+import axios from "axios";
+import FormData from "form-data";
+import { fileTypeFromBuffer } from "file-type";
+
+// Konfigurasi API
+const CONFIG = {
+    bypassUrl: "https://api.nekolabs.web.id/tools/bypass/cf-turnstile",
+    siteKey: "0x4AAAAAACLCCZe3S9swHyiM",
+    targetUrl: "https://photoeditorai.io",
+    createUrl: "https://api.photoeditorai.io/pe/photo-editor/create-job-v2",
+    jobUrl: "https://api.photoeditorai.io/pe/photo-editor/get-job/"
+};
+
+const HEADERS = {
+    "product-serial": "367c957aa6b1ffb6cf7107c247f552e9",
+    "user-agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36",
+    "origin": "https://photoeditorai.io",
+    "referer": "https://photoeditorai.io/"
+};
 
 export default {
-    execute: async ({ sock, m, text, reply, getFile }) => {
-        // Cek prompt
-        if (!text) {
-            return reply(`Kasih prompt-nya dong ngab. Mau diedit jadi apa?\n\nContoh: *!nanobanana become anime style*`);
-        }
-
-        // Ambil media (support reply atau kirim langsung)
-        const mediaBuffer = await getFile();
-        if (!mediaBuffer) {
-            return reply("Gambarnya mana wir? Kirim atau reply foto terus kasih caption command-nya. 🍌");
-        }
-
-        await reply("Bentar ye, lagi dimasak sama AI-nya... 🍳");
-
+    execute: async ({ sock, m, text, getFile, reply }) => {
         try {
-            // Setup Form Data
-            const formData = new FormData();
-            formData.append('target_images', mediaBuffer, { filename: 'image.jpg', contentType: 'image/jpeg' });
-            formData.append('prompt', text);
-
-            const headers = {
-                'product-serial': 'rvgaeg',
-                'product-code': '067003',
-                'sec-ch-ua-platform': '"Android"',
-                'sec-ch-ua-mobile': '?1',
-                ...formData.getHeaders()
-            };
-
-            // Request Create Job
-            const { data: createData } = await axios.post(
-                'https://api.unwatermark.ai/api/web/v1/photo-editor-nano-banana/create-job',
-                formData,
-                { headers }
-            );
-
-            if (createData.code !== 300000 || !createData.result?.job_id) {
-                return reply("Duh, gagal bikin job ID-nya. Coba gambar lain atau prompt yang lebih simpel.");
+            // Validasi prompt
+            if (!text) {
+                return reply("❌ Masukkan prompt!\n\nContoh:\n.nanobananapro <prompt>");
             }
 
-            const jobId = createData.result.job_id;
-            let resultUrl = null;
-            let attempts = 0;
-
-            // Polling status (max 40x percobaan @ 2 detik)
-            while (attempts < 40) {
-                await new Promise(r => setTimeout(r, 2000));
-
-                const { data: checkData } = await axios.get(
-                    `https://api.unwatermark.ai/api/web/v1/photo-editor-nano-banana/get-job/${jobId}`,
-                    {
-                        headers: {
-                            'product-serial': 'rvgaeg',
-                            'product-code': '067003',
-                            'sec-ch-ua-platform': '"Android"',
-                            'sec-ch-ua-mobile': '?1'
-                        }
-                    }
-                );
-
-                // Cek output
-                if (checkData.result?.output_url) {
-                    resultUrl = checkData.result.output_url;
-                    break;
-                } else if (checkData.code !== 300006) {
-                    // Kalau codenya bukan 'processing' (300006), berarti error
-                    throw new Error(checkData.msg || "Unknown error saat processing");
-                }
-                attempts++;
+            // Validasi media
+            const buffer = await getFile();
+            if (!buffer) {
+                return reply("❌ Harap reply atau kirim gambar dengan caption.");
             }
 
-            if (!resultUrl) {
-                return reply("Lama banget anjir, timeout. Server AI-nya lagi sibuk kayaknya.");
+            // Cek tipe file
+            const fileType = await fileTypeFromBuffer(buffer);
+            if (!fileType || !fileType.mime.startsWith("image/")) {
+                return reply("❌ Hanya support format gambar.");
             }
+
+            await reply("⏳ Sedang memproses gambar dengan AI...");
+
+            // Proses AI
+            const resultBuffer = await processImage(buffer, fileType.mime, text);
 
             // Kirim hasil
-            await sock.sendMessage(m.chat, {
-                image: { url: resultUrl },
-                caption: `✅ *Nih Hasilnya!* 🍌\nPrompt: ${text}`
+            await sock.sendMessage(m.chat, { 
+                image: resultBuffer, 
+                caption: `🎨 *Prompt:* ${text}` 
             }, { quoted: m });
 
         } catch (error) {
             console.error(error);
-            const errMsg = error.response?.data ? JSON.stringify(error.response.data, null, 2) : error.message;
-            await reply(`❌ *Error nih:*\n${errMsg}`);
+            await reply(typeof error === 'string' ? error : `❌ Terjadi kesalahan: ${error.message}`);
         }
     }
 };
+
+// --- Helper Functions ---
+
+async function processImage(buffer, mime, prompt) {
+    try {
+        const token = await getTurnstileToken();
+        const jobId = await createJob(buffer, mime, prompt, token);
+        const imageUrl = await pollJobResult(jobId);
+        
+        const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+        return Buffer.from(response.data);
+    } catch (e) {
+        throw e;
+    }
+}
+
+async function getTurnstileToken() {
+    try {
+        const { data } = await axios.get(CONFIG.bypassUrl, {
+            params: {
+                url: CONFIG.targetUrl,
+                siteKey: CONFIG.siteKey
+            }
+        });
+        
+        if (!data.success) throw new Error("Gagal bypass keamanan (Turnstile)");
+        return data.result;
+    } catch (e) {
+        throw new Error(`Bypass Error: ${e.message}`);
+    }
+}
+
+async function createJob(buffer, mime, prompt, token) {
+    try {
+        const form = new FormData();
+        form.append("model_name", "nano_banana_pro");
+        form.append("turnstile_token", token);
+        form.append("target_images", buffer, { 
+            filename: "image.jpg", 
+            contentType: mime 
+        });
+        form.append("prompt", prompt);
+        form.append("ratio", "match_input_image");
+        form.append("image_resolution", "1K");
+
+        const { data } = await axios.post(CONFIG.createUrl, form, {
+            headers: {
+                ...HEADERS,
+                ...form.getHeaders()
+            }
+        });
+
+        if (data.code !== 100000) {
+            throw new Error(data.message || "Gagal membuat job AI");
+        }
+        
+        return data.result.job_id;
+    } catch (e) {
+        throw e;
+    }
+}
+
+async function pollJobResult(jobId) {
+    const maxAttempts = 50; // Max waktu tunggu sekitar 1.5 menit
+    
+    for (let i = 0; i < maxAttempts; i++) {
+        await new Promise(r => setTimeout(r, 2000)); // Delay 2 detik
+        
+        try {
+            const { data } = await axios.get(`${CONFIG.jobUrl}${jobId}`, { headers: HEADERS });
+            
+            if (data.code !== 100000) throw new Error(data.message);
+            if (data.result.error) throw new Error(data.result.error);
+            
+            // Cek status sukses (biasanya status 2)
+            if (data.result.status === 2 && data.result.output?.length > 0) {
+                return data.result.output[0];
+            }
+        } catch (e) {
+            // Lanjut polling jika error network sesaat, tapi throw jika error API fatal
+            if (e.message.includes("404") || e.message.includes("403")) throw e;
+        }
+    }
+    
+    throw new Error("Timeout: Proses AI terlalu lama.");
+}
