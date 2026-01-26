@@ -58,7 +58,7 @@ async function createTask(prompt, imageUrl) {
 }
 
 async function checkStatus(taskId, prompt) {
-    const maxAttempts = 60; // 60 x 3 detik = 3 menit timeout
+    const maxAttempts = 120;
     
     for (let i = 0; i < maxAttempts; i++) {
         await new Promise(resolve => setTimeout(resolve, 3000));
