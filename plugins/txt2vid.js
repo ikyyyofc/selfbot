@@ -38,7 +38,7 @@ async function createTask(prompt, imageUrl) {
         const payload = {
             prompt,
             image_urls: [imageUrl],
-            aspect_ratio: 'portrait', // Bisa diubah: '16:9', '9:16', '1:1'
+            aspect_ratio: 'portrait',
             n_frames: '10',
             remove_watermark: true
         };
@@ -58,11 +58,9 @@ async function createTask(prompt, imageUrl) {
 }
 
 async function checkStatus(taskId, prompt) {
-    const maxAttempts = 120;
-    
-    for (let i = 0; i < maxAttempts; i++) {
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        
+    while (true) {
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Delay 5 detik biar ga spam
+
         try {
             const { data } = await axios.get(`${API_BASE}/sora2/image-to-video/task/${taskId}`, {
                 params: {
@@ -77,24 +75,24 @@ async function checkStatus(taskId, prompt) {
             } else if (data.status === 'failed') {
                 throw new Error(data.provider_raw?.data?.failMsg || 'Generasi gagal di server');
             }
-            // Jika status 'processing' atau 'pending', lanjut loop
+            
+            // Status processing/pending -> lanjut loop forever
         } catch (e) {
-            // Jika error network, lanjut loop sebentar, kalau fatal throw
+            // Error network -> lanjut coba lagi
             if (e.message.includes('Generasi gagal')) throw e;
+            console.log('Sora polling error (retrying):', e.message);
         }
     }
-    throw new Error('Waktu habis (Timeout)');
 }
 
-// --- Main Plugin ---
+// --- Plugin Definition ---
 
 export default {
     name: 'sora',
     type: 'ai',
-    description: 'Generate video dari gambar menggunakan Sora 2 AI',
-    
+    description: 'Generate video dari gambar (Sora 2 - No Timeout)',
+
     execute: async ({ m, sock, text, reply, getFile }) => {
-        // 1. Validasi Input
         const q = m.quoted ? m.quoted : m;
         const mime = (q.msg || q).mimetype || '';
         const isImage = /image/.test(mime);
@@ -103,37 +101,30 @@ export default {
             return reply(`❌ *Format Salah!*\nKirim/Reply gambar dengan caption:\n*.sora <prompt>*`);
         }
         if (!text) {
-            return reply(`❌ *Prompt Kosong!*\nMasukkan deskripsi video yang diinginkan.\nContoh: *.sora walking in the rain*`);
+            return reply(`❌ *Prompt Kosong!*\nMasukkan deskripsi video.\nContoh: *.sora walking under neon lights*`);
         }
 
-        await reply(`🤖 *SORA 2 AI*\n\n⏳ _Sedang mengunggah media & memproses video..._\n_Estimasi: 1-2 Menit_`);
+        await reply(`🤖 *SORA 2 AI*\n\n⏳ _Mengunggah & Memproses (No Timeout Mode)..._`);
 
         try {
-            // 2. Download Media
             const buffer = await getFile();
-            if (!buffer) return reply('❌ Gagal mengunduh gambar.');
+            if (!buffer) return reply('❌ Gagal download gambar.');
 
-            // 3. Upload ke Server Nanobana
             const imageUrl = await uploadToNanobana(buffer);
-            
-            // 4. Buat Task Generasi
             const taskId = await createTask(text, imageUrl);
-            
-            // 5. Polling Status sampai selesai
             const videoUrl = await checkStatus(taskId, text);
 
-            if (!videoUrl) throw new Error('Url video tidak ditemukan');
+            if (!videoUrl) throw new Error('Url video null');
 
-            // 6. Kirim Hasil
             await sock.sendMessage(m.chat, {
                 video: { url: videoUrl },
-                caption: `✅ *Generate Success!*\n\n📝 *Prompt:* ${text}\n🤖 *Model:* Sora 2 (Img2Vid)`,
+                caption: `✅ *Generate Success!*\n\n📝 *Prompt:* ${text}\n🤖 *Model:* Sora 2`,
                 gifPlayback: false
             }, { quoted: m });
 
         } catch (error) {
             console.error('Sora Error:', error);
-            await reply(`❌ *Terjadi Kesalahan:*\n${error.message}`);
+            await reply(`❌ *Error:* ${error.message}`);
         }
     }
 };
