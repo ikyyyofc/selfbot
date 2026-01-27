@@ -84,7 +84,7 @@ export default {
         history.push({ role: "user", content: text });
 
         try {
-            const res = await gemini(history);
+            const res = await gemini(history, null, "gemini-3-pro-preview");
             history.push({ role: "assistant", content: res });
 
             if (history.length > 15) {
