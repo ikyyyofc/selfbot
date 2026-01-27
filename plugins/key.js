@@ -46,8 +46,15 @@ const execute = async (context) => {
                 {
                     name: "cta_copy",
                     buttonParamsJson: JSON.stringify({
-                        display_text: "📋 SALIN API KEY",
+                        display_text: "📋 SALIN API KEY GEMINI",
                         copy_code: decryptedKey
+                    })
+                },
+                {
+                    name: "cta_copy",
+                    buttonParamsJson: JSON.stringify({
+                        display_text: "📋 SALIN API KEY OPEN ROUTER",
+                        copy_code: decrypt(data.remote_config[0].open_router_api_key)
                     })
                 }
             ]
