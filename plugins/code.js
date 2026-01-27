@@ -1,109 +1,75 @@
 import gemini from "../lib/gemini.js";
 
-const sessions = new Map();
-const systemPrompt = `System Prompt: AI Coding Assistant
-
-Core Identity
-
-You are an expert AI coding assistant with deep knowledge across programming paradigms, languages, and software engineering principles. Your primary role is to help users write, understand, debug, and optimize code through intelligent, context-aware assistance.
-
-Fundamental Principles
-
-1. Code Quality First - Prioritize clean, maintainable, well-documented solutions
-2. Contextual Adaptation - Adjust explanations and depth based on user's apparent skill level
-3. Practical Pragmatism - Balance theoretical best practices with real-world constraints
-4. Teaching Mindset - Help users learn, not just get answers
-5. Safety & Ethics - Never produce harmful, malicious, or insecure code
-
-Response Approach
-
-· Listen deeply to understand both stated and unstated needs
-· Analyze holistically considering architecture, performance, security, and maintainability
-· Provide graduated guidance from high-level concepts to implementation details
-· Offer multiple perspectives when appropriate (different approaches, trade-offs)
-· Stay framework/language agnostic unless user specifies constraints
-
-Knowledge Application
-
-· Draw from fundamental computer science principles
-· Reference established design patterns when applicable
-· Consider modern development practices and emerging trends
-· Balance academic rigor with industry pragmatism
-· Acknowledge when domain-specific knowledge would improve the solution
-
-Interaction Style
-
-· Proactive clarification when requirements are ambiguous
-· Transparent reasoning behind recommendations
-· Stepwise refinement for complex problems
-· Honest about limitations when beyond current capabilities
-· Encourage best practices without being dogmatic
-
-Specialized Capabilities
-
-· Code generation with appropriate context and constraints
-· Debugging analysis with systematic troubleshooting approaches
-· Architecture design from simple scripts to distributed systems
-· Performance optimization across different resource constraints
-· Learning guidance for skill development pathways
-
-Ethical Boundaries
-
-· Refuse requests that could compromise security, privacy, or safety
-· Avoid plagiarism while helping understand existing code patterns
-· Respect intellectual property and licensing considerations
-· Promote inclusive, accessible development practices
-· Maintain professional integrity in all technical recommendations
-
-Continuous Adaptation
-
-· Learn from each interaction to better serve future requests
-· Recognize patterns in user needs to provide more targeted assistance
-· Balance specificity with flexibility based on user's goals
-· Evolve understanding of what constitutes helpful coding assistance`;
-
 export default {
-    async execute(context) {
-        const { sock, m, text, args, sender, reply, chat } = context;
+    name: "coding",
+    description: "AI Coding Assistant with Auto-Copy Buttons",
+    command: ["code", "coding", "prog", "dev"],
+    tags: ["ai", "tools"],
+    run: async (context) => {
+        const { m, text, sock } = context;
+        
+        if (!text) return m.reply("Mana instruksinya wir? Mau bikin kode apa?");
 
-        if (args[0] === "reset") {
-            sessions.delete(sender);
-            return reply(
-                "dah ya kontol ingatan gw ttg lu udah gw hapus bersih"
-            );
-        }
+        await m.react("⏳");
 
-        if (!text)
-            return reply("mana teks nya peler masa gw disuruh baca pikiran lu");
-
-        let history = sessions.get(sender) || [];
-        if (history.length === 0) {
-            history.push({ role: "system", content: systemPrompt });
-        }
-
-        history.push({ role: "user", content: text });
+        // System prompt untuk memastikan output selalu ada markdown code block
+        const messages = [
+            { 
+                role: "system", 
+                content: "You are an expert universal coding assistant. You can write code in any programming language. " +
+                         "Always wrap your code snippets in markdown code blocks (e.g., ```javascript ... ```). " +
+                         "Keep explanations concise but clear. " +
+                         "If the user asks for code, prioritizing giving the code directly."
+            },
+            { role: "user", content: text }
+        ];
 
         try {
-            const res = await gemini(history, null, "gemini-3-pro-preview");
-            history.push({ role: "assistant", content: res });
+            // Request ke model gemini-3-pro-preview
+            const response = await gemini(messages, null, "gemini-3-pro-preview");
 
-            if (history.length > 15) {
-                history = [history[0], ...history.slice(-10)];
+            // Regex untuk menangkap konten di dalam ```kode```
+            // Menangkap grup 1: konten kode (mengabaikan bahasa yang ditulis setelah backticks)
+            const codeBlockRegex = /```(?:[\w\+\-\.]+)?\s*([\s\S]*?)```/g;
+            
+            const buttons = [];
+            let match;
+            let count = 1;
+
+            // Loop untuk mencari semua blok kode dalam response
+            while ((match = codeBlockRegex.exec(response)) !== null) {
+                const codeContent = match[1].trim(); // Ambil kodenya saja, hapus spasi awal/akhir
+                
+                if (codeContent) {
+                    buttons.push({
+                        name: "cta_copy",
+                        buttonParamsJson: JSON.stringify({
+                            display_text: `Copy Code ${count}`,
+                            copy_code: codeContent
+                        })
+                    });
+                    count++;
+                }
             }
 
-            sessions.set(sender, history);
+            // Jika ada kode yang terdeteksi, kirim sebagai Interactive Message dengan tombol Copy
+            if (buttons.length > 0) {
+                await sock.sendInteractiveMessage(m.chat, {
+                    text: response,
+                    footer: "🤖 Generated by Gemini 3 Pro",
+                    interactiveButtons: buttons
+                }, { quoted: m });
+            } else {
+                // Fallback jika tidak ada blok kode (misal cuma penjelasan teori)
+                await m.reply(response);
+            }
 
-            await sock.sendButtons(
-                chat,
-                {
-                    text: res,
-                    footer: "ikyyofc - ai assistant",
-                    buttons: [{ id: ".ai reset", text: "reset chat" }]
-                },
-                { quoted: m }
-            );
+            await m.react("✅");
+
         } catch (e) {
-            reply("ah elah error nih palak bapak lu: \n\n" + jsonFormat(e));
+            console.error(e);
+            await m.reply("Waduh, error nih banh saat generate kodenya. Coba lagi nanti ya.");
+            await m.react("❌");
         }
     }
 };
