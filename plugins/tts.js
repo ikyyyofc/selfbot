@@ -41,7 +41,7 @@ async function getApiKey() {
 const CONFIG = {
     BASE_URL: "https://generativelanguage.googleapis.com/v1beta/models/",
     // Menggunakan gemini-2.0-flash-exp yang support native audio generation
-    DEFAULT_MODEL: "gemini-2.5-pro-preview-tts", 
+    DEFAULT_MODEL: "gemini-2.5-flash-preview-tts", 
     HEADERS: {
         "User-Agent": "okhttp/5.3.2",
         "Accept-Encoding": "gzip",
