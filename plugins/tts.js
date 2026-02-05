@@ -95,7 +95,7 @@ async function tts(text, { model = CONFIG.DEFAULT_MODEL } = {}) {
             speechConfig: {
                 voiceConfig: {
                     prebuiltVoiceConfig: {
-                        voiceName: "Aoede" // Voice profile Gemini (Puck, Charon, Kore, Fenrir, Aoede)
+                        voiceName: "Leda" // Voice profile Gemini (Puck, Charon, Kore, Fenrir, Aoede)
                     }
                 }
             },
